@@ -1,0 +1,36 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: booking-service
+
+  datasource:
+    url: jdbc:h2:mem:bookingdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    show-sql: false
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+
+logging:
+  level:
+    com.hotelbooking: INFO
+
+app:
+  jwt:
+    issuer: hotel-booking
+    access-token-ttl: PT1H
+    keystore:
+      path: ${JWT_KEYSTORE_PATH}
+      password: ${JWT_KEYSTORE_PASSWORD}
+      alias: jwt-signing

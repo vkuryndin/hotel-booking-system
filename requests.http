@@ -1,0 +1,119 @@
+@baseUrl = http://localhost:8080
+
+### Register user
+POST {{baseUrl}}/api/users/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "MyPassword123"
+}
+
+### Register duplicate user - expected 409
+POST {{baseUrl}}/api/users/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "MyPassword123"
+}
+
+### Register with invalid email - expected 400
+POST {{baseUrl}}/api/users/register
+Content-Type: application/json
+
+{
+  "email": "invalid-email",
+  "password": "MyPassword123"
+}
+
+### Login
+POST {{baseUrl}}/api/users/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "MyPassword123"
+}
+
+> {%
+    client.global.set("accessToken", response.body.accessToken);
+%}
+
+
+### Create hotel without JWT — expected 401
+POST {{baseUrl}}/api/hotels
+Content-Type: application/json
+
+{
+  "name": "Test Hotel",
+  "address": "Yerevan, Armenia"
+}
+
+### Create hotel as USER — expected 403
+POST {{baseUrl}}/api/hotels
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Test Hotel",
+  "address": "Yerevan, Armenia"
+}
+
+### Login as ADMIN
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "admin@hotelbooking.com",
+  "password": "Gefsbizd19!"
+}
+
+> {%
+    client.global.set("adminToken", response.body.accessToken);
+%}
+
+# should be redone everytime i restart hotelservice
+
+### Create hotel as ADMIN — expected 201
+POST {{baseUrl}}/api/hotels
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "Ararat Hotel",
+  "address": "Yerevan, Armenia"
+}
+
+### Create room as ADMIN
+POST {{baseUrl}}/api/rooms
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "hotelId": 1,
+  "number": "101"
+}
+
+### Duplicate room — expected 409
+POST {{baseUrl}}/api/rooms
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "hotelId": 1,
+  "number": "101"
+}
+
+### Create room in non-existing hotel — expected 404
+POST {{baseUrl}}/api/rooms
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "hotelId": 999999,
+  "number": "202"
+}
+
+### Get rooms by hotel — no JWT required
+GET {{baseUrl}}/api/rooms?hotelId=1
