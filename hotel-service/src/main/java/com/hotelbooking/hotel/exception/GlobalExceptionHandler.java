@@ -111,6 +111,24 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(RoomNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRoomNotFound(
+            RoomNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                new ErrorResponse(
+                        Instant.now(),
+                        404,
+                        "ROOM_NOT_FOUND",
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        null,
+                        null
+                )
+        );
+    }
+
     private ResponseEntity<ErrorResponse> buildError(
             HttpStatus status,
             String code,

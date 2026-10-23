@@ -1,5 +1,6 @@
 package com.hotelbooking.hotel.service;
 
+import com.hotelbooking.hotel.dto.request.RoomAvailabilityRequest;
 import com.hotelbooking.hotel.dto.request.RoomRequest;
 import com.hotelbooking.hotel.dto.response.RoomResponse;
 import com.hotelbooking.hotel.entity.Hotel;
@@ -72,4 +73,29 @@ public class RoomService {
 
         return roomMapper.toResponse(room);
     }
+    @Transactional
+    public RoomResponse updateAvailability(
+            Long roomId,
+            RoomAvailabilityRequest request
+    ) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new RoomNotFoundException(roomId));
+
+        room.setAvailable(request.available());
+
+        return roomMapper.toResponse(room);
+    }
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getAvailableRoomsByHotelId(Long hotelId) {
+
+        if (!hotelRepository.existsById(hotelId)) {
+            throw new HotelNotFoundException(hotelId);
+        }
+
+        return roomRepository.findByHotelIdAndAvailableTrue(hotelId)
+                .stream()
+                .map(roomMapper::toResponse)
+                .toList();
+    }
+
 }

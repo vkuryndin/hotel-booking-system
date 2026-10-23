@@ -92,7 +92,7 @@ Authorization: Bearer {{adminToken}}
 
 {
   "hotelId": 1,
-  "number": "101"
+  "number": "102"
 }
 
 ### Duplicate room — expected 409
@@ -117,3 +117,21 @@ Authorization: Bearer {{adminToken}}
 
 ### Get rooms by hotel — no JWT required
 GET {{baseUrl}}/api/rooms?hotelId=1
+
+### Получить номер по ID — ожидаем 200
+GET {{baseUrl}}/api/rooms/1
+
+### Получить несуществующий номер — ожидаем 404
+GET {{baseUrl}}/api/rooms/999999
+
+### Отключить номер — ожидаем 200
+PATCH {{baseUrl}}/api/rooms/1/availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "available": false
+}
+
+### Получить доступные номера — ожидаем 200
+GET {{baseUrl}}/api/rooms/available?hotelId=1

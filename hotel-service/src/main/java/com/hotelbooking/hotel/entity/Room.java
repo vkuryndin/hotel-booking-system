@@ -64,4 +64,8 @@ public class Room {
     public void incrementTimesBooked() {
         this.timesBooked++;
     }
+
+    public void setAvailable(boolean available) {
+        this.available = available;
+    }
 }
