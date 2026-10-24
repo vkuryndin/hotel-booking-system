@@ -3,6 +3,7 @@ package com.hotelbooking.hotel.service;
 import com.hotelbooking.hotel.dto.request.HotelRequest;
 import com.hotelbooking.hotel.dto.response.HotelResponse;
 import com.hotelbooking.hotel.entity.Hotel;
+import com.hotelbooking.hotel.exception.HotelAlreadyExistsException;
 import com.hotelbooking.hotel.mapper.HotelMapper;
 import com.hotelbooking.hotel.repository.HotelRepository;
 
@@ -35,7 +36,15 @@ public class HotelService {
                 request.name(),
                 request.address()
         );
+        if (hotelRepository.existsByNameIgnoreCaseAndAddressIgnoreCase(
+                request.name().trim(),
+                request.address().trim())) {
 
+            throw new HotelAlreadyExistsException(
+                    request.name(),
+                    request.address()
+            );
+        }
         Hotel savedHotel = hotelRepository.save(hotel);
 
         log.info("Hotel created: id={}, name={}",

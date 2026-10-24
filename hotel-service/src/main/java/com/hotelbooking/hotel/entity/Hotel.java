@@ -3,7 +3,12 @@ package com.hotelbooking.hotel.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "hotels")
+@Table(
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_hotel_name_address",
+                columnNames = {"name", "address"}
+        )
+)
 public class Hotel {
 
     @Id

@@ -143,12 +143,12 @@ Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
-  "roomId": 1,
+  "roomId":3,
   "checkIn": "2026-12-10",
   "checkOut": "2026-12-13"
 }
 
-### Создание бронирования
+### возврат номера в available
 PATCH {{baseUrl}}/api/rooms/1/availability
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
@@ -156,3 +156,43 @@ Content-Type: application/json
 {
   "available": true
 }
+
+### Мои бронирования
+GET {{baseUrl}}/api/bookings/my
+Authorization: Bearer {{adminToken}}
+
+### Получить бронирование по ID
+GET {{baseUrl}}/api/bookings/1
+Authorization: Bearer {{adminToken}}
+
+### Попытка получить чужое бронирование
+GET {{baseUrl}}/api/bookings/1
+Authorization: Bearer {{accessToken}}
+
+### попытка получить бронирования без авторизации
+GET {{baseUrl}}/api/bookings/my
+
+### Подтвердить бронирование
+PATCH {{baseUrl}}/api/bookings/1/confirm
+Authorization: Bearer {{adminToken}}
+
+### Отменить бронирование
+PATCH {{baseUrl}}/api/bookings/1/cancel
+Authorization: Bearer {{adminToken}}
+
+### Все бронирования (ADMIN)
+GET {{baseUrl}}/api/bookings?page=0&size=10
+Authorization: Bearer {{adminToken}}
+
+
+### Все бронирования
+GET {{baseUrl}}/api/bookings?page=0&size=10
+Authorization: Bearer {{adminToken}}
+
+### Только ожидающие подтверждения
+GET {{baseUrl}}/api/bookings?status=PENDING&page=0&size=10
+Authorization: Bearer {{adminToken}}
+
+### Только подтверждённые
+GET {{baseUrl}}/api/bookings?status=CONFIRMED
+Authorization: Bearer {{adminToken}}
