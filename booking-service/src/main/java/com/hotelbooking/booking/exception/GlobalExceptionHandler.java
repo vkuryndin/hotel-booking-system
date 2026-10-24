@@ -101,4 +101,62 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(status).body(response);
     }
+    @ExceptionHandler(RoomNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRoomNotFound(
+            RoomNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                new ErrorResponse(
+                        Instant.now(), 404, "ROOM_NOT_FOUND",
+                        ex.getMessage(), request.getRequestURI(),
+                        null, null
+                )
+        );
+    }
+
+    @ExceptionHandler(RoomUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleRoomUnavailable(
+            RoomUnavailableException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new ErrorResponse(
+                        Instant.now(), 409, "ROOM_UNAVAILABLE",
+                        ex.getMessage(), request.getRequestURI(),
+                        null, null
+                )
+        );
+    }
+
+    @ExceptionHandler(HotelServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleHotelServiceUnavailable(
+            HotelServiceUnavailableException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+                new ErrorResponse(
+                        Instant.now(), 503, "HOTEL_SERVICE_UNAVAILABLE",
+                        ex.getMessage(), request.getRequestURI(),
+                        null, null
+                )
+        );
+    }
+    @ExceptionHandler(RoomAlreadyBookedException.class)
+    public ResponseEntity<ErrorResponse> handleRoomAlreadyBooked(
+            RoomAlreadyBookedException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new ErrorResponse(
+                        Instant.now(),
+                        409,
+                        "ROOM_ALREADY_BOOKED",
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        null,
+                        null
+                )
+        );
+    }
 }

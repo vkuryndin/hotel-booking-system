@@ -135,3 +135,24 @@ Content-Type: application/json
 
 ### Получить доступные номера — ожидаем 200
 GET {{baseUrl}}/api/rooms/available?hotelId=1
+
+
+### Создание бронирования
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2026-12-10",
+  "checkOut": "2026-12-13"
+}
+
+### Создание бронирования
+PATCH {{baseUrl}}/api/rooms/1/availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "available": true
+}
