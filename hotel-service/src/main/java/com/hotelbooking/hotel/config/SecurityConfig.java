@@ -45,6 +45,11 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/rooms/{id}/confirm-availability",
+                                "/api/rooms/{id}/release"
+                        ).hasRole("SERVICE")
                         .anyRequest().hasRole("ADMIN")
                 )
                 .exceptionHandling(ex -> ex

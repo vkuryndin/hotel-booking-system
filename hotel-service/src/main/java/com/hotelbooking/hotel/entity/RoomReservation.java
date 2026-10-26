@@ -1,0 +1,75 @@
+package com.hotelbooking.hotel.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Entity
+@Table(name = "room_reservations")
+public class RoomReservation {
+
+    @Id
+    private UUID reservationId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "room_id", nullable = false)
+    private Room room;
+
+    private LocalDate checkIn;
+    private LocalDate checkOut;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReservationStatus status;
+
+    @Version
+    private Long version;
+
+    protected RoomReservation() {
+    }
+
+    public RoomReservation(
+            UUID reservationId,
+            Room room,
+            LocalDate checkIn,
+            LocalDate checkOut
+    ) {
+        this.reservationId = reservationId;
+        this.room = room;
+        this.checkIn = checkIn;
+        this.checkOut = checkOut;
+        this.status = ReservationStatus.RESERVED;
+    }
+
+    public static RoomReservation released(UUID reservationId, Room room) {
+        RoomReservation reservation = new RoomReservation();
+        reservation.reservationId = reservationId;
+        reservation.room = room;
+        reservation.status = ReservationStatus.RELEASED;
+        return reservation;
+    }
+
+    public void release() {
+        this.status = ReservationStatus.RELEASED;
+    }
+
+    public UUID getReservationId() {
+        return reservationId;
+    }
+
+    public Room getRoom() {
+        return room;
+    }
+
+    public LocalDate getCheckIn() {
+        return checkIn;
+    }
+
+    public LocalDate getCheckOut() {
+        return checkOut;
+    }
+
+    public ReservationStatus getStatus() {
+        return status;
+    }
+}

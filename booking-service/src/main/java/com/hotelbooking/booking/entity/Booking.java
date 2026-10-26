@@ -3,6 +3,7 @@ package com.hotelbooking.booking.entity;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 @Table(name = "bookings", indexes = {
@@ -37,6 +38,9 @@ public class Booking {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "reservation_id", nullable = false, unique = true, updatable = false)
+    private UUID reservationId;
+
     protected Booking() {
     }
 
@@ -46,6 +50,7 @@ public class Booking {
         this.roomId = roomId;
         this.checkIn = checkIn;
         this.checkOut = checkOut;
+        this.reservationId = UUID.randomUUID();
     }
 
     @PrePersist
@@ -74,5 +79,8 @@ public class Booking {
             return;
         }
         status = BookingStatus.CANCELLED;
+    }
+    public UUID getReservationId() {
+        return reservationId;
     }
 }

@@ -13,6 +13,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.ResponseEntity;
+import java.util.Locale;
+
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -165,5 +169,55 @@ public class GlobalExceptionHandler {
                 null
         );
     }
+    @ExceptionHandler(RoomReservationConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleRoomReservationConflict(
+            RoomReservationConflictException ex,
+            HttpServletRequest request
+    ) {
+        return new ErrorResponse(
+                Instant.now(),
+                409,
+                "ROOM_RESERVATION_CONFLICT",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                null
+        );
+    }
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(
+            DataIntegrityViolationException ex,
+            HttpServletRequest request
+    ) {
+        boolean nightConflict = false;
 
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException c
+                    && c.getConstraintName() != null
+                    && c.getConstraintName().toLowerCase(Locale.ROOT)
+                    .contains("uk_room_night")) {
+                nightConflict = true;
+                break;
+            }
+        }
+
+        HttpStatus status = nightConflict
+                ? HttpStatus.CONFLICT
+                : HttpStatus.INTERNAL_SERVER_ERROR;
+
+        return ResponseEntity.status(status).body(
+                new ErrorResponse(
+                        Instant.now(),
+                        status.value(),
+                        nightConflict ? "ROOM_RESERVATION_CONFLICT" : "DATA_INTEGRITY_ERROR",
+                        nightConflict
+                                ? "Room is already booked for selected dates"
+                                : "Database integrity constraint violated",
+                        request.getRequestURI(),
+                        null,
+                        null
+                )
+        );
+    }
 }

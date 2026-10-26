@@ -92,7 +92,7 @@ Authorization: Bearer {{adminToken}}
 
 {
   "hotelId": 1,
-  "number": "102"
+  "number": "101"
 }
 
 ### Duplicate room — expected 409
@@ -143,7 +143,7 @@ Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {
-  "roomId":3,
+  "roomId":1,
   "checkIn": "2026-12-10",
   "checkOut": "2026-12-13"
 }
@@ -196,3 +196,24 @@ Authorization: Bearer {{adminToken}}
 ### Только подтверждённые
 GET {{baseUrl}}/api/bookings?status=CONFIRMED
 Authorization: Bearer {{adminToken}}
+
+
+### Резервирование номера
+POST {{baseUrl}}/api/rooms/1/confirm-availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "reservationId": "123e4567-e89b-42d3-a456-426614174000",
+  "checkIn": "2026-12-20",
+  "checkOut": "2026-12-23"
+}
+
+### Освобождение резервирования
+POST {{baseUrl}}/api/rooms/1/release
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "reservationId": "123e4567-e89b-42d3-a456-426614174000"
+}

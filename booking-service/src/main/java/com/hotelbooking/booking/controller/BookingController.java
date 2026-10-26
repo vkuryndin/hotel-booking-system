@@ -58,16 +58,7 @@ public class BookingController {
 
         return bookingService.getBookingById(id, userId, isAdmin);
     }
-    @PatchMapping("/{id}/confirm")
-    public BookingResponse confirmBooking(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long userId = Long.valueOf(jwt.getSubject());
-        boolean isAdmin = "ADMIN".equals(jwt.getClaimAsString("role"));
 
-        return bookingService.confirmBooking(id, userId, isAdmin);
-    }
     @PatchMapping("/{id}/cancel")
     public BookingResponse cancelBooking(
             @PathVariable Long id,

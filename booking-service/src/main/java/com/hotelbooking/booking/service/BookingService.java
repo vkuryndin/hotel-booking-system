@@ -22,6 +22,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.hotelbooking.booking.entity.BookingStatus;
 
+import com.hotelbooking.booking.exception.BookingSagaUnavailableException;
+import org.springframework.web.client.RestClientResponseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 
 @Service
@@ -31,18 +36,24 @@ public class BookingService {
 
     private final BookingRepository bookingRepository;
     private final BookingMapper bookingMapper;
-    private final BookingNightRepository bookingNightRepository;
+
+    private static final Logger log =
+            LoggerFactory.getLogger(BookingService.class);
+
+    private final BookingSagaStateService sagaStateService;
 
     public BookingService(
             HotelServiceClient hotelServiceClient,
             BookingRepository bookingRepository,
-            BookingNightRepository bookingNightRepository,
-            BookingMapper bookingMapper
+            BookingMapper bookingMapper,
+
+            BookingSagaStateService sagaStateService
     ) {
         this.hotelServiceClient = hotelServiceClient;
         this.bookingRepository = bookingRepository;
-        this.bookingNightRepository = bookingNightRepository;
         this.bookingMapper = bookingMapper;
+
+        this.sagaStateService = sagaStateService;
     }
 
     public void validateDates(BookingRequest request) {
@@ -88,38 +99,63 @@ public class BookingService {
             throw new RoomAlreadyBookedException(request.roomId());
         }
     }
-    @Transactional
     public BookingResponse createBooking(Long userId, BookingRequest request) {
+        validateDates(request);
+        validateRoom(request.roomId());
 
-        validateBooking(request);
-
-        Booking booking = new Booking(
-                userId,
-                request.roomId(),
-                request.checkIn(),
-                request.checkOut()
-        );
-
-        Booking saved = bookingRepository.saveAndFlush(booking);
-
-        List<BookingNight> nights = request.checkIn()
-                .datesUntil(request.checkOut())
-                .map(date -> new BookingNight(saved, date))
-                .toList();
+        var pending = sagaStateService.createPending(userId, request);
 
         try {
-            bookingNightRepository.saveAllAndFlush(nights);
-        } catch (DataIntegrityViolationException ex) {
-            throw new RoomAlreadyBookedException(request.roomId());
-        }
+            var reservation = hotelServiceClient.reserveRoom(
+                    pending.roomId(),
+                    pending.reservationId(),
+                    pending.checkIn(),
+                    pending.checkOut()
+            );
 
-        return bookingMapper.toResponse(saved);
-    }
-    public List<BookingResponse> getMyBookings(Long userId) {
-        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(bookingMapper::toResponse)
-                .toList();
+            if (!"RESERVED".equals(reservation.status())
+                    || !pending.reservationId().equals(reservation.reservationId())
+                    || !pending.roomId().equals(reservation.roomId())) {
+                throw new IllegalStateException("Invalid Hotel Service response");
+            }
+
+            return sagaStateService.confirm(pending.bookingId());
+
+        } catch (RuntimeException error) {
+
+            try {
+                hotelServiceClient.releaseRoom(
+                        pending.roomId(),
+                        pending.reservationId()
+                );
+
+                sagaStateService.cancel(pending.bookingId());
+
+            } catch (RuntimeException compensationError) {
+                log.error(
+                        "Saga compensation failed for booking {}",
+                        pending.bookingId(),
+                        compensationError
+                );
+
+                error.addSuppressed(compensationError);
+
+                throw new BookingSagaUnavailableException(
+                        "Booking requires compensation: " + pending.bookingId(),
+                        error
+                );
+            }
+
+            if (error instanceof RestClientResponseException httpError
+                    && httpError.getStatusCode().value() == 409) {
+                throw new RoomAlreadyBookedException(pending.roomId());
+            }
+
+            throw new BookingSagaUnavailableException(
+                    "Booking cancelled because reservation failed",
+                    error
+            );
+        }
     }
     @Transactional(readOnly = true)
     public BookingResponse getBookingById(
@@ -157,24 +193,28 @@ public class BookingService {
 
         return bookingMapper.toResponse(booking);
     }
-    @Transactional
     public BookingResponse cancelBooking(
             Long bookingId,
             Long userId,
             boolean isAdmin
     ) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BookingNotFoundException(bookingId));
+        var booking = sagaStateService.findAuthorized(
+                bookingId, userId, isAdmin
+        );
 
-        if (!isAdmin && !booking.getUserId().equals(userId)) {
-            throw new AccessDeniedException("Access denied to booking: " + bookingId);
+        try {
+            hotelServiceClient.releaseRoom(
+                    booking.roomId(),
+                    booking.reservationId()
+            );
+        } catch (RuntimeException ex) {
+            throw new BookingSagaUnavailableException(
+                    "Cannot release reservation for booking: " + bookingId,
+                    ex
+            );
         }
 
-        booking.cancel();
-
-        bookingNightRepository.deleteByBookingId(bookingId);
-
-        return bookingMapper.toResponse(booking);
+        return sagaStateService.cancel(bookingId);
     }
     @Transactional(readOnly = true)
     public Page<BookingResponse> getAllBookings(
@@ -191,5 +231,13 @@ public class BookingService {
                 : bookingRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
 
         return bookings.map(bookingMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingResponse> getMyBookings(Long userId) {
+        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(bookingMapper::toResponse)
+                .toList();
     }
 }

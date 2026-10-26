@@ -209,4 +209,20 @@ public class GlobalExceptionHandler {
                 null
         );
     }
+    @ExceptionHandler(BookingSagaUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse handleSagaUnavailable(
+            BookingSagaUnavailableException ex,
+            HttpServletRequest request
+    ) {
+        return new ErrorResponse(
+                Instant.now(),
+                503,
+                "BOOKING_SAGA_UNAVAILABLE",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                null
+        );
+    }
 }
