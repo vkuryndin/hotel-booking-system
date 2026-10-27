@@ -49,4 +49,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             BookingCreationOutcome creationOutcome,
             Instant createdAt
     );
+    boolean existsByUserId(Long userId);
 }

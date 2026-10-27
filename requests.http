@@ -92,7 +92,7 @@ Authorization: Bearer {{adminToken}}
 
 {
   "hotelId": 1,
-  "number": "101"
+  "number": "102"
 }
 
 ### Duplicate room — expected 409
@@ -375,3 +375,351 @@ Content-Type: application/json
   "checkIn": "2029-02-10",
   "checkOut": "2029-02-13"
 }
+
+### Проверки
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 7e41f401-01c0-4d81-9a12-111111111111
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-15",
+  "checkOut": "2029-10-18"
+}
+
+### Проверки-2
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: a9321e40-6b2c-4e3e-b7f4-222222222222
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-15",
+  "checkOut": "2029-10-18"
+}
+
+### TEST 1 — Повтор запроса с тем же Idempotency-Key: ожидаем 201 и id=2
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 7e41f401-01c0-4d81-9a12-111111111111
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-15",
+  "checkOut": "2029-10-18"
+}
+
+
+### TEST 2 — Повторное бронирование тех же дат с новым ключом: ожидаем 409
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: b1000000-0000-4000-8000-000000000002
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-15",
+  "checkOut": "2029-10-18"
+}
+
+
+### TEST 3 — Пересечение с началом существующей брони: ожидаем 409
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: b1000000-0000-4000-8000-000000000003
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-14",
+  "checkOut": "2029-10-16"
+}
+
+
+### TEST 4 — Пересечение с концом существующей брони: ожидаем 409
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: b1000000-0000-4000-8000-000000000004
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-17",
+  "checkOut": "2029-10-19"
+}
+
+
+### TEST 5 — Заезд в день выезда предыдущего гостя: ожидаем 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: b1000000-0000-4000-8000-000000000005
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-18",
+  "checkOut": "2029-10-20"
+}
+
+
+### TEST 6 — Некорректные даты: ожидаем 400
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: b1000000-0000-4000-8000-000000000006
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-10-20",
+  "checkOut": "2029-10-19"
+}
+
+### TEST 5 — Тайм-аут Hotel Service
+POST http://localhost:8081/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: c7400000-0000-4000-8000-000000000005
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2042-04-10",
+  "checkOut": "2042-04-13"
+}
+
+### TEST 5 — Проверка Timeout и Retry через Gateway
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: e8500000-0000-4000-8000-000000000051
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2043-06-10",
+  "checkOut": "2043-06-13"
+}
+
+
+### TEST CREATE — Создание пользователя
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "admin-check-03@example.com",
+  "password": "Test12345!",
+  "role": "USER"
+}
+
+
+### TEST READ 1 — Список пользователей (200)
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{adminToken}}
+
+
+### TEST READ 2 — Пользователь по ID (200)
+GET {{baseUrl}}/api/users/2
+Authorization: Bearer {{adminToken}}
+
+
+### TEST READ 3 — Несуществующий пользователь (404)
+GET {{baseUrl}}/api/users/9999999
+Authorization: Bearer {{adminToken}}
+
+
+### TEST READ 4 — USER не может получить список (403)
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{accessToken}}
+
+
+### TEST READ 5 — USER не может получить пользователя (403)
+GET {{baseUrl}}/api/users/2
+Authorization: Bearer {{accessToken}}
+
+
+### TEST READ 6 — Без JWT (401)
+GET {{baseUrl}}/api/users
+
+
+### UPDATE 1 — ADMIN изменяет email и роль (200)
+PATCH {{baseUrl}}/api/users/2
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "updated-user@example.com",
+  "role": "ADMIN"
+}
+
+
+### UPDATE 2 — Проверка изменений (200)
+GET {{baseUrl}}/api/users/2
+Authorization: Bearer {{adminToken}}
+
+
+### UPDATE 3 — Сброс пароля администратором (204)
+POST {{baseUrl}}/api/users/2/reset-password
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "NewPassword123!"
+}
+
+
+### UPDATE 4 — Вход со старым паролем (401)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "updated-user@example.com",
+  "password": "Test12345!"
+}
+
+
+### UPDATE 5 — Вход с новым паролем (200)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "updated-user@example.com",
+  "password": "NewPassword123!"
+}
+
+
+### UPDATE 6 — USER не может изменять данные (403)
+PATCH http://localhost:8080/api/users/2
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "forbidden@example.com"
+}
+
+
+### UPDATE 7 — USER не может сбрасывать пароль (403)
+POST http://localhost:8080/api/users/2/reset-password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "Forbidden123!"
+}
+
+
+### UPDATE 8 — Некорректный email (400)
+PATCH http://localhost:8080/api/users/2
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "invalid-email"
+}
+
+
+### UPDATE 9 — Пустой запрос (400)
+PATCH http://localhost:8080/api/users/2
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{}
+
+
+### UPDATE 10 — Слишком короткий пароль (400)
+POST http://localhost:8080/api/users/2/reset-password
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "123"
+}
+
+
+### UPDATE 11 — Несуществующий пользователь (404)
+PATCH http://localhost:8080/api/users/999999
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "missing@example.com"
+}
+
+
+### UPDATE 12 — Сброс пароля несуществующего пользователя (404)
+POST http://localhost:8080/api/users/999999/reset-password
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "NewPassword123!"
+}
+
+
+### UPDATE 13 — Изменение без JWT (401)
+PATCH http://localhost:8080/api/users/2
+Content-Type: application/json
+
+{
+  "role": "USER"
+}
+
+
+### UPDATE 14 — Сброс без JWT (401)
+POST http://localhost:8080/api/users/2/reset-password
+Content-Type: application/json
+
+{
+  "newPassword": "NewPassword123!"
+}
+
+
+### DELETE 1 — ADMIN создаёт пользователя для удаления (201)
+POST http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "delete-test-001@example.com",
+  "password": "TestPassword123!",
+  "role": "USER"
+}
+
+> {%
+    client.global.set("deleteTestUserId", response.body.id);
+%}
+
+
+### DELETE 2 — Проверка существования пользователя (200)
+GET http://localhost:8080/api/users/{{deleteTestUserId}}
+Authorization: Bearer {{adminToken}}
+
+
+### DELETE 3 — USER не может удалить пользователя (403)
+DELETE http://localhost:8080/api/users/{{deleteTestUserId}}
+Authorization: Bearer {{accessToken}}
+
+
+### DELETE 4 — Удаление без JWT запрещено (401)
+DELETE http://localhost:8080/api/users/{{deleteTestUserId}}
+
+
+### DELETE 5 — ADMIN удаляет пользователя (200)
+DELETE http://localhost:8080/api/users/{{deleteTestUserId}}
+Authorization: Bearer {{adminToken}}
+
+
+### DELETE 6 — Удалённого пользователя больше нет (404)
+GET http://localhost:8080/api/users/{{deleteTestUserId}}
+Authorization: Bearer {{adminToken}}
+
+
+### DELETE 7 — Повторное удаление (404)
+DELETE http://localhost:8080/api/users/{{deleteTestUserId}}
+Authorization: Bearer {{adminToken}}
+
+
+### DELETE 8 — Удаление несуществующего пользователя (404)
+DELETE http://localhost:8080/api/users/9999999
+Authorization: Bearer {{adminToken}}

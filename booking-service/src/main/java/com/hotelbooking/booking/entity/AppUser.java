@@ -44,4 +44,16 @@ public class AppUser {
     public Role getRole() {
         return role;
     }
+
+    public void changeEmail(String email) {
+        this.email = email;
+    }
+
+    public void changeRole(Role role) {
+        this.role = role;
+    }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
 }
