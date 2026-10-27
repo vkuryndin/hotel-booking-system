@@ -40,6 +40,8 @@ public class JwtService {
                 .issuedAt(now)
                 .expiresAt(now.plus(tokenTtl))
                 .claim("role", user.getRole().name())
+                .claim("tokenVersion", user.getTokenVersion())
+                .claim("tokenIdentity", user.getTokenIdentity())
                 .build();
 
         JwsHeader header = JwsHeader

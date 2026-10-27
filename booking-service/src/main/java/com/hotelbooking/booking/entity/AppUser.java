@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.entity;
 
 import jakarta.persistence.*;
+import java.util.UUID;
 
 @Entity
 @Table(name = "app_users")
@@ -19,6 +20,16 @@ public class AppUser {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
+
+    @Column(name = "password_change_required", nullable = false)
+    private boolean passwordChangeRequired = false;
+
+    @Column(name = "token_version", nullable = false)
+    private long tokenVersion = 0;
+
+    @Column(name = "token_identity", nullable = false,
+            unique = true, updatable = false, length = 36)
+    private String tokenIdentity = UUID.randomUUID().toString();
 
     protected AppUser() {
     }
@@ -49,11 +60,37 @@ public class AppUser {
         this.email = email;
     }
 
+    public String getTokenIdentity() {
+        return tokenIdentity;
+    }
+
     public void changeRole(Role role) {
-        this.role = role;
+        if (this.role != role) {
+            this.role = role;
+            this.tokenVersion++;
+        }
     }
 
     public void changePasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
     }
+    public boolean isPasswordChangeRequired() {
+        return passwordChangeRequired;
+    }
+
+    public long getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void requirePasswordChange() {
+        this.passwordChangeRequired = true;
+        this.tokenVersion++;
+    }
+
+    public void completePasswordChange(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.passwordChangeRequired = false;
+        this.tokenVersion++;
+    }
+
 }

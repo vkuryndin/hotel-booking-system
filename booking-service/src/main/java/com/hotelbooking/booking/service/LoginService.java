@@ -57,7 +57,8 @@ public class LoginService {
         return new LoginResponse(
                 token,
                 "Bearer",
-                jwtService.getExpiresInSeconds()
+                jwtService.getExpiresInSeconds(),
+                user.isPasswordChangeRequired()
         );
     }
 }

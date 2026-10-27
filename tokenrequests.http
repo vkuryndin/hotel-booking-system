@@ -1,0 +1,162 @@
+### 1 — ADMIN создаёт тестового пользователя (201)
+POST http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "OriginalPassword123!",
+  "role": "USER"
+}
+
+> {%
+    client.global.set("resetUserId", response.body.id);
+%}
+
+
+### 2 — Вход до сброса (200, passwordChangeRequired=false)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "OriginalPassword123!"
+}
+
+> {%
+    client.global.set("oldUserToken", response.body.accessToken);
+%}
+
+
+### 3 — Старый токен работает в Booking (200)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{oldUserToken}}
+
+
+### 4 — Старый токен работает в Hotel (200)
+GET http://localhost:8080/api/hotels
+Authorization: Bearer {{oldUserToken}}
+
+### 9 — Вход с временным паролем (200, passwordChangeRequired=true)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "TemporaryPassword123!"
+}
+
+> {%
+    client.global.set("temporaryToken", response.body.accessToken);
+%}
+
+
+### 10 — Обычный API Booking запрещён (403)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{temporaryToken}}
+
+
+### 11 — Hotel API запрещён (403)
+GET http://localhost:8080/api/hotels
+Authorization: Bearer {{temporaryToken}}
+
+
+### 12 — Неправильный временный пароль (400)
+POST http://localhost:8080/api/users/me/change-password
+Authorization: Bearer {{temporaryToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "WrongPassword123!",
+  "newPassword": "NewPermanentPassword123!"
+}
+
+
+### 13 — Слишком короткий новый пароль (400)
+POST http://localhost:8080/api/users/me/change-password
+Authorization: Bearer {{temporaryToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "TemporaryPassword123!",
+  "newPassword": "123"
+}
+
+### 14 — Пользователь меняет временный пароль (200)
+POST http://localhost:8080/api/users/me/change-password
+Authorization: Bearer {{temporaryToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "TemporaryPassword123!",
+  "newPassword": "NewPermanentPassword123!"
+}
+
+
+### 15 — Временный JWT отозван после смены (401)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{temporaryToken}}
+
+
+### 16 — Временный JWT в Hotel тоже отозван (401)
+GET http://localhost:8080/api/hotels
+Authorization: Bearer {{temporaryToken}}
+
+
+### 17 — Повторный вход с временным паролем запрещён (401)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "TemporaryPassword123!"
+}
+
+
+### 18 — Вход с новым паролем (200, passwordChangeRequired=false)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "NewPermanentPassword123!"
+}
+
+> {%
+    client.global.set("newUserToken", response.body.accessToken);
+%}
+
+
+### 19 — Booking снова доступен (200)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{newUserToken}}
+
+
+### 20 — Hotel снова доступен (200)
+GET http://localhost:8080/api/hotels
+Authorization: Bearer {{newUserToken}}
+
+
+### 21 — Смена пароля без JWT (401)
+POST http://localhost:8080/api/users/me/change-password
+Content-Type: application/json
+
+{
+  "currentPassword": "NewPermanentPassword123!",
+  "newPassword": "AnotherPassword123!"
+}
+
+
+### 22 — USER не может сбрасывать пароль через ADMIN API (403)
+POST http://localhost:8080/api/users/{{resetUserId}}/reset-password
+Authorization: Bearer {{newUserToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "ForbiddenPassword123!"
+}
+
+
+### 23 — Проверка действующего JWT в Booking (204)
+GET http://localhost:8080/api/users/token-status
+Authorization: Bearer {{newUserToken}}

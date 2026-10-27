@@ -40,7 +40,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET,
                                 "/api/hotels/**",
-                                "/api/rooms/**").permitAll()
+                                "/api/rooms/**")
+                        .hasAnyRole("USER", "ADMIN", "SERVICE")
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",

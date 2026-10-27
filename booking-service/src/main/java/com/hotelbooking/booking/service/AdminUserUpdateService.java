@@ -109,6 +109,7 @@ public class AdminUserUpdateService {
         );
 
         user.changePasswordHash(passwordHash);
+        user.requirePasswordChange();
 
         userRepository.saveAndFlush(user);
     }

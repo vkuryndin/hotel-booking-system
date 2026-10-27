@@ -570,7 +570,7 @@ Content-Type: application/json
 
 
 ### UPDATE 4 — Вход со старым паролем (401)
-POST http://localhost:8080/api/users/login
+POST {{baseUrl}}/api/users/login
 Content-Type: application/json
 
 {
@@ -580,7 +580,7 @@ Content-Type: application/json
 
 
 ### UPDATE 5 — Вход с новым паролем (200)
-POST http://localhost:8080/api/users/login
+POST {{baseUrl}}/api/users/login
 Content-Type: application/json
 
 {
@@ -590,7 +590,7 @@ Content-Type: application/json
 
 
 ### UPDATE 6 — USER не может изменять данные (403)
-PATCH http://localhost:8080/api/users/2
+PATCH {{baseUrl}}/api/users/2
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -600,7 +600,7 @@ Content-Type: application/json
 
 
 ### UPDATE 7 — USER не может сбрасывать пароль (403)
-POST http://localhost:8080/api/users/2/reset-password
+POST {{baseUrl}}/api/users/2/reset-password
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -610,7 +610,7 @@ Content-Type: application/json
 
 
 ### UPDATE 8 — Некорректный email (400)
-PATCH http://localhost:8080/api/users/2
+PATCH {{baseUrl}}/api/users/2
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -620,7 +620,7 @@ Content-Type: application/json
 
 
 ### UPDATE 9 — Пустой запрос (400)
-PATCH http://localhost:8080/api/users/2
+PATCH {{baseUrl}}/api/users/2
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -628,7 +628,7 @@ Content-Type: application/json
 
 
 ### UPDATE 10 — Слишком короткий пароль (400)
-POST http://localhost:8080/api/users/2/reset-password
+POST {{baseUrl}}/api/users/2/reset-password
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -722,4 +722,521 @@ Authorization: Bearer {{adminToken}}
 
 ### DELETE 8 — Удаление несуществующего пользователя (404)
 DELETE http://localhost:8080/api/users/9999999
+Authorization: Bearer {{adminToken}}
+
+
+### 1 — ADMIN создаёт тестового пользователя (201)
+POST http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "OriginalPassword123!",
+  "role": "USER"
+}
+
+> {%
+    client.global.set("resetUserId", response.body.id);
+%}
+
+
+### 2 — Вход до сброса (200, passwordChangeRequired=false)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "OriginalPassword123!"
+}
+
+> {%
+    client.global.set("oldUserToken", response.body.accessToken);
+%}
+
+
+### 3 — Старый токен работает в Booking (200)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{oldUserToken}}
+
+
+### 4 — Старый JWT работает в Hotel Service (200)
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{oldUserToken}}
+
+> {%
+    client.test("Hotel Service returns 200", function () {
+        client.assert(response.status === 200,
+            "Expected 200, got " + response.status);
+    });
+%}
+
+
+### 5 — ADMIN сбрасывает пароль пользователя (200)
+POST http://localhost:8080/api/users/{{resetUserId}}/reset-password
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "TemporaryPassword123!"
+}
+
+
+### 6 — Старый JWT отозван в Booking (401)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{oldUserToken}}
+
+
+### 7 — Старый JWT отозван в Hotel (401)
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{oldUserToken}}
+
+
+### 8 — Старый пароль больше не работает (401)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "OriginalPassword123!"
+}
+
+
+
+### 9 — Вход с временным паролем: 200
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "TemporaryPassword123!"
+}
+
+> {%
+    client.test("9: Login with temporary password", function () {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(response.body.passwordChangeRequired === true,
+            "Password change must be required");
+    });
+    client.global.set("temporaryToken", response.body.accessToken);
+%}
+
+
+### 10 — Обычный API Booking запрещён: 403
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{temporaryToken}}
+
+> {%
+    client.test("10: Booking blocked", function () {
+        client.assert(response.status === 403, "Expected 403");
+    });
+%}
+
+
+### 11 — Hotel API запрещён: 403
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{temporaryToken}}
+
+> {%
+    client.test("11: Hotel blocked", function () {
+        client.assert(response.status === 403, "Expected 403");
+    });
+%}
+
+
+### 12 — Неправильный текущий пароль: 400
+POST http://localhost:8080/api/users/me/change-password
+Authorization: Bearer {{temporaryToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "WrongPassword123!",
+  "newPassword": "NewPermanentPassword123!"
+}
+
+> {%
+    client.test("12: Wrong password rejected", function () {
+        client.assert(response.status === 400, "Expected 400");
+    });
+%}
+
+
+### 13 — Слишком короткий новый пароль: 400
+POST http://localhost:8080/api/users/me/change-password
+Authorization: Bearer {{temporaryToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "TemporaryPassword123!",
+  "newPassword": "123"
+}
+
+> {%
+    client.test("13: Short password rejected", function () {
+        client.assert(response.status === 400, "Expected 400");
+    });
+%}
+
+
+### 14 — Успешная смена временного пароля: 200
+POST http://localhost:8080/api/users/me/change-password
+Authorization: Bearer {{temporaryToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "TemporaryPassword123!",
+  "newPassword": "NewPermanentPassword123!"
+}
+
+> {%
+    client.test("14: Password changed", function () {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+
+### 15 — Временный JWT отозван в Booking: 401
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{temporaryToken}}
+
+> {%
+    client.test("15: Temporary token revoked in Booking", function () {
+        client.assert(response.status === 401, "Expected 401");
+    });
+%}
+
+
+### 16 — Временный JWT отозван в Hotel: 401
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{temporaryToken}}
+
+> {%
+    client.test("16: Temporary token revoked in Hotel", function () {
+        client.assert(response.status === 401, "Expected 401");
+    });
+%}
+
+
+### 17 — Старый временный пароль больше не работает: 401
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "TemporaryPassword123!"
+}
+
+> {%
+    client.test("17: Temporary password rejected", function () {
+        client.assert(response.status === 401, "Expected 401");
+    });
+%}
+
+
+### 18 — Вход с новым постоянным паролем: 200
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "NewPermanentPassword123!"
+}
+
+> {%
+    client.test("18: Login with new password", function () {
+        client.assert(response.status === 200, "Expected 200");
+        client.assert(response.body.passwordChangeRequired === false,
+            "Password change must not be required");
+    });
+    client.global.set("newUserToken", response.body.accessToken);
+%}
+
+
+### 19 — Новый JWT работает в Booking: 200
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{newUserToken}}
+
+> {%
+    client.test("19: New token works in Booking", function () {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+
+### 20 — Новый JWT работает в Hotel: 200
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{newUserToken}}
+
+> {%
+    client.test("20: New token works in Hotel", function () {
+        client.assert(response.status === 200, "Expected 200");
+    });
+%}
+
+
+### 21 — Смена пароля без JWT: 401
+POST http://localhost:8080/api/users/me/change-password
+Content-Type: application/json
+
+{
+  "currentPassword": "NewPermanentPassword123!",
+  "newPassword": "AnotherPassword123!"
+}
+
+> {%
+    client.test("21: JWT required", function () {
+        client.assert(response.status === 401, "Expected 401");
+    });
+%}
+
+
+### 22 — USER не может сбрасывать пароль через ADMIN API: 403
+POST http://localhost:8080/api/users/{{resetUserId}}/reset-password
+Authorization: Bearer {{newUserToken}}
+Content-Type: application/json
+
+{
+  "newPassword": "ForbiddenPassword123!"
+}
+
+> {%
+    client.test("22: ADMIN permission required", function () {
+        client.assert(response.status === 403, "Expected 403");
+    });
+%}
+
+
+### 23 — Внутренний token-status закрыт через Gateway: 403
+GET http://localhost:8080/api/users/token-status
+Authorization: Bearer {{newUserToken}}
+
+> {%
+    client.test("23: Internal endpoint blocked", function () {
+        client.assert(response.status === 403, "Expected 403");
+    });
+%}
+
+
+### 24 — Без JWT доступ запрещён (401)
+GET http://localhost:8080/api/bookings/my
+
+
+### 25 — INTERNAL confirm запрещён через Gateway (403)
+POST http://localhost:8080/api/rooms/1/confirm-availability
+Authorization: Bearer {{adminToken}}
+
+
+### 26 — INTERNAL release запрещён через Gateway (403)
+POST http://localhost:8080/api/rooms/1/release
+Authorization: Bearer {{adminToken}}
+
+
+### 27 — Новый JWT, внутренний endpoint закрыт (403)
+GET http://localhost:8080/api/users/token-status
+Authorization: Bearer {{newUserToken}}
+
+
+
+### 24 — ADMIN меняет роль USER на ADMIN (200)
+PATCH http://localhost:8080/api/users/{{resetUserId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "role": "ADMIN"
+}
+
+
+### 25 — Старый JWT отозван в Booking (401)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{newUserToken}}
+
+
+### 26 — Старый JWT отозван в Hotel (401)
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{newUserToken}}
+
+
+### 27 — Пользователь входит с новой ролью (200)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "NewPermanentPassword123!"
+}
+
+> {%
+    client.global.set("roleAdminToken", response.body.accessToken);
+%}
+
+
+### 28 — Новая роль ADMIN работает (200)
+GET http://localhost:8080/api/users
+Authorization: Bearer {{roleAdminToken}}
+
+
+### 29 — Возвращаем роль USER (200)
+PATCH http://localhost:8080/api/users/{{resetUserId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "role": "USER"
+}
+
+
+### 30 — Предыдущий ADMIN JWT отозван (401)
+GET http://localhost:8080/api/users
+Authorization: Bearer {{roleAdminToken}}
+
+
+### 31 — Повторный вход USER (200)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "NewPermanentPassword123!"
+}
+
+> {%
+    client.global.set("beforeDeleteToken", response.body.accessToken);
+%}
+
+
+### 32 — ADMIN удаляет пользователя (200)
+DELETE http://localhost:8080/api/users/{{resetUserId}}
+Authorization: Bearer {{adminToken}}
+
+
+### 33 — JWT удалённого пользователя не работает в Booking (401)
+GET http://localhost:8080/api/bookings/my
+Authorization: Bearer {{beforeDeleteToken}}
+
+
+### 34 — JWT удалённого пользователя не работает в Hotel (401)
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{beforeDeleteToken}}
+
+
+### 35 — Удалённый пользователь не может войти (401)
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "forced-change-test@example.com",
+  "password": "NewPermanentPassword123!"
+}
+
+
+### 36 — Прямой запрос с отозванным JWT в Hotel (401)
+GET http://localhost:8082/api/rooms?hotelId=1
+Authorization: Bearer {{beforeDeleteToken}}
+
+
+### 37 — Прямой запрос в Hotel без JWT
+GET http://localhost:8082/api/rooms?hotelId=1
+
+
+### 38 — Проверка недоступности Booking Service
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{adminToken}}
+
+
+### 39 — Проверка старого JWT после перезапуска H2
+GET http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+
+
+
+### FINAL-1 — Booking через Gateway, новый ADMIN JWT: 200
+GET http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+
+
+### FINAL-2 — Hotel через Gateway, новый JWT: 200
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{adminToken}}
+
+
+### FINAL-3 — Booking напрямую с JWT: 403
+GET http://localhost:8081/api/users
+Authorization: Bearer {{adminToken}}
+
+
+### FINAL-4 — Hotel напрямую с JWT: 403
+GET http://localhost:8082/api/rooms?hotelId=1
+Authorization: Bearer {{adminToken}}
+
+
+### FINAL-5 — Hotel напрямую без JWT: 401
+GET http://localhost:8082/api/rooms?hotelId=1
+
+
+### FINAL-6 — Login напрямую в Booking запрещён: 403
+POST http://localhost:8081/api/users/login
+Content-Type: application/json
+
+{}
+
+
+### FINAL-7 — Поддельный секрет не помогает: 403
+GET http://localhost:8082/api/rooms?hotelId=1
+Authorization: Bearer {{adminToken}}
+X-Gateway-Internal-Secret: fake-secret
+
+
+### FINAL-8 — Поддельный заголовок через Gateway заменяется: 200
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer {{adminToken}}
+X-Gateway-Internal-Secret: fake-secret
+
+
+### FINAL-9 — Некорректный JWT: 401
+GET http://localhost:8080/api/rooms?hotelId=1
+Authorization: Bearer not-a-jwt
+
+
+### FINAL-10 — INTERNAL release через Gateway: 403
+POST http://localhost:8080/api/rooms/1/release
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{}
+
+
+### FINAL-11 — INTERNAL token-status через Gateway: 403
+GET http://localhost:8080/api/users/token-status
+Authorization: Bearer {{adminToken}}
+
+
+### FINAL-12 — Сохраняем JWT перед перезапуском H2
+GET http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.global.set("jwtBeforeRestart",
+        client.global.get("adminToken"));
+%}
+
+
+### FINAL-13 — После перезапуска Booking старый JWT: 401
+### Сначала перезапустить ТОЛЬКО Booking.
+### До этого запроса НЕ выполнять новый Login.
+GET http://localhost:8080/api/users
+Authorization: Bearer {{jwtBeforeRestart}}
+
+
+### FINAL-14 — Новый Login ADMIN
+### Выполните существующий Login ADMIN в requests.http.
+### Затем проверяем новый токен: 200
+GET http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+
+
+### FINAL-15 — Booking недоступен: 503
+### Остановите ТОЛЬКО Booking Service.
+### Не перезапускайте Gateway и Hotel.
+GET http://localhost:8080/api/rooms?hotelId=1
 Authorization: Bearer {{adminToken}}

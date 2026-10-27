@@ -51,6 +51,9 @@ public class HotelServiceClient {
         try {
             HotelRoomResponse room = hotelRestClient.get()
                     .uri("/api/rooms/{id}", roomId)
+                    .headers(headers -> headers.setBearerAuth(
+                            serviceTokenProvider.generateToken()
+                    ))
                     .retrieve()
                     .body(HotelRoomResponse.class);
 
