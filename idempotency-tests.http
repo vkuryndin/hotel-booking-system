@@ -1,0 +1,178 @@
+### ПАРАМЕТРЫ ТЕСТОВ
+@baseUrl = http://localhost:8080
+
+@roomId = 2
+@checkIn = 2027-04-10
+@checkOut = 2027-04-13
+@keyA = 550e8400-e29b-41d4-a716-446655441101
+@keyB = 550e8400-e29b-41d4-a716-446655441102
+@keyC = 550e8400-e29b-41d4-a716-446655441103
+@keyD = 550e8400-e29b-41d4-a716-446655441104
+
+### Login as ADMIN
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "admin@hotelbooking.com",
+  "password": "Gefsbizd19!"
+}
+
+> {%
+    client.global.set("adminToken", response.body.accessToken);
+%}
+
+
+### ТЕСТ 1 — Создаём бронирование
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{keyA}}
+Content-Type: application/json
+
+{
+  "roomId": {{roomId}},
+  "checkIn": "{{checkIn}}",
+  "checkOut": "{{checkOut}}"
+}
+
+> {%
+    client.test("1. Создание: 201 CONFIRMED", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+    client.global.set("idemBookingId", response.body.id);
+%}
+
+
+### ТЕСТ 2 — Повтор того же запроса
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{keyA}}
+Content-Type: application/json
+
+{
+  "roomId": {{roomId}},
+  "checkIn": "{{checkIn}}",
+  "checkOut": "{{checkOut}}"
+}
+
+> {%
+    client.test("2. Повтор: тот же Booking ID", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+        client.assert(String(response.body.id) ===
+            String(client.global.get("idemBookingId")));
+    });
+%}
+
+
+### ТЕСТ 3 — Тот же ключ, другие даты
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{keyA}}
+Content-Type: application/json
+
+{
+  "roomId": {{roomId}},
+  "checkIn": "{{checkIn}}",
+  "checkOut": "2027-04-14"
+}
+
+> {%
+    client.test("3. Изменение параметров: 409", function() {
+        client.assert(response.status === 409);
+        client.assert(response.body.code === "IDEMPOTENCY_KEY_CONFLICT");
+    });
+%}
+
+
+### ТЕСТ 4 — Новый ключ, занятые даты
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{keyB}}
+Content-Type: application/json
+
+{
+  "roomId": {{roomId}},
+  "checkIn": "{{checkIn}}",
+  "checkOut": "{{checkOut}}"
+}
+
+> {%
+    client.test("4. Двойное бронирование: 409", function() {
+        client.assert(response.status === 409);
+    });
+%}
+
+
+### ТЕСТ 5 — Повтор неудачного запроса
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{keyB}}
+Content-Type: application/json
+
+{
+  "roomId": {{roomId}},
+  "checkIn": "{{checkIn}}",
+  "checkOut": "{{checkOut}}"
+}
+
+> {%
+    client.test("5. Повтор отказа: снова 409", function() {
+        client.assert(response.status === 409);
+    });
+%}
+
+
+### ТЕСТ 6 — Соседние даты разрешены
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{keyC}}
+Content-Type: application/json
+
+{
+  "roomId": {{roomId}},
+  "checkIn": "2027-04-13",
+  "checkOut": "2027-04-15"
+}
+
+> {%
+    client.test("6. Соседние даты: 201 CONFIRMED", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+
+### ТЕСТ 7 — Отменяем первое бронирование
+PATCH {{baseUrl}}/api/bookings/{{idemBookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("7. Отмена: CANCELLED", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+
+### ТЕСТ 8 — Бронируем освобождённые даты
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{keyD}}
+Content-Type: application/json
+
+{
+  "roomId": {{roomId}},
+  "checkIn": "{{checkIn}}",
+  "checkOut": "{{checkOut}}"
+}
+
+> {%
+    client.test("8. После отмены: 201 CONFIRMED", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+        client.assert(String(response.body.id) !==
+            String(client.global.get("idemBookingId")));
+    });
+%}

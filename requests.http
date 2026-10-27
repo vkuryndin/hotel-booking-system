@@ -73,7 +73,7 @@ Content-Type: application/json
     client.global.set("adminToken", response.body.accessToken);
 %}
 
-# should be redone everytime i restart hotelservice
+### should be redone everytime i restart hotelservice
 
 ### Create hotel as ADMIN — expected 201
 POST {{baseUrl}}/api/hotels
@@ -137,17 +137,6 @@ Content-Type: application/json
 GET {{baseUrl}}/api/rooms/available?hotelId=1
 
 
-### Создание бронирования
-POST {{baseUrl}}/api/bookings
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "roomId":1,
-  "checkIn": "2026-12-10",
-  "checkOut": "2026-12-13"
-}
-
 ### возврат номера в available
 PATCH {{baseUrl}}/api/rooms/1/availability
 Authorization: Bearer {{adminToken}}
@@ -172,9 +161,7 @@ Authorization: Bearer {{accessToken}}
 ### попытка получить бронирования без авторизации
 GET {{baseUrl}}/api/bookings/my
 
-### Подтвердить бронирование
-PATCH {{baseUrl}}/api/bookings/1/confirm
-Authorization: Bearer {{adminToken}}
+
 
 ### Отменить бронирование
 PATCH {{baseUrl}}/api/bookings/1/cancel
@@ -216,4 +203,175 @@ Content-Type: application/json
 
 {
   "reservationId": "123e4567-e89b-42d3-a456-426614174000"
+}
+
+### Testing Idempotency!!
+
+### Тест 1 — новое бронирование
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+
+### Тест 2 — повтор с тем же ключом
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+
+### Тест 3 — конфликт ключа
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-14"
+}
+
+### Тест 4 — номер уже забронирован
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440002
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+
+### Тест 4.1 — занятые даты
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440099
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+
+### Первое бронирование
+GET {{baseUrl}}/api/bookings/1
+Authorization: Bearer {{adminToken}}
+
+### Второе бронирование
+GET {{baseUrl}}/api/bookings/2
+Authorization: Bearer {{adminToken}}
+
+
+### Тест 1.1 — новое бронирование
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440888
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+
+
+### Тест 1.2 — повтор того же бронирования с тем же ключом
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440888
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+
+### Тест 2 — попытка повторно забронировать занятую комнату
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440889
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+### Тест 3 — повтор неудачного бронирования
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440889
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2027-01-10",
+  "checkOut": "2027-01-13"
+}
+
+### Checking Hotelservice unavailability
+
+### Информация о Hotel Service в Eureka
+GET http://localhost:8761/eureka/apps/HOTEL-SERVICE
+Accept: application/json
+
+### Исключить Hotel Service из маршрутизации Eureka
+PUT http://localhost:8761/eureka/apps/HOTEL-SERVICE/ERV-W0013.infotecs-nt:hotel-service:8082/status?value=OUT_OF_SERVICE
+
+### Проверить статус Hotel Service
+GET http://localhost:8761/eureka/apps/HOTEL-SERVICE
+Accept: application/json
+
+### Вернуть Hotel Service в работу
+DELETE http://localhost:8761/eureka/apps/HOTEL-SERVICE/ERV-W0013.infotecs-nt:hotel-service:8082/status?value=UP
+
+### Проверка отказа Hotel Service
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 8e52e7b8-1e67-41c6-a4d2-4c1ef9b12001
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2028-12-10",
+  "checkOut": "2028-12-13"
+}
+
+### Проверка Booking Service напрямую, без Gateway
+POST http://localhost:8081/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 8e52e7b8-1e67-41c6-a4d2-4c1ef9b12010
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2028-12-10",
+  "checkOut": "2028-12-13"
+}
+
+### Тест сбоя после резервирования
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 7f6c2d40-91e5-47a2-a4f9-110000000601
+Content-Type: application/json
+
+{
+  "roomId": 2,
+  "checkIn": "2029-02-10",
+  "checkOut": "2029-02-13"
 }

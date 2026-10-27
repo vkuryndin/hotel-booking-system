@@ -6,6 +6,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.web.client.RestClient;
 
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import java.net.http.HttpClient;
+import java.time.Duration;
+
+
 @Configuration
 public class RestClientConfig {
 
@@ -27,6 +32,19 @@ public class RestClientConfig {
     ) {
         return builder
                 .baseUrl("http://hotel-service")
+                .requestFactory(hotelRequestFactory())
                 .build();
+    }
+    private JdkClientHttpRequestFactory hotelRequestFactory() {
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(2))
+                .build();
+
+        JdkClientHttpRequestFactory factory =
+                new JdkClientHttpRequestFactory(client);
+
+        factory.setReadTimeout(Duration.ofSeconds(5));
+
+        return factory;
     }
 }

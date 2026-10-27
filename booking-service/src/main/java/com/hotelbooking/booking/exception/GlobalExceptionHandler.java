@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.security.access.AccessDeniedException;
+import com.hotelbooking.booking.exception.RequestInProgressException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -224,5 +225,58 @@ public class GlobalExceptionHandler {
                 null,
                 null
         );
+    }
+    @ExceptionHandler(IdempotencyKeyConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleIdempotencyConflict(
+            IdempotencyKeyConflictException ex,
+            HttpServletRequest request
+    ) {
+        return new ErrorResponse(
+                Instant.now(),
+                409,
+                "IDEMPOTENCY_KEY_CONFLICT",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                null
+        );
+    }
+    @ExceptionHandler(RequestInProgressException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleRequestInProgress(
+            RequestInProgressException ex,
+            HttpServletRequest request
+    ) {
+        return new ErrorResponse(
+                Instant.now(),
+                409,
+                "REQUEST_IN_PROGRESS",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null,
+                null
+        );
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(
+            IllegalStateException ex,
+            HttpServletRequest request
+    ) {
+        if (!"No instances available for hotel-service".equals(ex.getMessage())) {
+            throw ex;
+        }
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse(
+                        Instant.now(),
+                        503,
+                        "BOOKING_SAGA_UNAVAILABLE",
+                        "Hotel Service is unavailable",
+                        request.getRequestURI(),
+                        null,
+                        null
+                ));
     }
 }

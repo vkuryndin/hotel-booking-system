@@ -11,6 +11,13 @@ import org.springframework.data.domain.Pageable;
 
 import com.hotelbooking.booking.entity.BookingStatus;
 
+import com.hotelbooking.booking.entity.BookingCreationOutcome;
+import java.time.Instant;
+import java.util.List;
+
+import java.util.Optional;
+import java.util.UUID;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -35,5 +42,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByStatusOrderByCreatedAtDesc(
             BookingStatus status,
             Pageable pageable
+    );
+    Optional<Booking> findByUserIdAndIdempotencyKey(
+            Long userId,
+            UUID idempotencyKey
+    );
+    List<Booking> findTop10ByStatusAndCreationOutcomeAndCreatedAtBeforeOrderByCreatedAtAsc(
+            BookingStatus status,
+            BookingCreationOutcome creationOutcome,
+            Instant createdAt
     );
 }

@@ -14,10 +14,26 @@ import com.hotelbooking.booking.dto.client.HotelReservationResponse;
 import com.hotelbooking.booking.dto.client.HotelReservationReleaseRequest;
 import com.hotelbooking.booking.security.ServiceTokenProvider;
 
+import org.springframework.resilience.annotation.Retryable;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.HttpServerErrorException;
+
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.Objects;
 
+@Retryable(
+        includes = {
+                ResourceAccessException.class,
+                HttpServerErrorException.BadGateway.class,
+                HttpServerErrorException.ServiceUnavailable.class,
+                HttpServerErrorException.GatewayTimeout.class
+        },
+        maxRetries = 2,
+        delay = 200,
+        multiplier = 2.0,
+        maxDelay = 1000
+)
 @Component
 public class HotelServiceClient {
 

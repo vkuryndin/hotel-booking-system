@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import java.util.UUID;
 
 import java.net.URI;
 import java.util.List;
@@ -30,12 +31,13 @@ public class BookingController {
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody BookingRequest request
+            @Valid @RequestBody BookingRequest request,
+            @RequestHeader("Idempotency-Key") UUID idempotencyKey
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
 
         BookingResponse response =
-                bookingService.createBooking(userId, request);
+                bookingService.createBooking(userId, request, idempotencyKey);
 
         return ResponseEntity
                 .created(URI.create("/api/bookings/" + response.id()))

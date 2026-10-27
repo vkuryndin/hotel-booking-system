@@ -10,6 +10,10 @@ import com.hotelbooking.booking.repository.BookingRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.hotelbooking.booking.entity.BookingCreationOutcome;
+
+import java.util.Optional;
+import com.hotelbooking.booking.exception.IdempotencyKeyConflictException;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -37,15 +41,21 @@ public class BookingSagaStateService {
     ) {}
 
     @Transactional
-    public SagaBooking createPending(Long userId, BookingRequest request) {
-        Booking booking = bookingRepository.saveAndFlush(
-                new Booking(
-                        userId,
-                        request.roomId(),
-                        request.checkIn(),
-                        request.checkOut()
-                )
+    public SagaBooking createPending(
+            Long userId,
+            BookingRequest request,
+            UUID idempotencyKey
+    ){
+        Booking booking = new Booking(
+                userId,
+                request.roomId(),
+                request.checkIn(),
+                request.checkOut()
         );
+
+        booking.assignIdempotencyKey(idempotencyKey);
+
+        bookingRepository.saveAndFlush(booking);
 
         return snapshot(booking);
     }
@@ -56,6 +66,7 @@ public class BookingSagaStateService {
 
         try {
             booking.confirm();
+            booking.markCreationOutcome(BookingCreationOutcome.SUCCESS);
         } catch (IllegalStateException ex) {
             throw new InvalidBookingStatusException(bookingId, "confirm");
         }
@@ -85,6 +96,32 @@ public class BookingSagaStateService {
         return snapshot(booking);
     }
 
+    public record ExistingCreation(
+            BookingResponse booking,
+            BookingCreationOutcome outcome
+    ) {}
+
+    @Transactional(readOnly = true)
+    public Optional<ExistingCreation> findByIdempotencyKey(
+            Long userId,
+            UUID key,
+            BookingRequest request
+    ) {
+        return bookingRepository.findByUserIdAndIdempotencyKey(userId, key)
+                .map(booking -> {
+                    if (!booking.getRoomId().equals(request.roomId())
+                            || !booking.getCheckIn().equals(request.checkIn())
+                            || !booking.getCheckOut().equals(request.checkOut())) {
+                        throw new IdempotencyKeyConflictException();
+                    }
+
+                    return new ExistingCreation(
+                            bookingMapper.toResponse(booking),
+                            booking.getCreationOutcome()
+                    );
+                });
+    }
+
     private Booking find(Long bookingId) {
         return bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId));
@@ -99,4 +136,22 @@ public class BookingSagaStateService {
                 booking.getCheckOut()
         );
     }
+    @Transactional
+    public BookingResponse cancelCreation(
+            Long bookingId,
+            BookingCreationOutcome outcome
+    ) {
+        if (outcome != BookingCreationOutcome.ROOM_CONFLICT
+                && outcome != BookingCreationOutcome.FAILED) {
+            throw new IllegalArgumentException("Invalid creation outcome");
+        }
+
+        Booking booking = find(bookingId);
+
+        booking.cancel();
+        booking.markCreationOutcome(outcome);
+
+        return bookingMapper.toResponse(booking);
+    }
+
 }

@@ -3,13 +3,24 @@ package com.hotelbooking.booking.entity;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
+
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(name = "bookings", indexes = {
         @Index(name = "idx_booking_room_dates",
                 columnList = "room_id, check_in, check_out")
-})
+},
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_booking_user_idempotency",
+                        columnNames = {"user_id", "idempotency_key"}
+                )
+        }
+)
 public class Booking {
 
     @Id
@@ -32,6 +43,9 @@ public class Booking {
     @Column(nullable = false)
     private BookingStatus status = BookingStatus.PENDING;
 
+    @Column(name = "idempotency_key")
+    private UUID idempotencyKey;
+
     @Version
     private Long version;
 
@@ -52,6 +66,11 @@ public class Booking {
         this.checkOut = checkOut;
         this.reservationId = UUID.randomUUID();
     }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "creation_outcome", nullable = false)
+    private BookingCreationOutcome creationOutcome =
+            BookingCreationOutcome.PROCESSING;
 
     @PrePersist
     void onCreate() {
@@ -83,4 +102,19 @@ public class Booking {
     public UUID getReservationId() {
         return reservationId;
     }
+
+    public UUID getIdempotencyKey() {
+        return idempotencyKey;
+    }
+    public void assignIdempotencyKey(UUID key) {
+        this.idempotencyKey = Objects.requireNonNull(key);
+    }
+    public BookingCreationOutcome getCreationOutcome() {
+        return creationOutcome;
+    }
+
+    public void markCreationOutcome(BookingCreationOutcome outcome) {
+        this.creationOutcome = Objects.requireNonNull(outcome);
+    }
+
 }

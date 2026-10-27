@@ -22,12 +22,22 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.hotelbooking.booking.entity.BookingStatus;
 
+import com.hotelbooking.booking.exception.RequestInProgressException;
+import com.hotelbooking.booking.entity.BookingCreationOutcome;
+import com.hotelbooking.booking.entity.BookingStatus;
+
 import com.hotelbooking.booking.exception.BookingSagaUnavailableException;
 import org.springframework.web.client.RestClientResponseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.HttpServerErrorException;
+
+import org.springframework.dao.DataIntegrityViolationException;
+
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class BookingService {
@@ -83,10 +93,26 @@ public class BookingService {
     }
 
     public void validateBooking(BookingRequest request) {
-
         validateDates(request);
 
-        validateRoom(request.roomId());
+        try {
+            validateRoom(request.roomId());
+
+        } catch (ResourceAccessException | HttpServerErrorException ex) {
+            throw new BookingSagaUnavailableException(
+                    "Hotel Service is unavailable", ex
+            );
+
+        } catch (IllegalStateException ex) {
+            if (ex.getMessage() != null
+                    && ex.getMessage().startsWith("No instances available for ")) {
+                throw new BookingSagaUnavailableException(
+                        "Hotel Service is unavailable", ex
+                );
+            }
+
+            throw ex;
+        }
 
         boolean occupied = bookingRepository.existsOverlappingBooking(
                 request.roomId(),
@@ -99,11 +125,39 @@ public class BookingService {
             throw new RoomAlreadyBookedException(request.roomId());
         }
     }
-    public BookingResponse createBooking(Long userId, BookingRequest request) {
+    public BookingResponse createBooking(
+            Long userId,
+            BookingRequest request,
+            UUID idempotencyKey
+    ) {
+        var existing = sagaStateService.findByIdempotencyKey(
+                userId, idempotencyKey, request
+        );
+
+        if (existing.isPresent()) {
+            return waitForExistingRequest(
+                    userId, request, idempotencyKey, existing.get()
+            );
+        }
+
         validateDates(request);
         validateRoom(request.roomId());
 
-        var pending = sagaStateService.createPending(userId, request);
+        BookingSagaStateService.SagaBooking pending;
+
+        try {
+            pending = sagaStateService.createPending(
+                    userId, request, idempotencyKey
+            );
+        } catch (DataIntegrityViolationException ex) {
+            var duplicate = sagaStateService.findByIdempotencyKey(
+                    userId, idempotencyKey, request
+            ).orElseThrow(() -> ex);
+
+            return waitForExistingRequest(
+                    userId, request, idempotencyKey, duplicate
+            );
+        }
 
         try {
             var reservation = hotelServiceClient.reserveRoom(
@@ -129,7 +183,16 @@ public class BookingService {
                         pending.reservationId()
                 );
 
-                sagaStateService.cancel(pending.bookingId());
+                Boolean roomConflict =
+                        error instanceof RestClientResponseException httpError
+                                && httpError.getStatusCode().value() == 409;
+
+                sagaStateService.cancelCreation(
+                        pending.bookingId(),
+                        roomConflict
+                                ? BookingCreationOutcome.ROOM_CONFLICT
+                                : BookingCreationOutcome.FAILED
+                );
 
             } catch (RuntimeException compensationError) {
                 log.error(
@@ -148,6 +211,10 @@ public class BookingService {
 
             if (error instanceof RestClientResponseException httpError
                     && httpError.getStatusCode().value() == 409) {
+
+                log.error("Hotel Service returned 409: {}",
+                        httpError.getResponseBodyAsString());
+
                 throw new RoomAlreadyBookedException(pending.roomId());
             }
 
@@ -239,5 +306,65 @@ public class BookingService {
                 .stream()
                 .map(bookingMapper::toResponse)
                 .toList();
+    }
+    private BookingResponse responseForRepeatedRequest(
+            BookingSagaStateService.ExistingCreation existing
+    ) {
+        BookingResponse booking = existing.booking();
+
+        return switch (existing.outcome()) {
+
+            case SUCCESS -> new BookingResponse(
+                    booking.id(),
+                    booking.userId(),
+                    booking.roomId(),
+                    booking.checkIn(),
+                    booking.checkOut(),
+                    BookingStatus.CONFIRMED,
+                    booking.createdAt()
+            );
+
+            case ROOM_CONFLICT ->
+                    throw new RoomAlreadyBookedException(booking.roomId());
+
+            case PROCESSING ->
+                    throw new RequestInProgressException();
+
+            case FAILED ->
+                    throw new BookingSagaUnavailableException(
+                            "Booking creation failed",
+                            new IllegalStateException("Creation outcome: FAILED")
+                    );
+        };
+    }
+    private BookingResponse waitForExistingRequest(
+            Long userId,
+            BookingRequest request,
+            UUID idempotencyKey,
+            BookingSagaStateService.ExistingCreation existing
+    ) {
+        var current = existing;
+
+        for (int i = 0;
+             i < 100 && current.outcome() == BookingCreationOutcome.PROCESSING;
+             i++) {
+
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new BookingSagaUnavailableException(
+                        "Interrupted while waiting for booking", ex
+                );
+            }
+
+            current = sagaStateService.findByIdempotencyKey(
+                    userId, idempotencyKey, request
+            ).orElseThrow(() ->
+                    new IllegalStateException("Booking disappeared")
+            );
+        }
+
+        return responseForRepeatedRequest(current);
     }
 }
