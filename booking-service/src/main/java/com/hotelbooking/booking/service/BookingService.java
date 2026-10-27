@@ -5,14 +5,12 @@ import com.hotelbooking.booking.dto.client.HotelRoomResponse;
 import com.hotelbooking.booking.dto.request.BookingRequest;
 import com.hotelbooking.booking.dto.response.BookingResponse;
 import com.hotelbooking.booking.entity.Booking;
-import com.hotelbooking.booking.entity.BookingNight;
 import com.hotelbooking.booking.entity.BookingStatus;
 import com.hotelbooking.booking.exception.BookingNotFoundException;
 import com.hotelbooking.booking.exception.InvalidBookingStatusException;
 import com.hotelbooking.booking.exception.RoomAlreadyBookedException;
 import com.hotelbooking.booking.exception.RoomUnavailableException;
 import com.hotelbooking.booking.mapper.BookingMapper;
-import com.hotelbooking.booking.repository.BookingNightRepository;
 import com.hotelbooking.booking.repository.BookingRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -20,11 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.hotelbooking.booking.entity.BookingStatus;
+
 
 import com.hotelbooking.booking.exception.RequestInProgressException;
 import com.hotelbooking.booking.entity.BookingCreationOutcome;
-import com.hotelbooking.booking.entity.BookingStatus;
+
 
 import com.hotelbooking.booking.exception.BookingSagaUnavailableException;
 import org.springframework.web.client.RestClientResponseException;
@@ -34,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.HttpServerErrorException;
 
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.UUID;
