@@ -1240,3 +1240,375 @@ Authorization: Bearer {{adminToken}}
 ### Не перезапускайте Gateway и Hotel.
 GET http://localhost:8080/api/rooms?hotelId=1
 Authorization: Bearer {{adminToken}}
+
+
+
+### CRUD-01 — ADMIN создаёт отель: 201
+POST http://localhost:8080/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CRUD Test Hotel",
+  "address": "Yerevan, Test Street 10"
+}
+
+> {%
+    client.global.set("crudHotelId", response.body.id);
+%}
+
+
+### CRUD-02 — список отелей: 200
+GET http://localhost:8080/api/hotels
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-03 — отель по ID: 200
+GET http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-04 — изменение отеля: 200
+PUT http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CRUD Hotel Updated",
+  "address": "Yerevan, New Street 20"
+}
+
+
+### CRUD-05 — читаем обновлённый отель: 200
+GET http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-06 — дубликат отеля: 409 HOTEL_ALREADY_EXISTS
+POST http://localhost:8080/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "crud hotel updated",
+  "address": "YEREVAN, NEW STREET 20"
+}
+
+
+### CRUD-07 — невалидное обновление: 400 VALIDATION_ERROR
+PUT http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "",
+  "address": "Yerevan"
+}
+
+
+### CRUD-08 — отель не существует: 404
+GET http://localhost:8080/api/hotels/999999
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-09 — обновление несуществующего отеля: 404
+PUT http://localhost:8080/api/hotels/999999
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Missing Hotel",
+  "address": "Yerevan"
+}
+
+
+### CRUD-10 — создаём второй отель: 201
+POST http://localhost:8080/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CRUD Second Hotel",
+  "address": "Yerevan, Street 2"
+}
+
+> {%
+    client.global.set("crudSecondHotelId", response.body.id);
+%}
+
+
+### CRUD-11 — изменение на дубликат: 409
+PUT http://localhost:8080/api/hotels/{{crudSecondHotelId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CRUD Hotel Updated",
+  "address": "Yerevan, New Street 20"
+}
+
+
+### CRUD-12 — удаляем пустой второй отель: 204
+DELETE http://localhost:8080/api/hotels/{{crudSecondHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-13 — создаём комнату A101: 201
+POST http://localhost:8080/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{crudHotelId}},
+  "number": "A101"
+}
+
+> {%
+    client.global.set("crudRoomId", response.body.id);
+%}
+
+
+### CRUD-14 — создаём комнату A102: 201
+POST http://localhost:8080/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{crudHotelId}},
+  "number": "A102"
+}
+
+> {%
+    client.global.set("crudSecondRoomId", response.body.id);
+%}
+
+
+### CRUD-15 — список комнат: 200, две комнаты
+GET http://localhost:8080/api/rooms?hotelId={{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-16 — переименовываем A101 в A103: 200
+PUT http://localhost:8080/api/rooms/{{crudRoomId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "number": "A103"
+}
+
+
+### CRUD-17 — читаем обновлённую комнату: 200
+GET http://localhost:8080/api/rooms/{{crudRoomId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-18 — номер A102 уже занят: 409 ROOM_ALREADY_EXISTS
+PUT http://localhost:8080/api/rooms/{{crudRoomId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "number": "A102"
+}
+
+
+### CRUD-19 — пустой номер комнаты: 400
+PUT http://localhost:8080/api/rooms/{{crudRoomId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "number": ""
+}
+
+
+### CRUD-20 — несуществующая комната: 404
+PUT http://localhost:8080/api/rooms/999999
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "number": "A200"
+}
+
+
+### CRUD-21 — отключаем комнату: 200, available=false
+PATCH http://localhost:8080/api/rooms/{{crudRoomId}}/availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "available": false
+}
+
+
+### CRUD-22 — включаем комнату обратно: 200
+PATCH http://localhost:8080/api/rooms/{{crudRoomId}}/availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "available": true
+}
+
+
+### CRUD-23 — нельзя удалить отель с комнатами: 409 HOTEL_HAS_ROOMS
+DELETE http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-24 — USER может читать отель: 200
+GET http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{accessToken}}
+
+
+### CRUD-25 — USER не может менять отель: 403
+PUT http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Hacked Hotel",
+  "address": "Unknown"
+}
+
+
+### CRUD-26 — USER не может удалить отель: 403
+DELETE http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{accessToken}}
+
+
+### CRUD-27 — USER не может изменить комнату: 403
+PUT http://localhost:8080/api/rooms/{{crudRoomId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "number": "A999"
+}
+
+
+### CRUD-28 — USER не может удалить комнату: 403
+DELETE http://localhost:8080/api/rooms/{{crudRoomId}}
+Authorization: Bearer {{accessToken}}
+
+
+### CRUD-29 — удаление второй комнаты: 204
+DELETE http://localhost:8080/api/rooms/{{crudSecondRoomId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-30 — удалённая комната: 404
+GET http://localhost:8080/api/rooms/{{crudSecondRoomId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-31 — удаляем первую комнату: 204
+DELETE http://localhost:8080/api/rooms/{{crudRoomId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-32 — теперь удаляем отель: 204
+DELETE http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-33 — удалённый отель: 404
+GET http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-34 — повторное удаление отеля: 404
+DELETE http://localhost:8080/api/hotels/{{crudHotelId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-35 — создаём отдельный отель для Saga: 201
+POST http://localhost:8080/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CRUD Saga Hotel",
+  "address": "Yerevan, Saga Street 100"
+}
+
+> {%
+    client.global.set("crudSagaHotelId", response.body.id);
+%}
+
+
+### CRUD-36 — создаём комнату для бронирования: 201
+POST http://localhost:8080/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{crudSagaHotelId}},
+  "number": "S101"
+}
+
+> {%
+    client.global.set("crudSagaRoomId", response.body.id);
+%}
+
+
+### CRUD-37 — создание бронирования через Saga: 201 CONFIRMED
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{crudSagaRoomId}},
+  "checkIn": "2030-01-10",
+  "checkOut": "2030-01-12"
+}
+
+> {%
+    client.global.set("crudSagaBookingId", response.body.id);
+%}
+
+
+### CRUD-38 — номер с бронированием удалять нельзя: 409
+DELETE http://localhost:8080/api/rooms/{{crudSagaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-39 — отмена бронирования через Saga: 200 CANCELLED
+PATCH http://localhost:8080/api/bookings/{{crudSagaBookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-40 — история сохраняется, удалить нельзя: 409
+DELETE http://localhost:8080/api/rooms/{{crudSagaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-41 — отключаем номер с историей: 200
+PATCH http://localhost:8080/api/rooms/{{crudSagaRoomId}}/availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "available": false
+}
+
+
+### CRUD-42 — без JWT чтение запрещено: 401
+GET http://localhost:8080/api/hotels
+
+
+### CRUD-43 — без JWT изменение запрещено: 401
+DELETE http://localhost:8080/api/hotels/{{crudSagaHotelId}}
+
+
+### CRUD-44 — прямой обход Gateway по-прежнему запрещён: 403
+GET http://localhost:8082/api/rooms/{{crudSagaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+
+### CRUD-45 — через Gateway доступ работает: 200
+GET http://localhost:8080/api/rooms/{{crudSagaRoomId}}
+Authorization: Bearer {{adminToken}}

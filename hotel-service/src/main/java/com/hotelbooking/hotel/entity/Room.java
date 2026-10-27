@@ -49,6 +49,10 @@ public class Room {
         return number;
     }
 
+    public void changeNumber(String number) {
+        this.number = number;
+    }
+
     public boolean isAvailable() {
         return available;
     }

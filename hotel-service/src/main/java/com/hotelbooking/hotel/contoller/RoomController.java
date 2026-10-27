@@ -2,6 +2,7 @@ package com.hotelbooking.hotel.controller;
 
 import com.hotelbooking.hotel.dto.request.RoomAvailabilityRequest;
 import com.hotelbooking.hotel.dto.request.RoomRequest;
+import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
 import com.hotelbooking.hotel.dto.response.RoomResponse;
 import com.hotelbooking.hotel.service.RoomService;
 import jakarta.validation.Valid;
@@ -64,5 +65,23 @@ public class RoomController {
         return ResponseEntity.ok(
                 roomService.getAvailableRoomsByHotelId(hotelId)
         );
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoomResponse> updateRoom(
+            @PathVariable Long id,
+            @Valid @RequestBody RoomUpdateRequest request
+    ) {
+        return ResponseEntity.ok(roomService.updateRoom(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteRoom(
+            @PathVariable Long id
+    ) {
+        roomService.deleteRoom(id);
+        return ResponseEntity.noContent().build();
     }
 }

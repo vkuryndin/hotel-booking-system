@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface RoomReservationRepository
         extends JpaRepository<RoomReservation, UUID> {
+    boolean existsByRoom_Id(Long roomId);
 }

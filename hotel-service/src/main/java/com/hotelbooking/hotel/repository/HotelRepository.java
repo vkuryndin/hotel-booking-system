@@ -8,4 +8,9 @@ public interface HotelRepository extends JpaRepository<Hotel, Long> {
             String name,
             String address
     );
+    boolean existsByNameIgnoreCaseAndAddressIgnoreCaseAndIdNot(
+            String name,
+            String address,
+            Long id
+    );
 }

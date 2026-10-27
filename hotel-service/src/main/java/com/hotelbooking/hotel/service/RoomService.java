@@ -16,22 +16,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-
+import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
+import com.hotelbooking.hotel.exception.ResourceInUseException;
+import com.hotelbooking.hotel.repository.RoomReservationRepository;
 @Service
 public class RoomService {
 
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
     private final RoomMapper roomMapper;
+    private final RoomReservationRepository reservationRepository;
 
     public RoomService(
             RoomRepository roomRepository,
             HotelRepository hotelRepository,
-            RoomMapper roomMapper
+            RoomMapper roomMapper,
+            RoomReservationRepository reservationRepository
     ) {
         this.roomRepository = roomRepository;
         this.hotelRepository = hotelRepository;
         this.roomMapper = roomMapper;
+        this.reservationRepository = reservationRepository;
     }
 
     @Transactional
@@ -96,6 +101,56 @@ public class RoomService {
                 .stream()
                 .map(roomMapper::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public RoomResponse updateRoom(
+            Long roomId,
+            RoomUpdateRequest request
+    ) {
+        Room room = roomRepository.findByIdForUpdate(roomId)
+                .orElseThrow(() -> new RoomNotFoundException(roomId));
+
+        String number = request.number().trim();
+        Long hotelId = room.getHotel().getId();
+
+        if (roomRepository.existsByHotelIdAndNumberAndIdNot(
+                hotelId, number, roomId)) {
+            throw new RoomAlreadyExistsException(hotelId, number);
+        }
+
+        room.changeNumber(number);
+
+        try {
+            roomRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new RoomAlreadyExistsException(hotelId, number);
+        }
+
+        return roomMapper.toResponse(room);
+    }
+
+    @Transactional
+    public void deleteRoom(Long roomId) {
+        Room room = roomRepository.findByIdForUpdate(roomId)
+                .orElseThrow(() -> new RoomNotFoundException(roomId));
+
+        if (reservationRepository.existsByRoom_Id(roomId)) {
+            throw new ResourceInUseException(
+                    "ROOM_HAS_RESERVATIONS",
+                    "Cannot delete room with reservation history: " + roomId
+            );
+        }
+
+        try {
+            roomRepository.delete(room);
+            roomRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResourceInUseException(
+                    "ROOM_HAS_RESERVATIONS",
+                    "Cannot delete room with reservation history: " + roomId
+            );
+        }
     }
 
 }

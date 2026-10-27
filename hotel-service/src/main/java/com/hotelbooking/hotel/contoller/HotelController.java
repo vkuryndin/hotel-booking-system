@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/hotels")
@@ -32,5 +33,36 @@ public class HotelController {
         URI location = URI.create("/api/hotels/" + response.id());
 
         return ResponseEntity.created(location).body(response);
+    }
+    @GetMapping
+    public ResponseEntity<List<HotelResponse>> getHotels() {
+        return ResponseEntity.ok(hotelService.getHotels());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<HotelResponse> getHotelById(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(hotelService.getHotelById(id));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<HotelResponse> updateHotel(
+            @PathVariable Long id,
+            @Valid @RequestBody HotelRequest request
+    ) {
+        return ResponseEntity.ok(
+                hotelService.updateHotel(id, request)
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteHotel(
+            @PathVariable Long id
+    ) {
+        hotelService.deleteHotel(id);
+        return ResponseEntity.noContent().build();
     }
 }

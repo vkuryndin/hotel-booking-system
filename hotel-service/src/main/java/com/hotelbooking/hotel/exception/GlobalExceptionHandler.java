@@ -220,4 +220,21 @@ public class GlobalExceptionHandler {
                 )
         );
     }
+    @ExceptionHandler(ResourceInUseException.class)
+    public ResponseEntity<ErrorResponse> handleResourceInUse(
+            ResourceInUseException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new ErrorResponse(
+                        Instant.now(),
+                        409,
+                        ex.getCode(),
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        null,
+                        null
+                )
+        );
+    }
 }
