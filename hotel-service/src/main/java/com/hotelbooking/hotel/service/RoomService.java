@@ -18,6 +18,7 @@ import com.hotelbooking.hotel.strategy.RoomSelectionStrategy;
 import java.time.LocalDate;
 
 
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
 import com.hotelbooking.hotel.exception.ResourceInUseException;
@@ -329,6 +330,11 @@ public class RoomService {
                 || checkIn.isBefore(LocalDate.now())
                 || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Invalid booking dates");
+        }
+        if (ChronoUnit.DAYS.between(checkIn, checkOut) > 365) {
+            throw new IllegalArgumentException(
+                    "Booking cannot exceed 365 nights"
+            );
         }
 
         if (guestCount < 1) {

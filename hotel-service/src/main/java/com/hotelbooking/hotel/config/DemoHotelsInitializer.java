@@ -168,7 +168,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                         ),
                         List.of(
                                 new PhotoSeed("maison-lumiere.jpg", "demo-maison-lumiere.jpg"),
-                                new PhotoSeed("maison-lumiere-2.jpg", "demo-maison-lumiere-2.jpg")
+                                new PhotoSeed("maison-lumiere-2.png", "demo-maison-lumiere-2.png")
                         ),
                         List.of(
                                 new RoomSeed("101", RoomCategory.STANDARD,
@@ -204,7 +204,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                         ),
                         List.of(
                                 new PhotoSeed("coral-bay.jpg", "demo-coral-bay.jpg"),
-                                new PhotoSeed("coral-bay-2.jpg", "demo-coral-bay-2.jpg")
+                                new PhotoSeed("coral-bay-2.png", "demo-coral-bay-2.png")
                         ),
                         List.of(
                                 new RoomSeed("101", RoomCategory.STANDARD,
@@ -240,7 +240,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                         ),
                         List.of(
                                 new PhotoSeed("alpine-summit.jpg", "demo-alpine-summit.jpg"),
-                                new PhotoSeed("alpine-summit-2.jpg", "demo-alpine-summit-2.jpg")
+                                new PhotoSeed("alpine-summit-2.png", "demo-alpine-summit-2.png")
                         ),
                         List.of(
                                 new RoomSeed("101", RoomCategory.STANDARD,

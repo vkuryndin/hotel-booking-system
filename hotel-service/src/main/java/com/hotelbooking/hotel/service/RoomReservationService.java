@@ -1,5 +1,5 @@
 package com.hotelbooking.hotel.service;
-
+import java.time.temporal.ChronoUnit;
 import com.hotelbooking.hotel.entity.*;
 import com.hotelbooking.hotel.exception.RoomNotFoundException;
 import com.hotelbooking.hotel.exception.RoomReservationConflictException;
@@ -55,6 +55,11 @@ public class RoomReservationService {
                 || checkIn == null || checkOut == null
                 || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Invalid reservation parameters");
+        }
+        if (ChronoUnit.DAYS.between(checkIn, checkOut) > 365) {
+            throw new IllegalArgumentException(
+                    "Reservation cannot exceed 365 nights"
+            );
         }
 
         Room room = roomRepository.findByIdForUpdate(roomId)

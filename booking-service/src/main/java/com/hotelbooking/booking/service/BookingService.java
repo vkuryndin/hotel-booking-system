@@ -39,6 +39,7 @@ import com.hotelbooking.booking.exception.NoAvailableRoomsException;
 import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.web.client.RestClientException;
+import java.time.temporal.ChronoUnit;
 
 @Service
 public class BookingService {
@@ -78,6 +79,11 @@ public class BookingService {
         if (!request.checkOut().isAfter(request.checkIn())) {
             throw new IllegalArgumentException(
                     "Check-out must be after check-in"
+            );
+        }
+        if (ChronoUnit.DAYS.between(request.checkIn(), request.checkOut()) > 365) {
+            throw new IllegalArgumentException(
+                    "Booking cannot exceed 365 nights"
             );
         }
     }
