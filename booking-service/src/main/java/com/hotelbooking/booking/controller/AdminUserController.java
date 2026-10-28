@@ -15,7 +15,8 @@ import java.time.Instant;
 import java.util.Map;
 
 import java.net.URI;
-
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 @RestController
 @RequestMapping("/api/users")
 public class AdminUserController {
@@ -40,9 +41,12 @@ public class AdminUserController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> deleteUser(
-            @PathVariable Long id
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        adminUserService.deleteUser(id);
+        Long actingAdminId = Long.valueOf(jwt.getSubject());
+
+        adminUserService.deleteUser(id, actingAdminId);
 
         return ResponseEntity.ok(Map.of(
                 "timestamp", Instant.now().toString(),

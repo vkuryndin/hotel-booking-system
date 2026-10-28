@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -30,9 +32,16 @@ public class AdminUserUpdateController {
     @PreAuthorize("hasRole('ADMIN')")
     public AdminUserResponse updateUser(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateAdminUserRequest request
+            @Valid @RequestBody UpdateAdminUserRequest request,
+            @AuthenticationPrincipal Jwt jwt
     ) {
-        return updateService.updateUser(id, request);
+        Long actingAdminId = Long.valueOf(jwt.getSubject());
+
+        return updateService.updateUser(
+                id,
+                request,
+                actingAdminId
+        );
     }
 
     @PostMapping("/{id}/reset-password")

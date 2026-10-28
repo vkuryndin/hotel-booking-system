@@ -16,6 +16,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
+import com.hotelbooking.booking.entity.Role;
+import org.springframework.security.access.AccessDeniedException;
+import java.util.List;
 @Service
 public class AdminUserUpdateService {
 
@@ -33,8 +36,13 @@ public class AdminUserUpdateService {
     @Transactional
     public AdminUserResponse updateUser(
             Long id,
-            UpdateAdminUserRequest request
+            UpdateAdminUserRequest request,
+            Long actingAdminId
     ) {
+        List<AppUser> lockedAdmins = request.role() == Role.USER
+                ? userRepository.lockUsersByRole(Role.ADMIN)
+                : List.of();
+
         AppUser user = findUser(id);
 
         if (request.email() == null
@@ -74,6 +82,24 @@ public class AdminUserUpdateService {
         }
 
         if (request.role() != null) {
+
+            if (user.getRole() == Role.ADMIN
+                    && request.role() == Role.USER) {
+
+                if (id.equals(actingAdminId)) {
+                    throw new AccessDeniedException(
+                            "Cannot demote yourself"
+                    );
+                }
+
+                if (lockedAdmins.size() <= 1) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "Cannot demote the last administrator"
+                    );
+                }
+            }
+
             user.changeRole(request.role());
         }
         if (request.username() != null

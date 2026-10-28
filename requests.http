@@ -4255,3 +4255,118 @@ Authorization: Bearer {{adminToken}}
             "Expected 4, got " + response.body.timesBooked);
     });
 %}
+
+
+
+### ADMIN-01 — Получаем ID текущего администратора
+### Ожидаем 200 и role=ADMIN
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("ADMIN-01", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.role === "ADMIN");
+        client.global.set("guardAdminId", response.body.id);
+    });
+%}
+
+
+### ADMIN-02 — Запрещаем понижение себя
+### Ожидаем 403
+PATCH {{baseUrl}}/api/users/{{guardAdminId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "role": "USER"
+}
+
+> {%
+    client.test("ADMIN-02: Self-demotion blocked", () => {
+        client.assert(response.status === 403);
+    });
+%}
+
+
+### ADMIN-03 — Запрещаем удаление себя
+### Ожидаем 403
+DELETE {{baseUrl}}/api/users/{{guardAdminId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("ADMIN-03: Self-deletion blocked", () => {
+        client.assert(response.status === 403);
+    });
+%}
+
+
+### ADMIN-04 — Создаём второго администратора
+### Ожидаем 201
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "admin-guard-test@example.com",
+  "password": "TestPassword123!",
+  "role": "ADMIN",
+  "username": "admin_guard_test",
+  "firstName": "Guard",
+  "lastName": "Test"
+}
+
+> {%
+    client.test("ADMIN-04: Second admin created", () => {
+        client.assert(response.status === 201);
+        client.global.set("guardSecondAdminId", response.body.id);
+    });
+%}
+
+
+### ADMIN-05 — Понижаем второго ADMIN до USER
+### Ожидаем 200 и role=USER
+PATCH {{baseUrl}}/api/users/{{guardSecondAdminId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "role": "USER"
+}
+
+> {%
+    client.test("ADMIN-05: Other admin demoted", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.role === "USER");
+    });
+%}
+
+
+### ADMIN-06 — Удаляем бывшего ADMIN
+### Ожидаем 200 USER_DELETED
+DELETE {{baseUrl}}/api/users/{{guardSecondAdminId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("ADMIN-06: User deleted", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.code === "USER_DELETED");
+    });
+%}
+
+
+### ADMIN-07 — Проверяем, что основной ADMIN остался
+### Ожидаем 200 и role=ADMIN
+GET {{baseUrl}}/api/users/me
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("ADMIN-07: Main admin preserved", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.role === "ADMIN");
+        client.assert(
+            Number(response.body.id) ===
+            Number(client.global.get("guardAdminId"))
+        );
+    });
+%}

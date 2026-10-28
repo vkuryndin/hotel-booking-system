@@ -16,6 +16,12 @@ import com.hotelbooking.booking.repository.BookingRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
+import com.hotelbooking.booking.entity.Role;
+import org.springframework.security.access.AccessDeniedException;
+import java.util.List;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 @Service
 public class AdminUserService {
 
@@ -84,13 +90,30 @@ public class AdminUserService {
         return AdminUserResponse.from(user);
     }
     @Transactional
-    public void deleteUser(Long id) {
+    public void deleteUser(Long id, Long actingAdminId) {
+
+        if (id.equals(actingAdminId)) {
+            throw new AccessDeniedException(
+                    "Cannot delete yourself"
+            );
+        }
+
+        List<AppUser> lockedAdmins =
+                userRepository.lockUsersByRole(Role.ADMIN);
 
         AppUser user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "User not found: " + id
                 ));
+
+        if (user.getRole() == Role.ADMIN
+                && lockedAdmins.size() <= 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cannot delete the last administrator"
+            );
+        }
 
         if (bookingRepository.existsByUserId(id)) {
             throw new ResponseStatusException(
