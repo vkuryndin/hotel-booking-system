@@ -3307,3 +3307,24 @@ X-Trace-Id: 99999999-9999-4999-8999-999999999999
         );
     });
 %}
+
+### demo user-1
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "anna.petrova@example.com",
+  "password": "1234567890!!@d"
+}
+
+> {%
+    client.global.set("accessToken", response.body.accessToken);
+%}
+
+### demo user-2
+GET http://localhost:8080/api/hotels
+Authorization: Bearer {{accessToken}}
+
+### photos
+GET http://localhost:8080/api/hotels/1/photos
+Authorization: Bearer {{accessToken}}
