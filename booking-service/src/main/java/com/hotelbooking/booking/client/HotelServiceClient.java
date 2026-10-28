@@ -1,32 +1,33 @@
+
 package com.hotelbooking.booking.client;
 
 import com.hotelbooking.booking.dto.client.HotelRoomResponse;
+import com.hotelbooking.booking.dto.client.HotelReservationRequest;
+import com.hotelbooking.booking.dto.client.HotelReservationResponse;
+import com.hotelbooking.booking.dto.client.HotelReservationReleaseRequest;
 import com.hotelbooking.booking.dto.request.RoomSelectionMode;
 import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
 import com.hotelbooking.booking.exception.RoomNotFoundException;
+import com.hotelbooking.booking.exception.HotelNotFoundException;
+import com.hotelbooking.booking.security.ServiceTokenProvider;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-
-import com.hotelbooking.booking.dto.client.HotelReservationRequest;
-import com.hotelbooking.booking.dto.client.HotelReservationResponse;
-import com.hotelbooking.booking.dto.client.HotelReservationReleaseRequest;
-import com.hotelbooking.booking.security.ServiceTokenProvider;
-
-import org.springframework.resilience.annotation.Retryable;
-
-import java.time.LocalDate;
-import java.util.UUID;
-import java.util.Objects;
-import com.hotelbooking.booking.exception.HotelNotFoundException;
 import org.springframework.core.ParameterizedTypeReference;
-import java.util.List;
-import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import org.springframework.resilience.annotation.Retryable;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
+
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 @Retryable(
@@ -91,7 +92,7 @@ public class HotelServiceClient {
             throw new HotelServiceUnavailableException(ex);
         }
     }
-    // Новый метод — учитывает количество гостей
+
     public HotelReservationResponse reserveRoom(
             Long roomId,
             UUID reservationId,
@@ -121,9 +122,30 @@ public class HotelServiceClient {
             );
         });
     }
+
+    // Обычная отмена подтверждённого бронирования
+    // timesBooked не уменьшается
     public HotelReservationResponse releaseRoom(
             Long roomId,
             UUID reservationId
+    ) {
+        return sendRelease(roomId, reservationId, false);
+    }
+
+    // Компенсация неудачной Saga
+    // timesBooked уменьшается
+    public HotelReservationResponse compensateRoom(
+            Long roomId,
+            UUID reservationId
+    ) {
+        return sendRelease(roomId, reservationId, true);
+    }
+
+    // Общий метод освобождения номера
+    private HotelReservationResponse sendRelease(
+            Long roomId,
+            UUID reservationId,
+            boolean compensation
     ) {
         return withCircuitBreaker(() -> {
 
@@ -132,7 +154,10 @@ public class HotelServiceClient {
                     .headers(headers -> headers.setBearerAuth(
                             serviceTokenProvider.generateToken()
                     ))
-                    .body(new HotelReservationReleaseRequest(reservationId))
+                    .body(new HotelReservationReleaseRequest(
+                            reservationId,
+                            compensation
+                    ))
                     .retrieve()
                     .body(HotelReservationResponse.class);
 
@@ -142,6 +167,7 @@ public class HotelServiceClient {
             );
         });
     }
+
     public List<HotelRoomResponse> recommendRooms(
             Long hotelId,
             LocalDate checkIn,
@@ -181,6 +207,7 @@ public class HotelServiceClient {
             throw new HotelNotFoundException(hotelId);
         }
     }
+
     public List<HotelRoomResponse> recommendRooms(
             Long hotelId,
             LocalDate checkIn,
@@ -194,6 +221,7 @@ public class HotelServiceClient {
                 1
         );
     }
+
     private <T> T withCircuitBreaker(Supplier<T> operation) {
 
         return circuitBreakerFactory.create("hotelService").run(

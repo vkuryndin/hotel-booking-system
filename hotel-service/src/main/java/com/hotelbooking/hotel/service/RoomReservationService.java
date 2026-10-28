@@ -112,8 +112,18 @@ public class RoomReservationService {
 
         return reservation;
     }
+
     @Transactional
     public RoomReservation release(UUID reservationId, Long roomId) {
+        return release(reservationId, roomId, false);
+    }
+
+    @Transactional
+    public RoomReservation release(
+            UUID reservationId,
+            Long roomId,
+            boolean compensation
+    ) {
 
         if (reservationId == null || roomId == null) {
             throw new IllegalArgumentException("Invalid release parameters");
@@ -140,9 +150,14 @@ public class RoomReservationService {
 
         if (reservation.getStatus() == ReservationStatus.RESERVED) {
             nightRepository.deleteByReservationId(reservationId);
+
+            if (compensation) {
+                room.decrementTimesBooked();
+            }
+
             reservation.release();
         }
-
         return reservation;
     }
 }
+

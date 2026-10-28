@@ -95,7 +95,14 @@ public class Room {
     public void incrementTimesBooked() {
         this.timesBooked++;
     }
-
+    public void decrementTimesBooked() {
+        if (timesBooked <= 0) {
+            throw new IllegalStateException(
+                    "timesBooked cannot be negative"
+            );
+        }
+        timesBooked--;
+    }
     public void setAvailable(boolean available) {
         this.available = available;
     }

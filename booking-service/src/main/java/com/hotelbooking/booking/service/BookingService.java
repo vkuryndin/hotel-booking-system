@@ -287,9 +287,15 @@ public class BookingService {
             Long userId,
             boolean isAdmin
     ) {
-        var booking = sagaStateService.findAuthorized(
+        var candidate = sagaStateService.startCancellation(
                 bookingId, userId, isAdmin
         );
+
+        if (candidate.isEmpty()) {
+            return getBookingById(bookingId, userId, isAdmin);
+        }
+
+        var booking = candidate.get();
 
         try {
             hotelServiceClient.releaseRoom(
@@ -303,7 +309,7 @@ public class BookingService {
             );
         }
 
-        return sagaStateService.cancel(bookingId);
+        return sagaStateService.finishCancellation(bookingId);
     }
     @Transactional(readOnly = true)
     public Page<BookingResponse> getAllBookings(
@@ -377,7 +383,7 @@ public class BookingService {
                         && httpError.getStatusCode().value() == 409;
 
         try {
-            hotelServiceClient.releaseRoom(
+            hotelServiceClient.compensateRoom(
                     pending.roomId(),
                     pending.reservationId()
             );

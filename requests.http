@@ -1,4 +1,7 @@
 @baseUrl = http://localhost:8080
+@qaFailureCheckIn = 2054-07-10
+@qaFailureCheckOut = 2054-07-12
+@qaRoomId = 1
 
 ### Register user
 POST {{baseUrl}}/api/users/register
@@ -3781,3 +3784,474 @@ GET http://localhost:8080/api/bookings/my?page=0&size=1
 ### EDGE CASE — Несуществующая страница, ожидаем 200
 GET http://localhost:8080/api/bookings/my?page=9999&size=2
 Authorization: Bearer {{accessToken}}
+
+
+
+### ==========================================
+### STAGE 23 — SAGA / COUNTER TESTS
+### ==========================================
+
+
+@qaCheckIn = 2054-06-10
+@qaCheckOut = 2054-06-12
+@qaGuestCount = 1
+
+
+### QA-01 — Создаём отдельный тестовый отель
+### Ожидаем: 201, возвращается id
+
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "QA Saga {{$uuid}}",
+  "address": "Yerevan, QA Test Street"
+}
+
+> {%
+    client.test("QA-01: Hotel created", function() {
+        client.assert(response.status === 201,
+            "Expected 201, got " + response.status);
+        client.assert(Number(response.body.id) > 0,
+            "Hotel ID missing");
+    });
+    if (response.status === 201) {
+        client.global.set("qaHotelId", response.body.id);
+    }
+%}
+
+
+### QA-02 — Создаём номер в тестовом отеле
+### Ожидаем: 201, сохраняем qaRoomId
+
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{qaHotelId}},
+  "number": "QA101",
+  "category": "STANDARD",
+  "capacity": 2,
+  "pricePerNight": 150
+}
+
+> {%
+    client.test("QA-02: Room created", function() {
+        client.assert(response.status === 201,
+            "Expected 201, got " + response.status);
+        client.assert(Number(response.body.id) > 0,
+            "Room ID missing");
+        client.assert(
+            Number(response.body.hotelId) ===
+            Number(client.global.get("qaHotelId")),
+            "Wrong hotel ID"
+        );
+    });
+    if (response.status === 201) {
+        client.global.set("qaRoomId", response.body.id);
+    }
+%}
+
+
+### QA-03 — Проверяем начальный счётчик
+### Ожидаем: 200, timesBooked = 0
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-03: Initial counter is zero", function() {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.timesBooked) === 0,
+            "Expected timesBooked=0, got " +
+            response.body.timesBooked);
+    });
+%}
+
+
+### QA-04 — Создаём первое бронирование
+### Ожидаем: 201, CONFIRMED
+### Сохраняем qaBookingId
+
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{qaRoomId}},
+  "checkIn": "{{qaCheckIn}}",
+  "checkOut": "{{qaCheckOut}}",
+  "guestCount": {{qaGuestCount}}
+}
+
+> {%
+    client.test("QA-04: Booking confirmed", function() {
+        client.assert(response.status === 201,
+            "Expected 201, got " + response.status);
+        client.assert(response.body.status === "CONFIRMED",
+            "Expected CONFIRMED");
+        client.assert(Number(response.body.roomId) ===
+            Number(client.global.get("qaRoomId")),
+            "Wrong room ID");
+    });
+    if (response.status === 201) {
+        client.global.set("qaBookingId", response.body.id);
+    }
+%}
+
+
+### QA-05 — Счётчик после успешной брони
+### Ожидаем: 200, timesBooked = 1
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-05: Counter increased to 1", function() {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.timesBooked) === 1,
+            "Expected 1, got " + response.body.timesBooked);
+    });
+%}
+
+
+### QA-06 — Пробуем занять те же даты повторно
+### Используем новый Idempotency-Key
+### Ожидаем: 409 ROOM_ALREADY_BOOKED
+
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{qaRoomId}},
+  "checkIn": "{{qaCheckIn}}",
+  "checkOut": "{{qaCheckOut}}",
+  "guestCount": {{qaGuestCount}}
+}
+
+> {%
+    client.test("QA-06: Double booking rejected", function() {
+        client.assert(response.status === 409,
+            "Expected 409, got " + response.status);
+        client.assert(response.body.code === "ROOM_ALREADY_BOOKED",
+            "Unexpected error code: " + response.body.code);
+    });
+%}
+
+
+### QA-07 — Неудачная попытка не изменила счётчик
+### Ожидаем: 200, timesBooked = 1
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-07: Counter stays 1", function() {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.timesBooked) === 1,
+            "Counter changed after conflict");
+    });
+%}
+
+
+### QA-08 — Отменяем подтверждённую бронь
+### Ожидаем: 200 CANCELLED
+
+PATCH {{baseUrl}}/api/bookings/{{qaBookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-08: Booking cancelled", function() {
+        client.assert(response.status === 200,
+            "Expected 200, got " + response.status);
+        client.assert(response.body.status === "CANCELLED",
+            "Expected CANCELLED");
+    });
+%}
+
+
+### QA-09 — Проверяем статус в Booking Service
+### Ожидаем: 200 CANCELLED
+
+GET {{baseUrl}}/api/bookings/{{qaBookingId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-09: Cancellation persisted", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+
+### QA-10 — Исторический счётчик не уменьшается
+### Ожидаем: 200, timesBooked = 1
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-10: History preserved", function() {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.timesBooked) === 1,
+            "Cancellation incorrectly reduced counter");
+    });
+%}
+
+
+### QA-11 — Повторная отмена той же брони
+### Ожидаем: 200 CANCELLED
+
+PATCH {{baseUrl}}/api/bookings/{{qaBookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-11: Cancellation is idempotent", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+
+### QA-12 — Бронируем тот же номер на те же даты
+### Ожидаем: 201 CONFIRMED
+
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{qaRoomId}},
+  "checkIn": "{{qaCheckIn}}",
+  "checkOut": "{{qaCheckOut}}",
+  "guestCount": {{qaGuestCount}}
+}
+
+> {%
+    client.test("QA-12: Room available after cancellation", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+        client.assert(
+            Number(response.body.id) !==
+            Number(client.global.get("qaBookingId")),
+            "Expected a new booking ID"
+        );
+    });
+    if (response.status === 201) {
+        client.global.set("qaSecondBookingId", response.body.id);
+    }
+%}
+
+
+### QA-13 — Итоговый счётчик
+### Ожидаем: 200, timesBooked = 2
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-13: Final counter is 2", function() {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.timesBooked) === 2,
+            "Expected 2, got " + response.body.timesBooked);
+    });
+%}
+
+
+
+
+
+### ==========================================
+### STAGE 23 — CANCELLATION RECOVERY
+### ==========================================
+
+### QA-14 — Создаём бронь для проверки сбоя
+### Ожидаем 201 CONFIRMED
+
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{qaRoomId}},
+  "checkIn": "{{qaFailureCheckIn}}",
+  "checkOut": "{{qaFailureCheckOut}}",
+  "guestCount": 1
+}
+
+> {%
+    client.test("QA-14: Booking created", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+    if (response.status === 201) {
+        client.global.set("qaFailureBookingId", response.body.id);
+    }
+%}
+
+
+### QA-15 — Получаем ID Hotel Service из Eureka
+### Ожидаем 200
+
+GET http://localhost:8761/eureka/apps/HOTEL-SERVICE
+Accept: application/json
+
+> {%
+    client.test("QA-15: Hotel instance found", function() {
+        client.assert(response.status === 200);
+        const data = response.body.application.instance;
+        const instance = Array.isArray(data) ? data[0] : data;
+        client.assert(!!instance.instanceId, "Instance ID missing");
+        client.global.set("qaHotelInstanceId", instance.instanceId);
+    });
+%}
+
+
+### QA-16 — Переводим Hotel Service в OUT_OF_SERVICE
+### Ожидаем успешное обновление статуса в Eureka
+
+PUT http://localhost:8761/eureka/apps/HOTEL-SERVICE/{{qaHotelInstanceId}}/status?value=OUT_OF_SERVICE
+
+
+### QA-17 — Проверяем недоступность через Gateway
+### Ожидаем 503
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-17: Hotel unavailable", function() {
+        client.assert(response.status === 503,
+            "Expected 503, got " + response.status);
+    });
+%}
+
+
+### QA-18 — Пытаемся отменить бронирование
+### Ожидаем 503 BOOKING_SAGA_UNAVAILABLE
+
+PATCH {{baseUrl}}/api/bookings/{{qaFailureBookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-18: Cancellation failed safely", function() {
+        client.assert(response.status === 503,
+            "Expected 503, got " + response.status);
+        client.assert(
+            response.body.code === "BOOKING_SAGA_UNAVAILABLE",
+            "Unexpected error: " + response.body.code
+        );
+    });
+%}
+
+
+### QA-19 — Проверяем сохранённое состояние
+### Ожидаем 200 CANCELLING
+
+GET {{baseUrl}}/api/bookings/{{qaFailureBookingId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-19: Cancellation pending", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLING",
+            "Expected CANCELLING, got " + response.body.status);
+    });
+%}
+
+
+### QA-20 — Возвращаем Hotel Service в Eureka
+### Ожидаем успешное обновление статуса
+
+DELETE http://localhost:8761/eureka/apps/HOTEL-SERVICE/{{qaHotelInstanceId}}/status?value=UP
+
+
+### QA-21 — Проверяем, что Hotel Service снова доступен
+### Ожидаем 200
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-21: Hotel restored", function() {
+        client.assert(response.status === 200,
+            "Expected 200, got " + response.status);
+    });
+%}
+
+
+### QA-22 — Проверяем завершение Recovery
+### Запускать после того, как отмена старше 2 минут
+### и планировщик Recovery выполнил очередной проход.
+### Ожидаем 200 CANCELLED
+
+GET {{baseUrl}}/api/bookings/{{qaFailureBookingId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-22: Recovery completed", function() {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED",
+            "Expected CANCELLED, got " + response.body.status);
+    });
+%}
+
+
+### QA-23 — Проверяем счётчик после Recovery
+### Ожидаем 200, timesBooked = 3
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-23: History preserved", function() {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.timesBooked) === 3,
+            "Expected 3, got " + response.body.timesBooked);
+    });
+%}
+
+
+### QA-24 — Бронируем освобождённые Recovery даты
+### Ожидаем 201 CONFIRMED
+
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{qaRoomId}},
+  "checkIn": "{{qaFailureCheckIn}}",
+  "checkOut": "{{qaFailureCheckOut}}",
+  "guestCount": 1
+}
+
+> {%
+    client.test("QA-24: Recovered room available", function() {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+
+### QA-25 — Финальный счётчик
+### Ожидаем 200, timesBooked = 4
+
+GET {{baseUrl}}/api/rooms/{{qaRoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("QA-25: Final counter is 4", function() {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.timesBooked) === 4,
+            "Expected 4, got " + response.body.timesBooked);
+    });
+%}

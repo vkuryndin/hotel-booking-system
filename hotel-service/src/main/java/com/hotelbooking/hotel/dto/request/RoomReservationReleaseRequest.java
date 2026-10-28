@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record RoomReservationReleaseRequest(
-        @NotNull UUID reservationId
+        @NotNull UUID reservationId,
+        boolean compensation
 ) {
 }

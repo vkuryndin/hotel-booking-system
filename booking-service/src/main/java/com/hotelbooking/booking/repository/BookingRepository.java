@@ -41,6 +41,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             List<BookingCreationOutcome> outcomes,
             Instant createdAt
     );
+
+    List<Booking>
+    findTop10ByStatusAndCancellationRequestedAtBeforeOrderByCancellationRequestedAtAsc(
+            BookingStatus status,
+            Instant cutoff
+    );
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.id = :id")
     Optional<Booking> findByIdForUpdate(@Param("id") Long id);

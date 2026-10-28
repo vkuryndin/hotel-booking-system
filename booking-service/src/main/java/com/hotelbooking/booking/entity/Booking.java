@@ -56,11 +56,16 @@ public class Booking {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "cancellation_requested_at")
+    private Instant cancellationRequestedAt;
+
     @Column(name = "reservation_id", nullable = false, unique = true, updatable = false)
     private UUID reservationId;
 
     @Column(name = "guest_count", nullable = false)
     private int guestCount = 1;
+
+
 
     public int getGuestCount() {
         return guestCount;
@@ -103,13 +108,25 @@ public class Booking {
     public BookingStatus getStatus() { return status; }
     public Long getVersion() { return version; }
     public Instant getCreatedAt() { return createdAt; }
-
+    public Instant getCancellationRequestedAt() {
+        return cancellationRequestedAt;
+    }
     public void confirm() {
         if (status != BookingStatus.PENDING
                 || creationOutcome != BookingCreationOutcome.PROCESSING) {
             throw new IllegalStateException("Booking is not pending");
         }
         status = BookingStatus.CONFIRMED;
+    }
+    public void requestCancellation() {
+        if (status != BookingStatus.CONFIRMED) {
+            throw new IllegalStateException(
+                    "Only confirmed bookings can be cancelled"
+            );
+        }
+
+        status = BookingStatus.CANCELLING;
+        cancellationRequestedAt = Instant.now();
     }
 
     public void cancel() {

@@ -65,7 +65,7 @@ class BookingRecoveryRaceTest {
         CountDownLatch releaseStarted = new CountDownLatch(1);
         CountDownLatch allowRelease = new CountDownLatch(1);
 
-        when(hotel.releaseRoom(eq(1L), any(UUID.class)))
+        when(hotel.compensateRoom(eq(1L), any(UUID.class)))
                 .thenAnswer(invocation -> {
                     releaseStarted.countDown();
 
@@ -117,7 +117,7 @@ class BookingRecoveryRaceTest {
             );
 
             verify(hotel, times(1))
-                    .releaseRoom(eq(1L), any(UUID.class));
+                    .compensateRoom(eq(1L), any(UUID.class));
 
         } finally {
             allowRelease.countDown();
@@ -147,7 +147,7 @@ class BookingRecoveryRaceTest {
         );
 
         verify(hotel, never())
-                .releaseRoom(anyLong(), any(UUID.class));
+                .compensateRoom(anyLong(), any(UUID.class));
     }
 
     private long createOldPendingBooking() {

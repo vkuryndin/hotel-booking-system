@@ -50,7 +50,8 @@ public class RoomReservationController {
     ) {
         RoomReservation reservation = reservationService.release(
                 request.reservationId(),
-                id
+                id,
+                request.compensation()
         );
 
         return ResponseEntity.ok(

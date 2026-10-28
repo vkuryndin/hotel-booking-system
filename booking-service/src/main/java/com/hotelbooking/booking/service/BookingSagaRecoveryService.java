@@ -61,7 +61,7 @@ public class BookingSagaRecoveryService {
 
                 var recovery = candidate.get();
 
-                hotelServiceClient.releaseRoom(
+                hotelServiceClient.compensateRoom(
                         recovery.roomId(),
                         recovery.reservationId()
                 );
@@ -80,6 +80,50 @@ public class BookingSagaRecoveryService {
             } catch (Exception ex) {
                 log.warn(
                         "Saga recovery failed: bookingId={}",
+                        booking.getId(),
+                        ex
+                );
+            }
+        }
+    }
+    @Scheduled(fixedDelay = 60000, initialDelay = 60000)
+    public void recoverCancellingBookings() {
+        Instant cutoff = Instant.now().minus(Duration.ofMinutes(2));
+
+        var cancelling = bookingRepository
+                .findTop10ByStatusAndCancellationRequestedAtBeforeOrderByCancellationRequestedAtAsc(
+                        BookingStatus.CANCELLING,
+                        cutoff
+                );
+
+        for (Booking booking : cancelling) {
+            try {
+                var candidate = sagaStateService.prepareCancellationRecovery(
+                        booking.getId(),
+                        cutoff
+                );
+
+                if (candidate.isEmpty()) {
+                    continue;
+                }
+
+                var recovery = candidate.get();
+
+                hotelServiceClient.releaseRoom(
+                        recovery.roomId(),
+                        recovery.reservationId()
+                );
+
+                sagaStateService.finishCancellation(recovery.bookingId());
+
+                log.info(
+                        "Cancellation recovered: bookingId={}",
+                        recovery.bookingId()
+                );
+
+            } catch (Exception ex) {
+                log.warn(
+                        "Cancellation recovery failed: bookingId={}",
                         booking.getId(),
                         ex
                 );

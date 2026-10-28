@@ -19,6 +19,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 import com.hotelbooking.booking.entity.BookingStatus;
 import java.time.Instant;
+
+import com.hotelbooking.booking.exception.RequestInProgressException;
 @Service
 public class BookingSagaStateService {
 
@@ -78,29 +80,54 @@ public class BookingSagaStateService {
     }
 
     @Transactional
-    public BookingResponse cancel(Long bookingId) {
-        Booking booking = find(bookingId);
+    public BookingResponse finishCancellation(Long bookingId) {
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            return bookingMapper.toResponse(booking);
+        }
+
+        if (booking.getStatus() != BookingStatus.CANCELLING) {
+            throw new InvalidBookingStatusException(bookingId, "cancel");
+        }
+
         booking.cancel();
         return bookingMapper.toResponse(booking);
     }
 
-    @Transactional(readOnly = true)
-    public SagaBooking findAuthorized(
+    @Transactional
+    public Optional<SagaBooking> startCancellation(
             Long bookingId,
             Long userId,
             boolean isAdmin
     ) {
-        Booking booking = find(bookingId);
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
 
         if (!isAdmin && !booking.getUserId().equals(userId)) {
-            throw new AccessDeniedException("Access denied to booking: " + bookingId);
+            throw new AccessDeniedException(
+                    "Access denied to booking: " + bookingId
+            );
         }
-        if (booking.getStatus() == BookingStatus.PENDING) {
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            return Optional.empty();
+        }
+
+        if (booking.getStatus() == BookingStatus.CANCELLING) {
+            throw new RequestInProgressException(
+                    "Booking cancellation is already in progress"
+            );
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new InvalidBookingStatusException(bookingId, "cancel");
         }
-        return snapshot(booking);
-    }
 
+        booking.requestCancellation();
+        return Optional.of(snapshot(booking));
+    }
     public record ExistingCreation(
             BookingResponse booking,
             BookingCreationOutcome outcome
@@ -195,6 +222,23 @@ public class BookingSagaStateService {
 
         if (booking.getCreationOutcome() == BookingCreationOutcome.PROCESSING) {
             booking.markCreationOutcome(BookingCreationOutcome.RECOVERING);
+        }
+
+        return Optional.of(snapshot(booking));
+    }
+    @Transactional
+    public Optional<SagaBooking> prepareCancellationRecovery(
+            Long bookingId,
+            Instant cutoff
+    ) {
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+                .orElse(null);
+
+        if (booking == null
+                || booking.getStatus() != BookingStatus.CANCELLING
+                || booking.getCancellationRequestedAt() == null
+                || !booking.getCancellationRequestedAt().isBefore(cutoff)) {
+            return Optional.empty();
         }
 
         return Optional.of(snapshot(booking));
