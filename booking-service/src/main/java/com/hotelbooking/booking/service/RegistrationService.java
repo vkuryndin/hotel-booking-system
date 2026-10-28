@@ -16,7 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
-
+import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 @Service
 public class RegistrationService {
 
@@ -43,6 +46,12 @@ public class RegistrationService {
         String email = request.email()
                 .trim()
                 .toLowerCase(Locale.ROOT);
+        String username = request.username()
+                .toLowerCase(Locale.ROOT);
+
+        if (userRepository.existsByUsername(username)) {
+            throw new UsernameAlreadyRegisteredException();
+        }
 
         if (userRepository.existsByEmail(email)) {
             throw new EmailAlreadyRegisteredException();
@@ -56,12 +65,33 @@ public class RegistrationService {
 
         String passwordHash = passwordEncoder.encode(request.password());
 
-        AppUser user = new AppUser(email, passwordHash, Role.USER);
+        AppUser user = new AppUser(
+                email,
+                passwordHash,
+                Role.USER,
+                username,
+                request.phone() == null || request.phone().isEmpty()
+                        ? null : request.phone(),
+                request.firstName().trim(),
+                request.lastName().trim()
+        );
 
-        AppUser savedUser = userRepository.save(user);
+        AppUser savedUser;
+
+        try {
+            savedUser = userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Email or username already exists",
+                    ex
+            );
+        }
 
         log.info("User registered: id={}", savedUser.getId());
 
         return userMapper.toResponse(savedUser);
+
+
     }
 }

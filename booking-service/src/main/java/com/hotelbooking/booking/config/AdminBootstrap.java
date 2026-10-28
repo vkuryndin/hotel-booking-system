@@ -39,6 +39,7 @@ public class AdminBootstrap implements ApplicationRunner {
             return;
         }
 
+
         if (adminEmail.isBlank() || adminPassword.isBlank()) {
             throw new IllegalStateException(
                     "Both ADMIN_EMAIL and ADMIN_PASSWORD must be configured"
@@ -46,6 +47,11 @@ public class AdminBootstrap implements ApplicationRunner {
         }
 
         String email = adminEmail.trim().toLowerCase(Locale.ROOT);
+
+        String bootstrapUsername = "admin-" +
+                java.util.UUID.nameUUIDFromBytes(
+                        email.getBytes(StandardCharsets.UTF_8)
+                ).toString().substring(0, 12);
 
         if (!email.contains("@")
                 || adminPassword.length() < 8
@@ -65,7 +71,11 @@ public class AdminBootstrap implements ApplicationRunner {
                         new AppUser(
                                 email,
                                 passwordEncoder.encode(adminPassword),
-                                Role.ADMIN
+                                Role.ADMIN,
+                                bootstrapUsername,
+                                null,
+                                "System",
+                                "Administrator"
                         )
                 )
         );

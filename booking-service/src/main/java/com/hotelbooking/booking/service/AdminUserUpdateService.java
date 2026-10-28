@@ -15,7 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
-
+import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
 @Service
 public class AdminUserUpdateService {
 
@@ -37,7 +37,12 @@ public class AdminUserUpdateService {
     ) {
         AppUser user = findUser(id);
 
-        if (request.email() == null && request.role() == null) {
+        if (request.email() == null
+                && request.role() == null
+                && request.username() == null
+                && request.phone() == null
+                && request.firstName() == null
+                && request.lastName() == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "No fields to update"
@@ -71,6 +76,34 @@ public class AdminUserUpdateService {
         if (request.role() != null) {
             user.changeRole(request.role());
         }
+        if (request.username() != null
+                || request.phone() != null
+                || request.firstName() != null
+                || request.lastName() != null) {
+
+            String username = request.username() == null
+                    ? user.getUsername()
+                    : request.username().toLowerCase(Locale.ROOT);
+
+            if (!username.equals(user.getUsername())
+                    && userRepository.existsByUsername(username)) {
+                throw new UsernameAlreadyRegisteredException();
+            }
+
+            String phone = request.phone() == null
+                    ? user.getPhone()
+                    : (request.phone().isEmpty() ? null : request.phone());
+
+            String firstName = request.firstName() == null
+                    ? user.getFirstName()
+                    : request.firstName().trim();
+
+            String lastName = request.lastName() == null
+                    ? user.getLastName()
+                    : request.lastName().trim();
+
+            user.changeProfile(username, phone, firstName, lastName);
+        }
 
         try {
             userRepository.saveAndFlush(user);
@@ -82,11 +115,7 @@ public class AdminUserUpdateService {
             );
         }
 
-        return new AdminUserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getRole()
-        );
+        return AdminUserResponse.from(user);
     }
 
     @Transactional

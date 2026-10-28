@@ -1992,3 +1992,366 @@ Content-Type: application/json
 ### PAR-04 — Оба номера доступны
 GET http://localhost:8080/api/rooms/recommend?hotelId={{parallelHotelId}}&checkIn=2031-07-10&checkOut=2031-07-12
 Authorization: Bearer {{adminToken}}
+
+
+
+### P11-01 — Регистрация с профилем: 201
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "email": "profile-test01@example.com",
+  "password": "Profile123!",
+  "username": "profile_user01",
+  "phone": "+37499123456",
+  "firstName": "Vladimir",
+  "lastName": "Test"
+}
+
+> {%
+    client.global.set("p11UserId", response.body.id);
+%}
+
+
+### P11-02 — Вход по email и паролю: 200
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "profile-test01@example.com",
+  "password": "Profile123!"
+}
+
+> {%
+    client.global.set("p11Token", response.body.accessToken);
+%}
+
+
+### P11-03 — Получить свой профиль: 200
+GET http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+
+
+### P11-04 — Изменить username и имя: 200
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "username": "PROFILE_NEW01",
+  "firstName": "Alexander"
+}
+
+
+### P11-05 — Проверить обновлённый профиль: 200
+### username должен быть profile_new01
+### firstName должен быть Alexander
+GET http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+
+
+### P11-06 — Старый JWT остаётся действительным: 200
+GET http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+
+
+### P11-07 — Авторизация по email после смены username: 200
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "profile-test01@example.com",
+  "password": "Profile123!"
+}
+
+
+### P11-08 — Username не используется для входа: 400
+### Поле email должно пройти проверку @Email
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "profile_new01",
+  "password": "Profile123!"
+}
+
+
+### P11-09 — Регистрация второго пользователя: 201
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "email": "profile-test02@example.com",
+  "password": "Profile123!",
+  "username": "profile_user02",
+  "firstName": "Maria",
+  "lastName": "Test"
+}
+
+> {%
+    client.global.set("p11SecondUserId", response.body.id);
+%}
+
+
+### P11-10 — Дублирующий username: 409
+### USERNAME_ALREADY_REGISTERED
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "email": "profile-test03@example.com",
+  "password": "Profile123!",
+  "username": "PROFILE_USER02",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+
+### P11-11 — Дублирующий email: 409
+### EMAIL_ALREADY_REGISTERED
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "email": "profile-test01@example.com",
+  "password": "Profile123!",
+  "username": "other_username01",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+
+### P11-12 — Изменение username на занятый: 409
+### USERNAME_ALREADY_REGISTERED
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "username": "profile_user02"
+}
+
+
+### P11-13 — Некорректный username: 400
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "username": "a"
+}
+
+
+### P11-14 — Некорректный телефон: 400
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "phone": "123abc"
+}
+
+
+### P11-15 — Изменение телефона: 200
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "phone": "+37477123456"
+}
+
+
+### P11-16 — Удаление телефона: 200
+### phone должен стать null
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "phone": ""
+}
+
+
+### P11-17 — Изменение фамилии: 200
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "lastName": "Updated"
+}
+
+
+### P11-18 — Пустой PATCH: 400 INVALID_ARGUMENT
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{}
+
+
+### P11-19 — Пустое имя: 400 VALIDATION_ERROR
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "firstName": " "
+}
+
+
+### P11-20 — Регистрация без username: 400
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "email": "missing-username@example.com",
+  "password": "Profile123!",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+
+### P11-21 — Регистрация без фамилии: 400
+POST http://localhost:8080/api/users/register
+Content-Type: application/json
+
+{
+  "email": "missing-lastname@example.com",
+  "password": "Profile123!",
+  "username": "missing_last01",
+  "firstName": "Test"
+}
+
+
+### P11-22 — ADMIN создаёт пользователя: 201
+POST http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "profile-admin-created@example.com",
+  "password": "Profile123!",
+  "role": "USER",
+  "username": "created_staff01",
+  "phone": "+37455123456",
+  "firstName": "Anna",
+  "lastName": "Smith"
+}
+
+> {%
+    client.global.set("p11AdminCreatedId", response.body.id);
+%}
+
+
+### P11-23 — ADMIN читает пользователя: 200
+GET http://localhost:8080/api/users/{{p11AdminCreatedId}}
+Authorization: Bearer {{adminToken}}
+
+
+### P11-24 — ADMIN редактирует профиль другого пользователя: 200
+PATCH http://localhost:8080/api/users/{{p11AdminCreatedId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "username": "STAFF_NEW01",
+  "firstName": "Anastasia",
+  "lastName": "Johnson"
+}
+
+
+### P11-25 — ADMIN проверяет изменения: 200
+### username должен быть staff_new01
+GET http://localhost:8080/api/users/{{p11AdminCreatedId}}
+Authorization: Bearer {{adminToken}}
+
+
+### P11-26 — ADMIN пытается занять чужой username: 409
+PATCH http://localhost:8080/api/users/{{p11AdminCreatedId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "username": "profile_new01"
+}
+
+
+### P11-27 — ADMIN получает список пользователей: 200
+GET http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+
+
+### P11-28 — ADMIN получает собственный профиль: 200
+GET http://localhost:8080/api/users/me
+Authorization: Bearer {{adminToken}}
+
+
+### P11-29 — USER не может читать список пользователей: 403
+GET http://localhost:8080/api/users
+Authorization: Bearer {{p11Token}}
+
+
+### P11-30 — USER не может менять чужой профиль через ADMIN API: 403
+PATCH http://localhost:8080/api/users/{{p11SecondUserId}}
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "firstName": "Hacked"
+}
+
+
+### P11-31 — Без JWT доступ к профилю запрещён: 401
+GET http://localhost:8080/api/users/me
+
+
+### P11-32 — Без JWT изменение профиля запрещено: 401
+PATCH http://localhost:8080/api/users/me
+Content-Type: application/json
+
+{
+  "firstName": "Unknown"
+}
+
+
+### P11-33 — Прямое обращение к Booking Service: 403
+GET http://localhost:8081/api/users/me
+Authorization: Bearer {{p11Token}}
+
+
+### P11-34 — Попытка менять роль через профиль: 400
+### Роль не принимается UpdateMyProfileRequest
+PATCH http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+
+{
+  "role": "ADMIN"
+}
+
+
+### P11-35 — Проверяем, что роль осталась USER: 200
+GET http://localhost:8080/api/users/me
+Authorization: Bearer {{p11Token}}
+
+
+### P11-36 — Проверка существующего ADMIN PATCH email: 200
+PATCH http://localhost:8080/api/users/{{p11AdminCreatedId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "profile-admin-updated@example.com"
+}
+
+
+### P11-37 — Вход пользователя после изменения профиля: 200
+POST http://localhost:8080/api/users/login
+Content-Type: application/json
+
+{
+  "email": "profile-test01@example.com",
+  "password": "Profile123!"
+}

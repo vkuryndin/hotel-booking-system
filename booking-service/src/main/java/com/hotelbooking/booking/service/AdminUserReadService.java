@@ -40,10 +40,7 @@ public class AdminUserReadService {
     }
 
     private AdminUserResponse toResponse(AppUser user) {
-        return new AdminUserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getRole()
-        );
+        return AdminUserResponse.from(user);
+
     }
 }

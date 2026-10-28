@@ -15,7 +15,7 @@ import com.hotelbooking.booking.repository.BookingRepository;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
-
+import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
 @Service
 public class AdminUserService {
 
@@ -39,6 +39,12 @@ public class AdminUserService {
         String email = request.email()
                 .trim()
                 .toLowerCase(Locale.ROOT);
+        String username = request.username()
+                .toLowerCase(Locale.ROOT);
+
+        if (userRepository.existsByUsername(username)) {
+            throw new UsernameAlreadyRegisteredException();
+        }
 
         if (userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(
@@ -57,7 +63,12 @@ public class AdminUserService {
         AppUser user = new AppUser(
                 email,
                 passwordEncoder.encode(request.password()),
-                request.role()
+                request.role(),
+                username,
+                request.phone() == null || request.phone().isEmpty()
+                        ? null : request.phone(),
+                request.firstName().trim(),
+                request.lastName().trim()
         );
 
         try {
@@ -70,11 +81,7 @@ public class AdminUserService {
             );
         }
 
-        return new AdminUserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getRole()
-        );
+        return AdminUserResponse.from(user);
     }
     @Transactional
     public void deleteUser(Long id) {

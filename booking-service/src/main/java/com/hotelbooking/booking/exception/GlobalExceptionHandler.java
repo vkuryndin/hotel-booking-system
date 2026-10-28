@@ -188,7 +188,7 @@ public class GlobalExceptionHandler {
                 Instant.now(),
                 403,
                 "ACCESS_DENIED",
-                "You do not have permission to access this booking",
+                "You do not have permission to access this resource",
                 request.getRequestURI(),
                 null,
                 null
@@ -301,6 +301,19 @@ public class GlobalExceptionHandler {
         return buildError(
                 HttpStatus.CONFLICT,
                 "NO_AVAILABLE_ROOMS",
+                ex.getMessage(),
+                request,
+                Map.of()
+        );
+    }
+    @ExceptionHandler(UsernameAlreadyRegisteredException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateUsername(
+            UsernameAlreadyRegisteredException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.CONFLICT,
+                "USERNAME_ALREADY_REGISTERED",
                 ex.getMessage(),
                 request,
                 Map.of()
