@@ -9,7 +9,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import java.net.http.HttpClient;
 import java.time.Duration;
-
+import org.slf4j.MDC;
 
 @Configuration
 public class RestClientConfig {
@@ -33,6 +33,19 @@ public class RestClientConfig {
         return builder
                 .baseUrl("http://hotel-service")
                 .requestFactory(hotelRequestFactory())
+                .requestInterceptor((request, body, execution) -> {
+
+                    String traceId = MDC.get("traceId");
+
+                    if (traceId != null) {
+                        request.getHeaders().set(
+                                "X-Trace-Id",
+                                traceId
+                        );
+                    }
+
+                    return execution.execute(request, body);
+                })
                 .build();
     }
     private JdkClientHttpRequestFactory hotelRequestFactory() {

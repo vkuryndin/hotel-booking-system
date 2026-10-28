@@ -4,10 +4,12 @@ server:
 spring:
   application:
     name: booking-service
-    cloud:
-      circuitbreaker:
-        resilience4j:
-          disable-time-limiter: true
+
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        disable-time-limiter: true
+        disable-thread-pool: true
 
   datasource:
     url: jdbc:h2:mem:bookingdb
@@ -29,6 +31,8 @@ eureka:
 logging:
   level:
     com.hotelbooking: INFO
+  pattern:
+      level: "%5p [traceId=%X{traceId}]"
 
 app:
   jwt:

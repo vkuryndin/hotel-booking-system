@@ -29,6 +29,8 @@ eureka:
 logging:
   level:
     com.hotelbooking: INFO
+  pattern:
+    level: "%5p [traceId=%X{traceId}]"
 
 app:
   jwt:

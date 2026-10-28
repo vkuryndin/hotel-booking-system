@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 import java.util.Map;
+import org.slf4j.MDC;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record ErrorResponse(
@@ -14,4 +15,10 @@ public record ErrorResponse(
         String path,
         String traceId,
         Map<String, String> fieldErrors
-) {}
+) {
+    public ErrorResponse {
+        if (traceId == null || traceId.isBlank()) {
+            traceId = MDC.get("traceId");
+        }
+    }
+}

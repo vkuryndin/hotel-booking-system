@@ -83,11 +83,20 @@ public class JwtRevocationFilter implements GlobalFilter, Ordered {
                     return webClient.get()
                             .uri("http://booking-service/api/users/token-status")
                             .headers(headers -> {
-                                headers.setBearerAuth(
-                                        jwt.getTokenValue());
+                                headers.setBearerAuth(jwt.getTokenValue());
+
                                 headers.set(
                                         GatewaySecretFilter.HEADER,
-                                        secret);
+                                        secret
+                                );
+
+                                String traceId = exchange.getRequest()
+                                        .getHeaders()
+                                        .getFirst(TraceWebFilter.HEADER);
+
+                                if (traceId != null) {
+                                    headers.set(TraceWebFilter.HEADER, traceId);
+                                }
                             })
                             .exchangeToMono(response ->
                                     Mono.just(

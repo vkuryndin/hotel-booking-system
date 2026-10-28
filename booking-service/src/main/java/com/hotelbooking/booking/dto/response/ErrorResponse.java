@@ -1,7 +1,7 @@
 package com.hotelbooking.booking.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-
+import org.slf4j.MDC;
 import java.time.Instant;
 import java.util.Map;
 
@@ -14,4 +14,10 @@ public record ErrorResponse(
         String path,
         String traceId,
         Map<String, String> fieldErrors
-) {}
+) {
+    public ErrorResponse {
+        if (traceId == null || traceId.isBlank()) {
+            traceId = MDC.get("traceId");
+        }
+    }
+}
