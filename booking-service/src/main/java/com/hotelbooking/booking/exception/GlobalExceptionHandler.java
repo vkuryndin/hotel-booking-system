@@ -279,4 +279,31 @@ public class GlobalExceptionHandler {
                         null
                 ));
     }
+    @ExceptionHandler(HotelNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleHotelNotFound(
+            HotelNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.NOT_FOUND,
+                "HOTEL_NOT_FOUND",
+                ex.getMessage(),
+                request,
+                Map.of()
+        );
+    }
+
+    @ExceptionHandler(NoAvailableRoomsException.class)
+    public ResponseEntity<ErrorResponse> handleNoAvailableRooms(
+            NoAvailableRoomsException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.CONFLICT,
+                "NO_AVAILABLE_ROOMS",
+                ex.getMessage(),
+                request,
+                Map.of()
+        );
+    }
 }

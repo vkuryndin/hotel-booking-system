@@ -35,6 +35,10 @@ import org.springframework.web.client.HttpServerErrorException;
 
 import java.util.List;
 import java.util.UUID;
+import com.hotelbooking.booking.exception.NoAvailableRoomsException;
+import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.web.client.RestClientException;
 
 @Service
 public class BookingService {
@@ -122,6 +126,7 @@ public class BookingService {
             throw new RoomAlreadyBookedException(request.roomId());
         }
     }
+
     public BookingResponse createBooking(
             Long userId,
             BookingRequest request,
@@ -138,89 +143,138 @@ public class BookingService {
         }
 
         validateDates(request);
-        validateRoom(request.roomId());
+
+        List<Long> candidateIds;
+
+        if (request.autoSelect()) {
+            if (request.hotelId() == null || request.hotelId() <= 0) {
+                throw new IllegalArgumentException(
+                        "Valid hotelId is required for autoSelect"
+                );
+            }
+
+            List<HotelRoomResponse> recommendations;
+
+            try {
+                recommendations = hotelServiceClient.recommendRooms(
+                        request.hotelId(),
+                        request.checkIn(),
+                        request.checkOut()
+                );
+            } catch (RestClientException ex) {
+                throw new HotelServiceUnavailableException(ex);
+            } catch (IllegalStateException ex) {
+                if (ex.getMessage() != null
+                        && ex.getMessage().startsWith(
+                        "No instances available for ")) {
+                    throw new HotelServiceUnavailableException(ex);
+                }
+                throw ex;
+            }
+
+            candidateIds = recommendations.stream()
+                    .map(HotelRoomResponse::id)
+                    .toList();
+
+            if (candidateIds.isEmpty()) {
+                throw new NoAvailableRoomsException();
+            }
+
+        } else {
+            if (request.roomId() == null || request.roomId() <= 0) {
+                throw new IllegalArgumentException(
+                        "Valid roomId is required"
+                );
+            }
+
+            if (request.hotelId() != null) {
+                throw new IllegalArgumentException(
+                        "hotelId is only allowed with autoSelect=true"
+                );
+            }
+
+            validateRoom(request.roomId());
+            candidateIds = List.of(request.roomId());
+        }
 
         BookingSagaStateService.SagaBooking pending;
 
         try {
             pending = sagaStateService.createPending(
-                    userId, request, idempotencyKey
+                    userId,
+                    request,
+                    candidateIds.get(0),
+                    idempotencyKey
             );
-        } catch (DataIntegrityViolationException ex) {
-            var duplicate = sagaStateService.findByIdempotencyKey(
-                    userId, idempotencyKey, request
-            ).orElseThrow(() -> ex);
-
-            return waitForExistingRequest(
-                    userId, request, idempotencyKey, duplicate
+        } catch (DataIntegrityViolationException
+                 | CannotAcquireLockException ex) {
+            return waitForConcurrentCreation(
+                    userId, request, idempotencyKey, ex
             );
         }
 
-        try {
-            var reservation = hotelServiceClient.reserveRoom(
-                    pending.roomId(),
-                    pending.reservationId(),
-                    pending.checkIn(),
-                    pending.checkOut()
-            );
-
-            if (!"RESERVED".equals(reservation.status())
-                    || !pending.reservationId().equals(reservation.reservationId())
-                    || !pending.roomId().equals(reservation.roomId())) {
-                throw new IllegalStateException("Invalid Hotel Service response");
-            }
-
-            return sagaStateService.confirm(pending.bookingId());
-
-        } catch (RuntimeException error) {
+        for (int i = 0; i < candidateIds.size(); i++) {
+            Long selectedRoomId = candidateIds.get(i);
 
             try {
-                hotelServiceClient.releaseRoom(
+                if (i > 0) {
+                    pending = sagaStateService.switchPendingRoom(
+                            pending.bookingId(),
+                            selectedRoomId
+                    );
+                }
+
+                var reservation = hotelServiceClient.reserveRoom(
                         pending.roomId(),
-                        pending.reservationId()
+                        pending.reservationId(),
+                        pending.checkIn(),
+                        pending.checkOut()
                 );
 
-                Boolean roomConflict =
+                if (!"RESERVED".equals(reservation.status())
+                        || !pending.reservationId().equals(
+                        reservation.reservationId())
+                        || !pending.roomId().equals(
+                        reservation.roomId())) {
+                    throw new IllegalStateException(
+                            "Invalid Hotel Service response"
+                    );
+                }
+
+                return sagaStateService.confirm(pending.bookingId());
+
+            } catch (RuntimeException error) {
+                boolean roomConflict =
                         error instanceof RestClientResponseException httpError
                                 && httpError.getStatusCode().value() == 409;
 
-                sagaStateService.cancelCreation(
-                        pending.bookingId(),
-                        roomConflict
-                                ? BookingCreationOutcome.ROOM_CONFLICT
-                                : BookingCreationOutcome.FAILED
-                );
+                if (request.autoSelect()
+                        && roomConflict
+                        && i < candidateIds.size() - 1) {
 
-            } catch (RuntimeException compensationError) {
-                log.error(
-                        "Saga compensation failed for booking {}",
-                        pending.bookingId(),
-                        compensationError
-                );
+                    log.info(
+                            "Auto-selection conflict: bookingId={}, roomId={}. " +
+                                    "Trying next candidate.",
+                            pending.bookingId(),
+                            pending.roomId()
+                    );
 
-                error.addSuppressed(compensationError);
+                    continue;
+                }
 
-                throw new BookingSagaUnavailableException(
-                        "Booking requires compensation: " + pending.bookingId(),
-                        error
+                return compensateFailedCreation(
+                        pending,
+                        error,
+                        request.autoSelect()
                 );
             }
-
-            if (error instanceof RestClientResponseException httpError
-                    && httpError.getStatusCode().value() == 409) {
-
-                log.error("Hotel Service returned 409: {}",
-                        httpError.getResponseBodyAsString());
-
-                throw new RoomAlreadyBookedException(pending.roomId());
-            }
-
-            throw new BookingSagaUnavailableException(
-                    "Booking cancelled because reservation failed",
-                    error
-            );
         }
+
+        throw new IllegalStateException(
+                "No room selection result"
+        );
     }
+
     @Transactional(readOnly = true)
     public BookingResponse getBookingById(
             Long bookingId,
@@ -310,7 +364,6 @@ public class BookingService {
         BookingResponse booking = existing.booking();
 
         return switch (existing.outcome()) {
-
             case SUCCESS -> new BookingResponse(
                     booking.id(),
                     booking.userId(),
@@ -321,17 +374,18 @@ public class BookingService {
                     booking.createdAt()
             );
 
-            case ROOM_CONFLICT ->
-                    throw new RoomAlreadyBookedException(booking.roomId());
+            case ROOM_CONFLICT -> throw new RoomAlreadyBookedException(booking.roomId());
 
-            case PROCESSING ->
-                    throw new RequestInProgressException();
+            case NO_AVAILABLE_ROOMS -> throw new NoAvailableRoomsException();
 
-            case FAILED ->
-                    throw new BookingSagaUnavailableException(
-                            "Booking creation failed",
-                            new IllegalStateException("Creation outcome: FAILED")
-                    );
+            case PROCESSING -> throw new RequestInProgressException();
+
+            case FAILED -> throw new BookingSagaUnavailableException(
+                    "Booking creation failed",
+                    new IllegalStateException(
+                            "Creation outcome: FAILED"
+                    )
+            );
         };
     }
     private BookingResponse waitForExistingRequest(
@@ -363,5 +417,90 @@ public class BookingService {
         }
 
         return responseForRepeatedRequest(current);
+    }
+    private BookingResponse compensateFailedCreation(
+            BookingSagaStateService.SagaBooking pending,
+            RuntimeException error,
+            boolean autoSelect
+    ) {
+        boolean roomConflict =
+                error instanceof RestClientResponseException httpError
+                        && httpError.getStatusCode().value() == 409;
+
+        try {
+            hotelServiceClient.releaseRoom(
+                    pending.roomId(),
+                    pending.reservationId()
+            );
+
+            BookingCreationOutcome outcome = roomConflict
+                    ? (autoSelect
+                    ? BookingCreationOutcome.NO_AVAILABLE_ROOMS
+                    : BookingCreationOutcome.ROOM_CONFLICT)
+                    : BookingCreationOutcome.FAILED;
+
+            sagaStateService.cancelCreation(
+                    pending.bookingId(),
+                    outcome
+            );
+
+        } catch (RuntimeException compensationError) {
+            log.error(
+                    "Saga compensation failed for booking {}",
+                    pending.bookingId(),
+                    compensationError
+            );
+
+            error.addSuppressed(compensationError);
+
+            throw new BookingSagaUnavailableException(
+                    "Booking requires compensation: "
+                            + pending.bookingId(),
+                    error
+            );
+        }
+
+        if (roomConflict) {
+            if (autoSelect) {
+                throw new NoAvailableRoomsException();
+            }
+
+            throw new RoomAlreadyBookedException(pending.roomId());
+        }
+
+        throw new BookingSagaUnavailableException(
+                "Booking cancelled because reservation failed",
+                error
+        );
+    }
+    private BookingResponse waitForConcurrentCreation(
+            Long userId,
+            BookingRequest request,
+            UUID idempotencyKey,
+            RuntimeException originalError
+    ) {
+        for (int i = 0; i < 50; i++) {
+            var existing = sagaStateService.findByIdempotencyKey(
+                    userId, idempotencyKey, request
+            );
+
+            if (existing.isPresent()) {
+                return waitForExistingRequest(
+                        userId, request, idempotencyKey, existing.get()
+                );
+            }
+
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new BookingSagaUnavailableException(
+                        "Interrupted while waiting for concurrent booking",
+                        ex
+                );
+            }
+        }
+
+        throw originalError;
     }
 }

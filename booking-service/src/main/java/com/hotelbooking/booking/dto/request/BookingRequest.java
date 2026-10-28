@@ -2,13 +2,24 @@ package com.hotelbooking.booking.dto.request;
 
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-
 import java.time.LocalDate;
 
 public record BookingRequest(
-        @NotNull @Positive Long roomId,
+        Long roomId,
+        Long hotelId,
+        Boolean autoSelect,
         @NotNull @FutureOrPresent LocalDate checkIn,
         @NotNull LocalDate checkOut
-) {
+)
+{
+    public BookingRequest {
+        autoSelect = Boolean.TRUE.equals(autoSelect);
+    }
+    public String fingerprint() {
+        String selection = autoSelect
+                ? "AUTO:" + hotelId
+                : "ROOM:" + roomId;
+
+        return selection + ":" + checkIn + ":" + checkOut;
+    }
 }

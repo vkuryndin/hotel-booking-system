@@ -1612,3 +1612,383 @@ Authorization: Bearer {{adminToken}}
 ### CRUD-45 — через Gateway доступ работает: 200
 GET http://localhost:8080/api/rooms/{{crudSagaRoomId}}
 Authorization: Bearer {{adminToken}}
+
+
+### S10-01 — Создание отеля: 201
+POST http://localhost:8080/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Strategy Final Hotel",
+  "address": "Yerevan, Strategy Final 10"
+}
+
+> {%
+    client.global.set("s10Hotel", response.body.id);
+%}
+
+
+### S10-02 — Создание комнаты S101: 201
+POST http://localhost:8080/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s10Hotel}},
+  "number": "S101"
+}
+
+> {%
+    client.global.set("s10Room1", response.body.id);
+%}
+
+
+### S10-03 — Создание комнаты S102: 201
+POST http://localhost:8080/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s10Hotel}},
+  "number": "S102"
+}
+
+> {%
+    client.global.set("s10Room2", response.body.id);
+%}
+
+
+### S10-04 — Рекомендации: 200
+### S101, S102; timesBooked=0 для обоих
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-03-10&checkOut=2031-03-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-05 — AUTO: 201 CONFIRMED, выбран S101
+### roomId=999999 игнорируется
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000101
+Content-Type: application/json
+
+{
+  "hotelId": {{s10Hotel}},
+  "roomId": 999999,
+  "autoSelect": true,
+  "checkIn": "2031-03-10",
+  "checkOut": "2031-03-12"
+}
+
+> {%
+    client.global.set("s10Booking1", response.body.id);
+%}
+
+
+### S10-06 — Повтор того же ключа: 201
+### Тот же booking ID и номер S101
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000101
+Content-Type: application/json
+
+{
+  "hotelId": {{s10Hotel}},
+  "roomId": 888888,
+  "autoSelect": true,
+  "checkIn": "2031-03-10",
+  "checkOut": "2031-03-12"
+}
+
+
+### S10-07 — Проверка S101: 200, timesBooked=1
+GET http://localhost:8080/api/rooms/{{s10Room1}}
+Authorization: Bearer {{adminToken}}
+
+
+### S10-08 — S101 занят: 200, только S102
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-03-10&checkOut=2031-03-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-09 — Второй AUTO: 201, выбран S102
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000102
+Content-Type: application/json
+
+{
+  "hotelId": {{s10Hotel}},
+  "autoSelect": true,
+  "checkIn": "2031-03-10",
+  "checkOut": "2031-03-12"
+}
+
+> {%
+    client.global.set("s10Booking2", response.body.id);
+%}
+
+
+### S10-10 — Нет свободных: 200 и пустой массив []
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-03-10&checkOut=2031-03-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-11 — AUTO без свободных: 409 NO_AVAILABLE_ROOMS
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000103
+Content-Type: application/json
+
+{
+  "hotelId": {{s10Hotel}},
+  "autoSelect": true,
+  "checkIn": "2031-03-10",
+  "checkOut": "2031-03-12"
+}
+
+
+### S10-12 — Отменяем первое бронирование: 200
+PATCH http://localhost:8080/api/bookings/{{s10Booking1}}/cancel
+Authorization: Bearer {{adminToken}}
+
+
+### S10-13 — Отменяем второе бронирование: 200
+PATCH http://localhost:8080/api/bookings/{{s10Booking2}}/cancel
+Authorization: Bearer {{adminToken}}
+
+
+### S10-14 — После отмены доступны оба: 200
+### timesBooked=1 у обоих; порядок S101, S102
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-03-10&checkOut=2031-03-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-15 — Старое ручное бронирование: 201
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000104
+Content-Type: application/json
+
+{
+  "roomId": {{s10Room1}},
+  "checkIn": "2031-04-10",
+  "checkOut": "2031-04-12"
+}
+
+> {%
+    client.global.set("s10Booking3", response.body.id);
+%}
+
+
+### S10-16 — Повтор ручного бронирования: 201
+### Тот же ID, статистика не увеличивается повторно
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000104
+Content-Type: application/json
+
+{
+  "roomId": {{s10Room1}},
+  "checkIn": "2031-04-10",
+  "checkOut": "2031-04-12"
+}
+
+
+### S10-17 — Статистика S101: timesBooked=2
+GET http://localhost:8080/api/rooms/{{s10Room1}}
+Authorization: Bearer {{adminToken}}
+
+
+### S10-18 — Статистика S102: timesBooked=1
+GET http://localhost:8080/api/rooms/{{s10Room2}}
+Authorization: Bearer {{adminToken}}
+
+
+### S10-19 — LeastBooked: первым S102, затем S101
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-05-10&checkOut=2031-05-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-20 — Те же ключ, но другие даты: 409
+### IDEMPOTENCY_KEY_CONFLICT
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000101
+Content-Type: application/json
+
+{
+  "hotelId": {{s10Hotel}},
+  "autoSelect": true,
+  "checkIn": "2031-06-10",
+  "checkOut": "2031-06-12"
+}
+
+
+### S10-21 — Пересечение дат: 200, только S102
+### S101 занят 10–12 апреля
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-04-11&checkOut=2031-04-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-22 — Заезд в день выезда: 200, оба номера
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-04-12&checkOut=2031-04-13
+Authorization: Bearer {{adminToken}}
+
+
+### S10-23 — Отключаем S102: 200
+PATCH http://localhost:8080/api/rooms/{{s10Room2}}/availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "available": false
+}
+
+
+### S10-24 — Отключённый номер не рекомендуем: 200
+### Только S101
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-05-10&checkOut=2031-05-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-25 — Включаем S102: 200
+PATCH http://localhost:8080/api/rooms/{{s10Room2}}/availability
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "available": true
+}
+
+
+### S10-26 — Несуществующий отель: 404 HOTEL_NOT_FOUND
+GET http://localhost:8080/api/rooms/recommend?hotelId=999999&checkIn=2031-05-10&checkOut=2031-05-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-27 — Неверные даты: 400 INVALID_ARGUMENT
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-05-12&checkOut=2031-05-10
+Authorization: Bearer {{adminToken}}
+
+
+### S10-28 — Отсутствует checkOut: 400 INVALID_ARGUMENT
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-05-10
+Authorization: Bearer {{adminToken}}
+
+
+### S10-29 — AUTO без hotelId: 400 INVALID_ARGUMENT
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000105
+Content-Type: application/json
+
+{
+  "autoSelect": true,
+  "checkIn": "2031-05-10",
+  "checkOut": "2031-05-12"
+}
+
+
+### S10-30 — Ручное бронирование без roomId: 400
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000106
+Content-Type: application/json
+
+{
+  "checkIn": "2031-05-10",
+  "checkOut": "2031-05-12"
+}
+
+
+### S10-31 — Обычный USER получает рекомендации: 200
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-05-10&checkOut=2031-05-12
+Authorization: Bearer {{accessToken}}
+
+
+### S10-32 — Без JWT: 401
+GET http://localhost:8080/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-05-10&checkOut=2031-05-12
+
+
+### S10-33 — Прямой обход Gateway: 403
+GET http://localhost:8082/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-05-10&checkOut=2031-05-12
+Authorization: Bearer {{adminToken}}
+
+
+### S10-34 — Предыдущее бронирование осталось: 200
+GET http://localhost:8080/api/bookings/{{s10Booking3}}
+Authorization: Bearer {{adminToken}}
+
+
+### S10-35 — Не удаляем номер с историей: 409
+DELETE http://localhost:8080/api/rooms/{{s10Room1}}
+Authorization: Bearer {{adminToken}}
+
+
+### S10-36 — Обычное бронирование занятой комнаты: 409
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000107
+Content-Type: application/json
+
+{
+  "roomId": {{s10Room1}},
+  "checkIn": "2031-04-11",
+  "checkOut": "2031-04-12"
+}
+
+
+### S10-37 — Повтор конфликта: 409 ROOM_ALREADY_BOOKED
+POST http://localhost:8080/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 33333333-3333-4333-8333-000000000107
+Content-Type: application/json
+
+{
+  "roomId": {{s10Room1}},
+  "checkIn": "2031-04-11",
+  "checkOut": "2031-04-12"
+}
+
+
+### PAR-01 — Отель для конкурентных тестов
+POST http://localhost:8080/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Strategy Parallel Test",
+  "address": "Yerevan, Parallel Street 10"
+}
+
+> {%
+    client.global.set("parallelHotelId", response.body.id);
+%}
+
+
+### PAR-02 — Первый номер
+POST http://localhost:8080/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{parallelHotelId}},
+  "number": "P101"
+}
+
+
+### PAR-03 — Второй номер
+POST http://localhost:8080/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{parallelHotelId}},
+  "number": "P102"
+}
+
+
+### PAR-04 — Оба номера доступны
+GET http://localhost:8080/api/rooms/recommend?hotelId={{parallelHotelId}}&checkIn=2031-07-10&checkOut=2031-07-12
+Authorization: Bearer {{adminToken}}

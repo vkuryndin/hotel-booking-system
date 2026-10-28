@@ -85,6 +85,8 @@ public class RoomReservationService {
 
         nightRepository.saveAllAndFlush(nights);
 
+        room.incrementTimesBooked();
+
         return reservation;
     }
     @Transactional

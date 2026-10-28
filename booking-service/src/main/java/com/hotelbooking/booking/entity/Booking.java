@@ -21,6 +21,7 @@ import jakarta.persistence.UniqueConstraint;
                 )
         }
 )
+
 public class Booking {
 
     @Id
@@ -45,6 +46,9 @@ public class Booking {
 
     @Column(name = "idempotency_key")
     private UUID idempotencyKey;
+
+    @Column(name = "request_fingerprint", nullable = false, length = 128)
+    private String requestFingerprint;
 
     @Version
     private Long version;
@@ -115,6 +119,25 @@ public class Booking {
 
     public void markCreationOutcome(BookingCreationOutcome outcome) {
         this.creationOutcome = Objects.requireNonNull(outcome);
+    }
+
+    public String getRequestFingerprint() {
+        return requestFingerprint;
+    }
+
+    public void assignRequestFingerprint(String fingerprint) {
+        this.requestFingerprint = Objects.requireNonNull(fingerprint);
+    }
+
+    public void switchPendingRoom(Long newRoomId) {
+        if (status != BookingStatus.PENDING
+                || creationOutcome != BookingCreationOutcome.PROCESSING) {
+            throw new IllegalStateException(
+                    "Only processing bookings can change room"
+            );
+        }
+
+        this.roomId = Objects.requireNonNull(newRoomId);
     }
 
 }

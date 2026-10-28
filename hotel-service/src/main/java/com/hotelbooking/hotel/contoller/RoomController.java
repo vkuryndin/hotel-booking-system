@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -83,5 +85,19 @@ public class RoomController {
     ) {
         roomService.deleteRoom(id);
         return ResponseEntity.noContent().build();
+    }
+    @GetMapping("/recommend")
+    public ResponseEntity<List<RoomResponse>> recommendRooms(
+            @RequestParam Long hotelId,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate checkIn,
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate checkOut
+    ) {
+        return ResponseEntity.ok(
+                roomService.recommendRooms(hotelId, checkIn, checkOut)
+        );
     }
 }

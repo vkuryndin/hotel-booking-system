@@ -19,6 +19,9 @@ import org.springframework.resilience.annotation.Retryable;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.Objects;
+import com.hotelbooking.booking.exception.HotelNotFoundException;
+import org.springframework.core.ParameterizedTypeReference;
+import java.util.List;
 
 @Retryable(
         includes = {
@@ -110,5 +113,37 @@ public class HotelServiceClient {
         return Objects.requireNonNull(
                 response, "Empty release response from Hotel Service"
         );
+    }
+    public List<HotelRoomResponse> recommendRooms(
+            Long hotelId,
+            LocalDate checkIn,
+            LocalDate checkOut
+    ) {
+        try {
+            List<HotelRoomResponse> response = hotelRestClient.get()
+                    .uri(builder -> builder
+                            .path("/api/rooms/recommend")
+                            .queryParam("hotelId", hotelId)
+                            .queryParam("checkIn", checkIn)
+                            .queryParam("checkOut", checkOut)
+                            .build())
+                    .headers(headers -> headers.setBearerAuth(
+                            serviceTokenProvider.generateToken()
+                    ))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<
+                            List<HotelRoomResponse>>() {});
+
+            if (response == null) {
+                throw new HotelServiceUnavailableException(
+                        "Empty recommendations from Hotel Service"
+                );
+            }
+
+            return response;
+
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new HotelNotFoundException(hotelId);
+        }
     }
 }

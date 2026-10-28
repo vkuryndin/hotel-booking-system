@@ -7,6 +7,8 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDate;
 import java.util.Optional;
 
 import java.util.List;
@@ -24,6 +26,23 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
             Long hotelId,
             String number,
             Long id
+    );
+    @Query("""
+        SELECT r FROM Room r
+        WHERE r.hotel.id = :hotelId
+          AND r.available = true
+          AND NOT EXISTS (
+              SELECT n.id
+              FROM RoomReservationNight n
+              WHERE n.room.id = r.id
+                AND n.nightDate >= :checkIn
+                AND n.nightDate < :checkOut
+          )
+        """)
+    List<Room> findAvailableForPeriod(
+            @Param("hotelId") Long hotelId,
+            @Param("checkIn") LocalDate checkIn,
+            @Param("checkOut") LocalDate checkOut
     );
 }
 

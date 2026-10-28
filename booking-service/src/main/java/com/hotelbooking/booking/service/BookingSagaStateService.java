@@ -44,16 +44,18 @@ public class BookingSagaStateService {
     public SagaBooking createPending(
             Long userId,
             BookingRequest request,
+            Long resolvedRoomId,
             UUID idempotencyKey
-    ){
+    ) {
         Booking booking = new Booking(
                 userId,
-                request.roomId(),
+                resolvedRoomId,
                 request.checkIn(),
                 request.checkOut()
         );
 
         booking.assignIdempotencyKey(idempotencyKey);
+        booking.assignRequestFingerprint(request.fingerprint());
 
         bookingRepository.saveAndFlush(booking);
 
@@ -109,9 +111,8 @@ public class BookingSagaStateService {
     ) {
         return bookingRepository.findByUserIdAndIdempotencyKey(userId, key)
                 .map(booking -> {
-                    if (!booking.getRoomId().equals(request.roomId())
-                            || !booking.getCheckIn().equals(request.checkIn())
-                            || !booking.getCheckOut().equals(request.checkOut())) {
+                    if (!booking.getRequestFingerprint()
+                            .equals(request.fingerprint())) {
                         throw new IdempotencyKeyConflictException();
                     }
 
@@ -142,6 +143,7 @@ public class BookingSagaStateService {
             BookingCreationOutcome outcome
     ) {
         if (outcome != BookingCreationOutcome.ROOM_CONFLICT
+                && outcome != BookingCreationOutcome.NO_AVAILABLE_ROOMS
                 && outcome != BookingCreationOutcome.FAILED) {
             throw new IllegalArgumentException("Invalid creation outcome");
         }
@@ -152,6 +154,18 @@ public class BookingSagaStateService {
         booking.markCreationOutcome(outcome);
 
         return bookingMapper.toResponse(booking);
+    }
+    @Transactional
+    public SagaBooking switchPendingRoom(
+            Long bookingId,
+            Long newRoomId
+    ) {
+        Booking booking = find(bookingId);
+
+        booking.switchPendingRoom(newRoomId);
+        bookingRepository.flush();
+
+        return snapshot(booking);
     }
 
 }

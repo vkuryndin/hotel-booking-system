@@ -14,6 +14,9 @@ import com.hotelbooking.hotel.repository.RoomRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.hotelbooking.hotel.strategy.RoomSelectionStrategy;
+import java.time.LocalDate;
+
 
 import java.util.List;
 import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
@@ -26,17 +29,20 @@ public class RoomService {
     private final HotelRepository hotelRepository;
     private final RoomMapper roomMapper;
     private final RoomReservationRepository reservationRepository;
+    private final RoomSelectionStrategy selectionStrategy;
 
     public RoomService(
             RoomRepository roomRepository,
             HotelRepository hotelRepository,
             RoomMapper roomMapper,
-            RoomReservationRepository reservationRepository
+            RoomReservationRepository reservationRepository,
+            RoomSelectionStrategy selectionStrategy
     ) {
         this.roomRepository = roomRepository;
         this.hotelRepository = hotelRepository;
         this.roomMapper = roomMapper;
         this.reservationRepository = reservationRepository;
+        this.selectionStrategy = selectionStrategy;
     }
 
     @Transactional
@@ -151,6 +157,35 @@ public class RoomService {
                     "Cannot delete room with reservation history: " + roomId
             );
         }
+    }
+    @Transactional(readOnly = true)
+    public List<RoomResponse> recommendRooms(
+            Long hotelId,
+            LocalDate checkIn,
+            LocalDate checkOut
+    ) {
+        if (hotelId == null || hotelId <= 0) {
+            throw new IllegalArgumentException("Invalid hotelId");
+        }
+
+        if (checkIn == null || checkOut == null
+                || checkIn.isBefore(LocalDate.now())
+                || !checkOut.isAfter(checkIn)) {
+            throw new IllegalArgumentException("Invalid booking dates");
+        }
+
+        if (!hotelRepository.existsById(hotelId)) {
+            throw new HotelNotFoundException(hotelId);
+        }
+
+        List<Room> rooms = roomRepository.findAvailableForPeriod(
+                hotelId, checkIn, checkOut
+        );
+
+        return selectionStrategy.rank(rooms)
+                .stream()
+                .map(roomMapper::toResponse)
+                .toList();
     }
 
 }

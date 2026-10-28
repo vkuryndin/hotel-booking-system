@@ -4,5 +4,6 @@ public enum BookingCreationOutcome {
     PROCESSING,
     SUCCESS,
     ROOM_CONFLICT,
-    FAILED
+    FAILED,
+    NO_AVAILABLE_ROOMS
 }
