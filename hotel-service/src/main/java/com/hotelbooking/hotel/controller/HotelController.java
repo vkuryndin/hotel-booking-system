@@ -11,7 +11,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import com.hotelbooking.hotel.entity.HotelAmenity;
 import java.math.BigDecimal;
 @RestController
@@ -36,13 +38,14 @@ public class HotelController {
         return ResponseEntity.created(location).body(response);
     }
     @GetMapping
-    public ResponseEntity<List<HotelResponse>> getHotels(
+    public ResponseEntity<Page<HotelResponse>> getHotels(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String address,
             @RequestParam(required = false) BigDecimal minRating,
             @RequestParam(required = false) HotelAmenity amenity,
             @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String direction
+            @RequestParam(defaultValue = "asc") String direction,
+            @PageableDefault(size = 20) Pageable pageable
     ) {
         return ResponseEntity.ok(
                 hotelService.searchHotels(
@@ -51,7 +54,8 @@ public class HotelController {
                         minRating,
                         amenity,
                         sortBy,
-                        direction
+                        direction,
+                        pageable
                 )
         );
     }

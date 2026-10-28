@@ -7,6 +7,10 @@ import com.hotelbooking.hotel.exception.HotelAlreadyExistsException;
 import com.hotelbooking.hotel.mapper.HotelMapper;
 import com.hotelbooking.hotel.repository.HotelRepository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -74,20 +78,22 @@ public class HotelService {
         return hotelMapper.toResponse(savedHotel);
     }
 
-    @Transactional(readOnly = true)
-    public List<HotelResponse> getHotels() {
-        return searchHotels(null, null, null, null, "id", "asc");
-    }
 
     @Transactional(readOnly = true)
-    public List<HotelResponse> searchHotels(
+    public Page<HotelResponse> searchHotels(
             String name,
             String address,
             BigDecimal minRating,
             HotelAmenity amenity,
             String sortBy,
-            String direction
+            String direction,
+            Pageable pageable
     ) {
+        if (pageable.getPageSize() > 100) {
+            throw new IllegalArgumentException(
+                    "Page size must not exceed 100"
+            );
+        }
         if (minRating != null &&
                 (minRating.compareTo(BigDecimal.ZERO) < 0 ||
                         minRating.compareTo(BigDecimal.valueOf(5)) > 0)) {
@@ -155,10 +161,14 @@ public class HotelService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        return hotelRepository.findAll(specification, sort)
-                .stream()
-                .map(hotelMapper::toResponse)
-                .toList();
+        Pageable pageRequest = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                sort
+        );
+
+        return hotelRepository.findAll(specification, pageRequest)
+                .map(hotelMapper::toResponse);
     }
     @Transactional(readOnly = true)
     public HotelResponse getHotelById(Long id) {

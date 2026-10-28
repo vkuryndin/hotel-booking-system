@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 
 import com.hotelbooking.booking.exception.RequestInProgressException;
@@ -313,19 +315,28 @@ public class BookingService {
             throw new AccessDeniedException("Admin access required");
         }
 
+        Pageable pageRequest = bookingPageable(pageable);
+
         Page<Booking> bookings = status == null
-                ? bookingRepository.findAllByOrderByCreatedAtDesc(pageable)
-                : bookingRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+                ? bookingRepository.findAllByOrderByCreatedAtDesc(pageRequest)
+                : bookingRepository.findByStatusOrderByCreatedAtDesc(
+                status, pageRequest
+        );
 
         return bookings.map(bookingMapper::toResponse);
     }
 
     @Transactional(readOnly = true)
-    public List<BookingResponse> getMyBookings(Long userId) {
-        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(bookingMapper::toResponse)
-                .toList();
+    public Page<BookingResponse> getMyBookings(
+            Long userId,
+            Pageable pageable
+    ) {
+        return bookingRepository
+                .findByUserIdOrderByCreatedAtDesc(
+                        userId,
+                        bookingPageable(pageable)
+                )
+                .map(bookingMapper::toResponse);
     }
     private BookingResponse responseForRepeatedRequest(
             BookingSagaStateService.ExistingCreation existing
@@ -409,6 +420,19 @@ public class BookingService {
         throw new BookingSagaUnavailableException(
                 "Booking cancelled because reservation failed",
                 error
+        );
+    }
+    private Pageable bookingPageable(Pageable pageable) {
+        if (pageable.getPageSize() > 100) {
+            throw new IllegalArgumentException(
+                    "Page size must not exceed 100"
+            );
+        }
+
+        return PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "id")
         );
     }
 }

@@ -18,6 +18,10 @@ import java.time.LocalDate;
 import com.hotelbooking.hotel.entity.RoomAmenity;
 import com.hotelbooking.hotel.entity.RoomCategory;
 import java.math.BigDecimal;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 @RestController
 @RequestMapping("/api/rooms")
 public class RoomController {
@@ -40,7 +44,7 @@ public class RoomController {
                 .body(response);
     }
     @GetMapping
-    public ResponseEntity<List<RoomResponse>> getRooms(
+    public ResponseEntity<Page<RoomResponse>> getRooms(
             @RequestParam Long hotelId,
             @RequestParam(required = false) RoomCategory category,
             @RequestParam(required = false) Integer minCapacity,
@@ -49,7 +53,8 @@ public class RoomController {
             @RequestParam(required = false) Boolean available,
             @RequestParam(required = false) RoomAmenity amenity,
             @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String direction
+            @RequestParam(defaultValue = "asc") String direction,
+            @PageableDefault(size = 20) Pageable pageable
     ) {
         return ResponseEntity.ok(
                 roomService.searchRooms(
@@ -61,7 +66,8 @@ public class RoomController {
                         available,
                         amenity,
                         sortBy,
-                        direction
+                        direction,
+                        pageable
                 )
         );
     }
@@ -82,11 +88,12 @@ public class RoomController {
         );
     }
     @GetMapping("/available")
-    public ResponseEntity<List<RoomResponse>> getAvailableRooms(
-            @RequestParam Long hotelId
+    public ResponseEntity<Page<RoomResponse>> getAvailableRooms(
+            @RequestParam Long hotelId,
+            @PageableDefault(size = 20) Pageable pageable
     ) {
         return ResponseEntity.ok(
-                roomService.getAvailableRoomsByHotelId(hotelId)
+                roomService.getAvailableRoomsByHotelId(hotelId, pageable)
         );
     }
 

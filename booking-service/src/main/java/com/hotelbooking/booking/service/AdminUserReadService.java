@@ -10,6 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @Service
 public class AdminUserReadService {
@@ -21,11 +25,23 @@ public class AdminUserReadService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminUserResponse> getAllUsers() {
-        return userRepository.findAll()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<AdminUserResponse> getAllUsers(
+            Pageable pageable
+    ) {
+        if (pageable.getPageSize() > 100) {
+            throw new IllegalArgumentException(
+                    "Page size must not exceed 100"
+            );
+        }
+
+        Pageable pageRequest = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by("id")
+        );
+
+        return userRepository.findAll(pageRequest)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

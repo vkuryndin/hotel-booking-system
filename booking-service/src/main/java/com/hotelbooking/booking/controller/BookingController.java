@@ -43,12 +43,15 @@ public class BookingController {
                 .created(URI.create("/api/bookings/" + response.id()))
                 .body(response);
     }
+
     @GetMapping("/my")
-    public List<BookingResponse> getMyBookings(
-            @AuthenticationPrincipal Jwt jwt
+    public Page<BookingResponse> getMyBookings(
+            @AuthenticationPrincipal Jwt jwt,
+            @PageableDefault(size = 20) Pageable pageable
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-        return bookingService.getMyBookings(userId);
+
+        return bookingService.getMyBookings(userId, pageable);
     }
     @GetMapping("/{id}")
     public BookingResponse getBookingById(

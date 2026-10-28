@@ -3645,3 +3645,139 @@ Authorization: Bearer {{accessToken}}
         client.assert(response.status === 200);
     });
 %}
+
+### PAGE-01 — Первая страница, 2 отеля
+GET {{baseUrl}}/api/hotels?page=0&size=2
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("PAGE-01", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.content.length === 2);
+        client.assert(response.body.number === 0);
+        client.assert(response.body.size === 2);
+    });
+%}
+
+### PAGE-02 — Вторая страница
+GET {{baseUrl}}/api/hotels?page=1&size=2
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("PAGE-02", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.number === 1);
+        client.assert(Array.isArray(response.body.content));
+    });
+%}
+
+### PAGE-03 — Превышен размер страницы
+GET {{baseUrl}}/api/hotels?page=0&size=101
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("PAGE-03", () => {
+        client.assert(response.status === 400);
+    });
+%}
+
+### PAGE-04 — Фильтрация и сортировка
+GET {{baseUrl}}/api/hotels?minRating=4.5&sortBy=rating&direction=desc&page=0&size=10
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("PAGE-04", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.content.every(
+            h => Number(h.rating) >= 4.5
+        ));
+    });
+%}
+### PAGE-05 — Фильтрация и сортировка
+GET http://localhost:8080/api/rooms?hotelId=1&page=0&size=2
+Authorization: Bearer {{adminToken}}
+
+### PAGE-06 — Фильтрация и сортировка
+GET http://localhost:8080/api/rooms/available?hotelId=1&page=0&size=2
+Authorization: Bearer {{adminToken}}
+
+
+
+### PAGINATION 1 — Hotels: первая страница, ожидаем 200
+GET http://localhost:8080/api/hotels?page=0&size=2
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 2 — Hotels: вторая страница, ожидаем 200
+GET http://localhost:8080/api/hotels?page=1&size=2
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 3 — Rooms: первая страница, ожидаем 200
+GET http://localhost:8080/api/rooms?hotelId=1&page=0&size=2
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 4 — Rooms: вторая страница, ожидаем 200
+GET http://localhost:8080/api/rooms?hotelId=1&page=1&size=2
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 5 — Rooms: фильтрация + пагинация, ожидаем 200
+GET http://localhost:8080/api/rooms?hotelId=1&category=STANDARD&page=0&size=2
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 6 — Available rooms, ожидаем 200
+GET http://localhost:8080/api/rooms/available?hotelId=1&page=0&size=2
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 7 — My bookings: первая страница, ожидаем 200
+GET http://localhost:8080/api/bookings/my?page=0&size=1
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 8 — My bookings: вторая страница, ожидаем 200
+GET http://localhost:8080/api/bookings/my?page=1&size=1
+Authorization: Bearer {{accessToken}}
+
+### PAGINATION 9 — All bookings: ADMIN, ожидаем 200
+GET http://localhost:8080/api/bookings?page=0&size=2
+Authorization: Bearer {{adminToken}}
+
+### PAGINATION 10 — Bookings: фильтр по статусу, ожидаем 200
+GET http://localhost:8080/api/bookings?status=CONFIRMED&page=0&size=2
+Authorization: Bearer {{adminToken}}
+
+### PAGINATION 11 — Users: первая страница, ожидаем 200
+GET http://localhost:8080/api/users?page=0&size=1
+Authorization: Bearer {{adminToken}}
+
+### PAGINATION 12 — Users: вторая страница, ожидаем 200
+GET http://localhost:8080/api/users?page=1&size=1
+Authorization: Bearer {{adminToken}}
+
+### NEGATIVE 1 — Rooms: size > 100, ожидаем 400
+GET http://localhost:8080/api/rooms?hotelId=1&page=0&size=101
+Authorization: Bearer {{accessToken}}
+
+### NEGATIVE 2 — My bookings: size > 100, ожидаем 400
+GET http://localhost:8080/api/bookings/my?page=0&size=101
+Authorization: Bearer {{accessToken}}
+
+### NEGATIVE 3 — All bookings: size > 100, ожидаем 400
+GET http://localhost:8080/api/bookings?page=0&size=101
+Authorization: Bearer {{adminToken}}
+
+### NEGATIVE 4 — Users: size > 100, ожидаем 400
+GET http://localhost:8080/api/users?page=0&size=101
+Authorization: Bearer {{adminToken}}
+
+### SECURITY 1 — Users: USER вместо ADMIN, ожидаем 403
+GET http://localhost:8080/api/users?page=0&size=1
+Authorization: Bearer {{accessToken}}
+
+### SECURITY 2 — All bookings: USER вместо ADMIN, ожидаем 403
+GET http://localhost:8080/api/bookings?page=0&size=1
+Authorization: Bearer {{accessToken}}
+
+### SECURITY 3 — Без токена, ожидаем 401
+GET http://localhost:8080/api/bookings/my?page=0&size=1
+
+### EDGE CASE — Несуществующая страница, ожидаем 200
+GET http://localhost:8080/api/bookings/my?page=9999&size=2
+Authorization: Bearer {{accessToken}}

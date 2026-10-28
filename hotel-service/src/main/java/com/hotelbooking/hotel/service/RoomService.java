@@ -17,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.hotelbooking.hotel.strategy.RoomSelectionStrategy;
 import java.time.LocalDate;
 
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
@@ -89,15 +91,18 @@ public class RoomService {
         }
     }
     @Transactional(readOnly = true)
-    public List<RoomResponse> getRoomsByHotelId(Long hotelId) {
+    public Page<RoomResponse> getRoomsByHotelId(
+            Long hotelId,
+            Pageable pageable
+    ) {
         return searchRooms(
                 hotelId, null, null, null, null,
-                null, null, "id", "asc"
+                null, null, "id", "asc", pageable
         );
     }
 
     @Transactional(readOnly = true)
-    public List<RoomResponse> searchRooms(
+    public Page<RoomResponse> searchRooms(
             Long hotelId,
             RoomCategory category,
             Integer minCapacity,
@@ -106,8 +111,14 @@ public class RoomService {
             Boolean available,
             RoomAmenity amenity,
             String sortBy,
-            String direction
+            String direction,
+            Pageable pageable
     ) {
+        if (pageable.getPageSize() > 100) {
+            throw new IllegalArgumentException(
+                    "Page size must not exceed 100"
+            );
+        }
         if (hotelId == null || hotelId <= 0) {
             throw new IllegalArgumentException("Invalid hotelId");
         }
@@ -211,10 +222,14 @@ public class RoomService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        return roomRepository.findAll(specification, sort)
-                .stream()
-                .map(roomMapper::toResponse)
-                .toList();
+        Pageable pageRequest = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                sort
+        );
+
+        return roomRepository.findAll(specification, pageRequest)
+                .map(roomMapper::toResponse);
     }
     @Transactional(readOnly = true)
     public RoomResponse getRoomById(Long roomId) {
@@ -236,17 +251,16 @@ public class RoomService {
 
         return roomMapper.toResponse(room);
     }
+
     @Transactional(readOnly = true)
-    public List<RoomResponse> getAvailableRoomsByHotelId(Long hotelId) {
-
-        if (!hotelRepository.existsById(hotelId)) {
-            throw new HotelNotFoundException(hotelId);
-        }
-
-        return roomRepository.findByHotelIdAndAvailableTrue(hotelId)
-                .stream()
-                .map(roomMapper::toResponse)
-                .toList();
+    public Page<RoomResponse> getAvailableRoomsByHotelId(
+            Long hotelId,
+            Pageable pageable
+    ) {
+        return searchRooms(
+                hotelId, null, null, null, null,
+                true, null, "id", "asc", pageable
+        );
     }
 
     @Transactional

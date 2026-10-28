@@ -22,7 +22,10 @@ import org.springframework.data.jpa.repository.Lock;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
 
-    List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
+    Page<Booking> findByUserIdOrderByCreatedAtDesc(
+            Long userId,
+            Pageable pageable
+    );
     Page<Booking> findAllByOrderByCreatedAtDesc(Pageable pageable);
     Page<Booking> findByStatusOrderByCreatedAtDesc(
             BookingStatus status,

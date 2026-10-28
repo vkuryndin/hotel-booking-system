@@ -7,6 +7,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
 @RestController
 @RequestMapping("/api/users")
@@ -20,8 +23,10 @@ public class AdminUserReadController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public List<AdminUserResponse> getAllUsers() {
-        return readService.getAllUsers();
+    public Page<AdminUserResponse> getAllUsers(
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        return readService.getAllUsers(pageable);
     }
 
     @GetMapping("/{id}")
