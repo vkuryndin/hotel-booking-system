@@ -25,7 +25,16 @@ import com.hotelbooking.hotel.repository.RoomReservationRepository;
 import com.hotelbooking.hotel.strategy.MostExpensiveStrategy;
 import com.hotelbooking.hotel.strategy.RoomSelectionMode;
 import org.springframework.beans.factory.annotation.Qualifier;
+import com.hotelbooking.hotel.entity.RoomAmenity;
+import com.hotelbooking.hotel.entity.RoomCategory;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Locale;
 @Service
 public class RoomService {
 
@@ -80,12 +89,128 @@ public class RoomService {
     }
     @Transactional(readOnly = true)
     public List<RoomResponse> getRoomsByHotelId(Long hotelId) {
+        return searchRooms(
+                hotelId, null, null, null, null,
+                null, null, "id", "asc"
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomResponse> searchRooms(
+            Long hotelId,
+            RoomCategory category,
+            Integer minCapacity,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Boolean available,
+            RoomAmenity amenity,
+            String sortBy,
+            String direction
+    ) {
+        if (hotelId == null || hotelId <= 0) {
+            throw new IllegalArgumentException("Invalid hotelId");
+        }
 
         if (!hotelRepository.existsById(hotelId)) {
             throw new HotelNotFoundException(hotelId);
         }
 
-        return roomRepository.findByHotelId(hotelId)
+        if (minCapacity != null && minCapacity < 1) {
+            throw new IllegalArgumentException(
+                    "minCapacity must be positive"
+            );
+        }
+
+        if ((minPrice != null && minPrice.signum() < 0)
+                || (maxPrice != null && maxPrice.signum() < 0)
+                || (minPrice != null && maxPrice != null
+                && minPrice.compareTo(maxPrice) > 0)) {
+            throw new IllegalArgumentException(
+                    "Invalid price range"
+            );
+        }
+
+        String sortProperty = switch (sortBy) {
+            case "id", "number", "capacity",
+                 "pricePerNight", "timesBooked" -> sortBy;
+
+            default -> throw new IllegalArgumentException(
+                    "Unsupported room sortBy: " + sortBy
+            );
+        };
+
+        String order = direction.toLowerCase(Locale.ROOT);
+
+        if (!order.equals("asc") && !order.equals("desc")) {
+            throw new IllegalArgumentException(
+                    "direction must be asc or desc"
+            );
+        }
+
+        Sort.Direction sortDirection = order.equals("desc")
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+
+        Sort sort = Sort.by(sortDirection, sortProperty);
+
+        if (!sortProperty.equals("id")) {
+            sort = sort.and(Sort.by("id"));
+        }
+
+        Specification<Room> specification = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            predicates.add(cb.equal(
+                    root.get("hotel").get("id"),
+                    hotelId
+            ));
+
+            if (category != null) {
+                predicates.add(cb.equal(
+                        root.get("category"),
+                        category
+                ));
+            }
+
+            if (minCapacity != null) {
+                predicates.add(cb.greaterThanOrEqualTo(
+                        root.get("capacity"),
+                        minCapacity
+                ));
+            }
+
+            if (minPrice != null) {
+                predicates.add(cb.greaterThanOrEqualTo(
+                        root.get("pricePerNight"),
+                        minPrice
+                ));
+            }
+
+            if (maxPrice != null) {
+                predicates.add(cb.lessThanOrEqualTo(
+                        root.get("pricePerNight"),
+                        maxPrice
+                ));
+            }
+
+            if (available != null) {
+                predicates.add(cb.equal(
+                        root.get("available"),
+                        available
+                ));
+            }
+
+            if (amenity != null) {
+                predicates.add(cb.isMember(
+                        amenity,
+                        root.<Collection<RoomAmenity>>get("amenities")
+                ));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return roomRepository.findAll(specification, sort)
                 .stream()
                 .map(roomMapper::toResponse)
                 .toList();

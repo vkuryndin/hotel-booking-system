@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-
+import com.hotelbooking.hotel.entity.HotelAmenity;
+import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/hotels")
 public class HotelController {
@@ -35,10 +36,25 @@ public class HotelController {
         return ResponseEntity.created(location).body(response);
     }
     @GetMapping
-    public ResponseEntity<List<HotelResponse>> getHotels() {
-        return ResponseEntity.ok(hotelService.getHotels());
+    public ResponseEntity<List<HotelResponse>> getHotels(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String address,
+            @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) HotelAmenity amenity,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction
+    ) {
+        return ResponseEntity.ok(
+                hotelService.searchHotels(
+                        name,
+                        address,
+                        minRating,
+                        amenity,
+                        sortBy,
+                        direction
+                )
+        );
     }
-
     @GetMapping("/{id}")
     public ResponseEntity<HotelResponse> getHotelById(
             @PathVariable Long id

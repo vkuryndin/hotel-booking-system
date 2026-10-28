@@ -33,6 +33,9 @@ dependencies {
     // Service Discovery
     implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
 
+    // Circuit Breaker
+    implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
+
     // DTO Mapping
     implementation("org.mapstruct:mapstruct:1.6.3")
     annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")

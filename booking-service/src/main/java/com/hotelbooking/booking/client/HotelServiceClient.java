@@ -23,13 +23,19 @@ import java.util.Objects;
 import com.hotelbooking.booking.exception.HotelNotFoundException;
 import org.springframework.core.ParameterizedTypeReference;
 import java.util.List;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.function.Supplier;
 
 @Retryable(
         includes = {
                 ResourceAccessException.class,
                 HttpServerErrorException.BadGateway.class,
                 HttpServerErrorException.ServiceUnavailable.class,
-                HttpServerErrorException.GatewayTimeout.class
+                HttpServerErrorException.GatewayTimeout.class,
+                HotelServiceUnavailableException.class
         },
         maxRetries = 2,
         delay = 200,
@@ -42,32 +48,41 @@ public class HotelServiceClient {
     private final RestClient hotelRestClient;
     private final ServiceTokenProvider serviceTokenProvider;
 
+    private static final Logger log =
+            LoggerFactory.getLogger(HotelServiceClient.class);
+
+    private final CircuitBreakerFactory<?, ?> circuitBreakerFactory;
 
     public HotelServiceClient(
             RestClient hotelRestClient,
-            ServiceTokenProvider serviceTokenProvider
+            ServiceTokenProvider serviceTokenProvider,
+            CircuitBreakerFactory<?, ?> circuitBreakerFactory
     ) {
         this.hotelRestClient = hotelRestClient;
         this.serviceTokenProvider = serviceTokenProvider;
+        this.circuitBreakerFactory = circuitBreakerFactory;
     }
 
     public HotelRoomResponse getRoom(Long roomId) {
         try {
-            HotelRoomResponse room = hotelRestClient.get()
-                    .uri("/api/rooms/{id}", roomId)
-                    .headers(headers -> headers.setBearerAuth(
-                            serviceTokenProvider.generateToken()
-                    ))
-                    .retrieve()
-                    .body(HotelRoomResponse.class);
+            return withCircuitBreaker(() -> {
 
-            if (room == null) {
-                throw new HotelServiceUnavailableException(
-                        "Empty response from Hotel Service"
-                );
-            }
+                HotelRoomResponse room = hotelRestClient.get()
+                        .uri("/api/rooms/{id}", roomId)
+                        .headers(headers -> headers.setBearerAuth(
+                                serviceTokenProvider.generateToken()
+                        ))
+                        .retrieve()
+                        .body(HotelRoomResponse.class);
 
-            return room;
+                if (room == null) {
+                    throw new HotelServiceUnavailableException(
+                            "Empty response from Hotel Service"
+                    );
+                }
+
+                return room;
+            });
 
         } catch (HttpClientErrorException.NotFound ex) {
             throw new RoomNotFoundException(roomId);
@@ -100,41 +115,48 @@ public class HotelServiceClient {
             LocalDate checkOut,
             int guestCount
     ) {
-        HotelReservationResponse response = hotelRestClient.post()
-                .uri("/api/rooms/{id}/confirm-availability", roomId)
-                .headers(headers -> headers.setBearerAuth(
-                        serviceTokenProvider.generateToken()
-                ))
-                .body(new HotelReservationRequest(
-                        reservationId,
-                        checkIn,
-                        checkOut,
-                        guestCount
-                ))
-                .retrieve()
-                .body(HotelReservationResponse.class);
+        return withCircuitBreaker(() -> {
 
-        return Objects.requireNonNull(
-                response,
-                "Empty reservation response from Hotel Service"
-        );
+            HotelReservationResponse response = hotelRestClient.post()
+                    .uri("/api/rooms/{id}/confirm-availability", roomId)
+                    .headers(headers -> headers.setBearerAuth(
+                            serviceTokenProvider.generateToken()
+                    ))
+                    .body(new HotelReservationRequest(
+                            reservationId,
+                            checkIn,
+                            checkOut,
+                            guestCount
+                    ))
+                    .retrieve()
+                    .body(HotelReservationResponse.class);
+
+            return Objects.requireNonNull(
+                    response,
+                    "Empty reservation response from Hotel Service"
+            );
+        });
     }
     public HotelReservationResponse releaseRoom(
             Long roomId,
             UUID reservationId
     ) {
-        HotelReservationResponse response = hotelRestClient.post()
-                .uri("/api/rooms/{id}/release", roomId)
-                .headers(headers -> headers.setBearerAuth(
-                        serviceTokenProvider.generateToken()
-                ))
-                .body(new HotelReservationReleaseRequest(reservationId))
-                .retrieve()
-                .body(HotelReservationResponse.class);
+        return withCircuitBreaker(() -> {
 
-        return Objects.requireNonNull(
-                response, "Empty release response from Hotel Service"
-        );
+            HotelReservationResponse response = hotelRestClient.post()
+                    .uri("/api/rooms/{id}/release", roomId)
+                    .headers(headers -> headers.setBearerAuth(
+                            serviceTokenProvider.generateToken()
+                    ))
+                    .body(new HotelReservationReleaseRequest(reservationId))
+                    .retrieve()
+                    .body(HotelReservationResponse.class);
+
+            return Objects.requireNonNull(
+                    response,
+                    "Empty release response from Hotel Service"
+            );
+        });
     }
     public List<HotelRoomResponse> recommendRooms(
             Long hotelId,
@@ -144,29 +166,32 @@ public class HotelServiceClient {
             int guestCount
     ) {
         try {
-            List<HotelRoomResponse> response = hotelRestClient.get()
-                    .uri(builder -> builder
-                            .path("/api/rooms/recommend")
-                            .queryParam("hotelId", hotelId)
-                            .queryParam("checkIn", checkIn)
-                            .queryParam("checkOut", checkOut)
-                            .queryParam("strategy", strategy.name())
-                            .queryParam("guestCount", guestCount)
-                            .build())
-                    .headers(headers -> headers.setBearerAuth(
-                            serviceTokenProvider.generateToken()
-                    ))
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<
-                            List<HotelRoomResponse>>() {});
+            return withCircuitBreaker(() -> {
 
-            if (response == null) {
-                throw new HotelServiceUnavailableException(
-                        "Empty recommendations from Hotel Service"
-                );
-            }
+                List<HotelRoomResponse> response = hotelRestClient.get()
+                        .uri(builder -> builder
+                                .path("/api/rooms/recommend")
+                                .queryParam("hotelId", hotelId)
+                                .queryParam("checkIn", checkIn)
+                                .queryParam("checkOut", checkOut)
+                                .queryParam("strategy", strategy.name())
+                                .queryParam("guestCount", guestCount)
+                                .build())
+                        .headers(headers -> headers.setBearerAuth(
+                                serviceTokenProvider.generateToken()
+                        ))
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<
+                                List<HotelRoomResponse>>() {});
 
-            return response;
+                if (response == null) {
+                    throw new HotelServiceUnavailableException(
+                            "Empty recommendations from Hotel Service"
+                    );
+                }
+
+                return response;
+            });
 
         } catch (HttpClientErrorException.NotFound ex) {
             throw new HotelNotFoundException(hotelId);
@@ -183,6 +208,34 @@ public class HotelServiceClient {
                 checkOut,
                 RoomSelectionMode.LEAST_BOOKED,
                 1
+        );
+    }
+    private <T> T withCircuitBreaker(Supplier<T> operation) {
+
+        return circuitBreakerFactory.create("hotelService").run(
+                operation,
+                error -> {
+
+                    if (error instanceof CallNotPermittedException) {
+                        log.warn(
+                                "Hotel Service Circuit Breaker is OPEN"
+                        );
+                        throw new HotelServiceUnavailableException(error);
+                    }
+
+                    if (error instanceof IllegalStateException
+                            && error.getMessage() != null
+                            && error.getMessage().startsWith(
+                            "No instances available for ")) {
+                        throw new HotelServiceUnavailableException(error);
+                    }
+
+                    if (error instanceof RuntimeException runtimeError) {
+                        throw runtimeError;
+                    }
+
+                    throw new HotelServiceUnavailableException(error);
+                }
         );
     }
 }

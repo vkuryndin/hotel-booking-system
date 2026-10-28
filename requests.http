@@ -2940,3 +2940,200 @@ Content-Type: application/json
         client.assert(Number(response.body.pricePerNight) === 0);
     });
 %}
+
+
+### S2-01 — Все отели без фильтров: 200
+GET {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-01", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(response.body));
+    });
+%}
+
+
+### S2-02 — Отель по названию, рейтингу, удобствам: 200
+GET {{baseUrl}}/api/hotels?name=S12&minRating=4.5&amenity=WIFI&sortBy=rating&direction=desc
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-02", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.some(h =>
+            h.id === Number(client.global.get("s12HotelId"))
+        ));
+        client.assert(response.body.every(h =>
+            Number(h.rating) >= 4.5 &&
+            h.amenities.includes("WIFI")
+        ));
+    });
+%}
+
+
+### S2-03 — Неверный рейтинг: 400
+GET {{baseUrl}}/api/hotels?minRating=5.5
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-03", () =>
+        client.assert(response.status === 400)
+    );
+%}
+
+
+### S2-04 — Недопустимое поле сортировки: 400
+GET {{baseUrl}}/api/hotels?sortBy=password
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-04", () =>
+        client.assert(response.status === 400)
+    );
+%}
+
+
+### S2-05 — Номера без фильтров: 200
+GET {{baseUrl}}/api/rooms?hotelId={{s12HotelId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-05", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(response.body));
+    });
+%}
+
+
+### S2-06 — SUITE, вместимость от 3, цена до 400: 200
+GET {{baseUrl}}/api/rooms?hotelId={{s12HotelId}}&category=SUITE&minCapacity=3&maxPrice=400&sortBy=pricePerNight&direction=desc
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-06", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.length > 0);
+        client.assert(response.body.every(r =>
+            r.category === "SUITE" &&
+            r.capacity >= 3 &&
+            Number(r.pricePerNight) <= 400
+        ));
+    });
+%}
+
+
+### S2-07 — Неверный диапазон цены: 400
+GET {{baseUrl}}/api/rooms?hotelId={{s12HotelId}}&minPrice=500&maxPrice=100
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-07", () =>
+        client.assert(response.status === 400)
+    );
+%}
+
+
+### S2-08 — Статистика существующего отеля: 200
+GET {{baseUrl}}/api/hotels/{{s12HotelId}}/statistics
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-08", () => {
+        client.assert(response.status === 200);
+        client.assert(
+            response.body.hotelId ===
+            Number(client.global.get("s12HotelId"))
+        );
+        client.assert(response.body.totalRooms >= 3);
+        client.assert(
+            response.body.totalReservations ===
+            response.body.reservedReservations +
+            response.body.releasedReservations
+        );
+    });
+%}
+
+
+### S2-09 — Статистика без токена: 401
+GET {{baseUrl}}/api/hotels/{{s12HotelId}}/statistics
+
+> {%
+    client.test("S2-09", () =>
+        client.assert(response.status === 401)
+    );
+%}
+
+
+### S2-10 — Статистика неизвестного отеля: 404
+GET {{baseUrl}}/api/hotels/999999/statistics
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S2-10", () =>
+        client.assert(response.status === 404)
+    );
+%}
+
+### S3-01 — Hotel Service недоступен
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{p11Token}}
+Content-Type: application/json
+Idempotency-Key: {{$uuid}}
+
+{
+  "hotelId": 1,
+  "autoSelect": true,
+  "checkIn": "2030-01-10",
+  "checkOut": "2030-01-12",
+  "guestCount": 1,
+  "strategy": "LEAST_BOOKED"
+}
+
+
+### S3-02 — Первое бронирование: 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{s12Suite2}},
+  "guestCount": 1,
+  "checkIn": "2042-06-10",
+  "checkOut": "2042-06-12"
+}
+
+> {% client.test("First booking: 201", () => client.assert(response.status === 201)); %}
+
+
+### S3-03 — Двойное бронирование: 409
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{s12Suite2}},
+  "guestCount": 1,
+  "checkIn": "2042-06-10",
+  "checkOut": "2042-06-12"
+}
+
+> {% client.test("Double booking: 409", () => client.assert(response.status === 409)); %}
+
+
+### S3-04 — Другие даты, тот же номер: 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{s12Suite2}},
+  "guestCount": 1,
+  "checkIn": "2042-07-10",
+  "checkOut": "2042-07-12"
+}
+
+> {% client.test("Booking after 409: 201", () => client.assert(response.status === 201)); %}

@@ -12,8 +12,11 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 import java.util.List;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface RoomRepository extends JpaRepository<Room, Long> {
+public interface RoomRepository extends
+        JpaRepository<Room, Long>,
+        JpaSpecificationExecutor<Room> {
 
     List<Room> findByHotelId(Long hotelId);
     List<Room> findByHotelIdAndAvailableTrue(Long hotelId);
@@ -43,6 +46,18 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
             @Param("hotelId") Long hotelId,
             @Param("checkIn") LocalDate checkIn,
             @Param("checkOut") LocalDate checkOut
+    );
+    long countByHotelId(Long hotelId);
+
+    long countByHotelIdAndAvailableTrue(Long hotelId);
+
+    @Query("""
+        SELECT COALESCE(SUM(r.timesBooked), 0)
+        FROM Room r
+        WHERE r.hotel.id = :hotelId
+        """)
+    Long sumTimesBookedByHotelId(
+            @Param("hotelId") Long hotelId
     );
 }
 

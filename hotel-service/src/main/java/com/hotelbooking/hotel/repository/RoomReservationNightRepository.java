@@ -30,4 +30,14 @@ public interface RoomReservationNightRepository
             @Param("checkIn") LocalDate checkIn,
             @Param("checkOut") LocalDate checkOut
     );
+    @Query("""
+        SELECT COUNT(DISTINCT n.room.id)
+        FROM RoomReservationNight n
+        WHERE n.room.hotel.id = :hotelId
+          AND n.nightDate = :date
+        """)
+    long countOccupiedRoomsOnDate(
+            @Param("hotelId") Long hotelId,
+            @Param("date") LocalDate date
+    );
 }

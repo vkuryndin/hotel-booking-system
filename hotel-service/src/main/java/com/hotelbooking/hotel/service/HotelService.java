@@ -18,6 +18,15 @@ import com.hotelbooking.hotel.repository.RoomRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 
+import com.hotelbooking.hotel.entity.HotelAmenity;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Locale;
+
 import java.util.List;
 
 @Service
@@ -64,15 +73,93 @@ public class HotelService {
 
         return hotelMapper.toResponse(savedHotel);
     }
+
     @Transactional(readOnly = true)
     public List<HotelResponse> getHotels() {
-        return hotelRepository.findAll(
-                        Sort.by(Sort.Direction.ASC, "id"))
+        return searchHotels(null, null, null, null, "id", "asc");
+    }
+
+    @Transactional(readOnly = true)
+    public List<HotelResponse> searchHotels(
+            String name,
+            String address,
+            BigDecimal minRating,
+            HotelAmenity amenity,
+            String sortBy,
+            String direction
+    ) {
+        if (minRating != null &&
+                (minRating.compareTo(BigDecimal.ZERO) < 0 ||
+                        minRating.compareTo(BigDecimal.valueOf(5)) > 0)) {
+            throw new IllegalArgumentException(
+                    "minRating must be between 0 and 5"
+            );
+        }
+
+        String sortProperty = switch (sortBy) {
+            case "id", "name", "address", "rating" -> sortBy;
+            default -> throw new IllegalArgumentException(
+                    "Unsupported hotel sortBy: " + sortBy
+            );
+        };
+
+        String order = direction.toLowerCase(Locale.ROOT);
+
+        if (!order.equals("asc") && !order.equals("desc")) {
+            throw new IllegalArgumentException(
+                    "direction must be asc or desc"
+            );
+        }
+
+        Sort.Direction sortDirection = order.equals("desc")
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+
+        Sort sort = Sort.by(sortDirection, sortProperty);
+
+        if (!sortProperty.equals("id")) {
+            sort = sort.and(Sort.by("id"));
+        }
+
+        Specification<Hotel> specification = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (name != null && !name.isBlank()) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("name")),
+                        "%" + name.trim().toLowerCase(Locale.ROOT) + "%"
+                ));
+            }
+
+            if (address != null && !address.isBlank()) {
+                predicates.add(cb.like(
+                        cb.lower(root.get("address")),
+                        "%" + address.trim().toLowerCase(Locale.ROOT) + "%"
+                ));
+            }
+
+            if (minRating != null) {
+                predicates.add(cb.greaterThanOrEqualTo(
+                        root.get("rating"),
+                        minRating
+                ));
+            }
+
+            if (amenity != null) {
+                predicates.add(cb.isMember(
+                        amenity,
+                        root.<Collection<HotelAmenity>>get("amenities")
+                ));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return hotelRepository.findAll(specification, sort)
                 .stream()
                 .map(hotelMapper::toResponse)
                 .toList();
     }
-
     @Transactional(readOnly = true)
     public HotelResponse getHotelById(Long id) {
         Hotel hotel = hotelRepository.findById(id)

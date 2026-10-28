@@ -15,7 +15,9 @@ import java.net.URI;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDate;
-
+import com.hotelbooking.hotel.entity.RoomAmenity;
+import com.hotelbooking.hotel.entity.RoomCategory;
+import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/rooms")
 public class RoomController {
@@ -39,10 +41,28 @@ public class RoomController {
     }
     @GetMapping
     public ResponseEntity<List<RoomResponse>> getRooms(
-            @RequestParam Long hotelId
+            @RequestParam Long hotelId,
+            @RequestParam(required = false) RoomCategory category,
+            @RequestParam(required = false) Integer minCapacity,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean available,
+            @RequestParam(required = false) RoomAmenity amenity,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction
     ) {
         return ResponseEntity.ok(
-                roomService.getRoomsByHotelId(hotelId)
+                roomService.searchRooms(
+                        hotelId,
+                        category,
+                        minCapacity,
+                        minPrice,
+                        maxPrice,
+                        available,
+                        amenity,
+                        sortBy,
+                        direction
+                )
         );
     }
     @GetMapping("/{id}")
