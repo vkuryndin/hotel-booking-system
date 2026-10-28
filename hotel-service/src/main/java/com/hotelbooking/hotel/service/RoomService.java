@@ -229,7 +229,7 @@ public class RoomService {
             Long roomId,
             RoomAvailabilityRequest request
     ) {
-        Room room = roomRepository.findById(roomId)
+        Room room = roomRepository.findByIdForUpdate(roomId)
                 .orElseThrow(() -> new RoomNotFoundException(roomId));
 
         room.setAvailable(request.available());

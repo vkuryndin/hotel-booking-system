@@ -6,7 +6,10 @@ Content-Type: application/json
 
 {
   "email": "test@example.com",
-  "password": "MyPassword123"
+  "password": "MyPassword123",
+  "username": "vova",
+  "lastName": "vova",
+  "firstName": "vova"
 }
 
 ### Register duplicate user - expected 409
@@ -66,7 +69,7 @@ Content-Type: application/json
 
 {
   "email": "admin@hotelbooking.com",
-  "password": "Gefsbizd19!"
+  "password": "1234567890art!"
 }
 
 > {%
@@ -3591,3 +3594,54 @@ Content-Type: application/json
 ###
 GET http://localhost:8761/eureka/apps/HOTEL-SERVICE
 Accept: application/json
+
+### S7-01 — Запрет бронирования на 366 ночей
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 77000000-0000-4000-8000-000000000001
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2053-10-10",
+  "checkOut": "2054-10-11",
+  "guestCount": 1
+}
+
+> {%
+    client.test("S7-01: max stay validation", () => {
+        client.assert(response.status === 400);
+        client.assert(response.body.code === "INVALID_ARGUMENT");
+    });
+%}
+
+### ARCH-01 — USER не может получить статистику
+GET {{baseUrl}}/api/hotels/1/statistics
+Authorization: Bearer {{accessToken}}
+
+> {%
+    client.test("USER statistics: 403", () => {
+        client.assert(response.status === 403);
+        client.assert(response.body.code === "ACCESS_DENIED");
+    });
+%}
+
+### ARCH-02 — ADMIN получает статистику
+GET {{baseUrl}}/api/hotels/1/statistics
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("ADMIN statistics: 200", () => {
+        client.assert(response.status === 200);
+    });
+%}
+
+### ARCH-03 — USER по-прежнему видит отель
+GET {{baseUrl}}/api/hotels/1
+Authorization: Bearer {{accessToken}}
+
+> {%
+    client.test("USER hotel: 200", () => {
+        client.assert(response.status === 200);
+    });
+%}

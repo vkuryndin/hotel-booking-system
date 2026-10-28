@@ -31,16 +31,6 @@ public class RoomReservationService {
         this.nightRepository = nightRepository;
     }
 
-    // Старый метод: бронирование на одного гостя
-    @Transactional
-    public RoomReservation reserve(
-            UUID reservationId,
-            Long roomId,
-            LocalDate checkIn,
-            LocalDate checkOut
-    ) {
-        return reserve(reservationId, roomId, checkIn, checkOut, 1);
-    }
 
     // Новый метод: бронирование с учётом количества гостей
     @Transactional

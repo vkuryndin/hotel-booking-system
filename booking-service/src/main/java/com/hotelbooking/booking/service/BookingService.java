@@ -7,7 +7,6 @@ import com.hotelbooking.booking.dto.response.BookingResponse;
 import com.hotelbooking.booking.entity.Booking;
 import com.hotelbooking.booking.entity.BookingStatus;
 import com.hotelbooking.booking.exception.BookingNotFoundException;
-import com.hotelbooking.booking.exception.InvalidBookingStatusException;
 import com.hotelbooking.booking.exception.RoomAlreadyBookedException;
 import com.hotelbooking.booking.exception.RoomUnavailableException;
 import com.hotelbooking.booking.mapper.BookingMapper;
@@ -28,9 +27,6 @@ import com.hotelbooking.booking.exception.BookingSagaUnavailableException;
 import org.springframework.web.client.RestClientResponseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.HttpServerErrorException;
 
 
 import java.util.List;
@@ -100,39 +96,6 @@ public class BookingService {
         return room;
     }
 
-    public void validateBooking(BookingRequest request) {
-        validateDates(request);
-
-        try {
-            validateRoom(request.roomId());
-
-        } catch (ResourceAccessException | HttpServerErrorException ex) {
-            throw new BookingSagaUnavailableException(
-                    "Hotel Service is unavailable", ex
-            );
-
-        } catch (IllegalStateException ex) {
-            if (ex.getMessage() != null
-                    && ex.getMessage().startsWith("No instances available for ")) {
-                throw new BookingSagaUnavailableException(
-                        "Hotel Service is unavailable", ex
-                );
-            }
-
-            throw ex;
-        }
-
-        boolean occupied = bookingRepository.existsOverlappingBooking(
-                request.roomId(),
-                request.checkIn(),
-                request.checkOut(),
-                List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED)
-        );
-
-        if (occupied) {
-            throw new RoomAlreadyBookedException(request.roomId());
-        }
-    }
 
     public BookingResponse createBooking(
             Long userId,
@@ -142,11 +105,8 @@ public class BookingService {
         var existing = sagaStateService.findByIdempotencyKey(
                 userId, idempotencyKey, request
         );
-
         if (existing.isPresent()) {
-            return waitForExistingRequest(
-                    userId, request, idempotencyKey, existing.get()
-            );
+            return responseForRepeatedRequest(existing.get());
         }
 
         validateDates(request);
@@ -225,9 +185,20 @@ public class BookingService {
             );
         } catch (DataIntegrityViolationException
                  | CannotAcquireLockException ex) {
-            return waitForConcurrentCreation(
-                    userId, request, idempotencyKey, ex
+
+            var concurrent = sagaStateService.findByIdempotencyKey(
+                    userId, idempotencyKey, request
             );
+
+            if (concurrent.isPresent()) {
+                return responseForRepeatedRequest(concurrent.get());
+            }
+
+            if (ex instanceof CannotAcquireLockException) {
+                throw new RequestInProgressException();
+            }
+
+            throw ex;
         }
 
         for (int i = 0; i < candidateIds.size(); i++) {
@@ -308,27 +279,7 @@ public class BookingService {
 
         return bookingMapper.toResponse(booking);
     }
-    @Transactional
-    public BookingResponse confirmBooking(
-            Long bookingId,
-            Long userId,
-            boolean isAdmin
-    ) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BookingNotFoundException(bookingId));
 
-        if (!isAdmin && !booking.getUserId().equals(userId)) {
-            throw new AccessDeniedException("Access denied to booking: " + bookingId);
-        }
-
-        try {
-            booking.confirm();
-        } catch (IllegalStateException ex) {
-            throw new InvalidBookingStatusException(bookingId, "confirm");
-        }
-
-        return bookingMapper.toResponse(booking);
-    }
     public BookingResponse cancelBooking(
             Long bookingId,
             Long userId,
@@ -405,36 +356,6 @@ public class BookingService {
             );
         };
     }
-    private BookingResponse waitForExistingRequest(
-            Long userId,
-            BookingRequest request,
-            UUID idempotencyKey,
-            BookingSagaStateService.ExistingCreation existing
-    ) {
-        var current = existing;
-
-        for (int i = 0;
-             i < 100 && current.outcome() == BookingCreationOutcome.PROCESSING;
-             i++) {
-
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                throw new BookingSagaUnavailableException(
-                        "Interrupted while waiting for booking", ex
-                );
-            }
-
-            current = sagaStateService.findByIdempotencyKey(
-                    userId, idempotencyKey, request
-            ).orElseThrow(() ->
-                    new IllegalStateException("Booking disappeared")
-            );
-        }
-
-        return responseForRepeatedRequest(current);
-    }
     private BookingResponse compensateFailedCreation(
             BookingSagaStateService.SagaBooking pending,
             RuntimeException error,
@@ -489,35 +410,5 @@ public class BookingService {
                 "Booking cancelled because reservation failed",
                 error
         );
-    }
-    private BookingResponse waitForConcurrentCreation(
-            Long userId,
-            BookingRequest request,
-            UUID idempotencyKey,
-            RuntimeException originalError
-    ) {
-        for (int i = 0; i < 50; i++) {
-            var existing = sagaStateService.findByIdempotencyKey(
-                    userId, idempotencyKey, request
-            );
-
-            if (existing.isPresent()) {
-                return waitForExistingRequest(
-                        userId, request, idempotencyKey, existing.get()
-                );
-            }
-
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                throw new BookingSagaUnavailableException(
-                        "Interrupted while waiting for concurrent booking",
-                        ex
-                );
-            }
-        }
-
-        throw originalError;
     }
 }

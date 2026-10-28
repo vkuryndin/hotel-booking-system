@@ -91,22 +91,6 @@ public class HotelServiceClient {
             throw new HotelServiceUnavailableException(ex);
         }
     }
-    // Старый метод — сохраняем для совместимости
-    public HotelReservationResponse reserveRoom(
-            Long roomId,
-            UUID reservationId,
-            LocalDate checkIn,
-            LocalDate checkOut
-    ) {
-        return reserveRoom(
-                roomId,
-                reservationId,
-                checkIn,
-                checkOut,
-                1
-        );
-    }
-
     // Новый метод — учитывает количество гостей
     public HotelReservationResponse reserveRoom(
             Long roomId,
