@@ -2,6 +2,8 @@ package com.hotelbooking.booking.dto.request;
 
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import java.time.LocalDate;
 
 public record BookingRequest(
@@ -9,17 +11,32 @@ public record BookingRequest(
         Long hotelId,
         Boolean autoSelect,
         @NotNull @FutureOrPresent LocalDate checkIn,
-        @NotNull LocalDate checkOut
+        @NotNull LocalDate checkOut,
+        @Positive Integer guestCount,
+        RoomSelectionMode strategy
 )
 {
     public BookingRequest {
         autoSelect = Boolean.TRUE.equals(autoSelect);
+        guestCount = guestCount == null ? 1 : guestCount;
+        strategy = strategy == null
+                ? RoomSelectionMode.LEAST_BOOKED
+                : strategy;
     }
     public String fingerprint() {
-        String selection = autoSelect
-                ? "AUTO:" + hotelId
-                : "ROOM:" + roomId;
+        if (Boolean.TRUE.equals(autoSelect)) {
+            return "AUTO:"
+                    + hotelId + ":"
+                    + checkIn + ":"
+                    + checkOut + ":"
+                    + guestCount + ":"
+                    + strategy;
+        }
 
-        return selection + ":" + checkIn + ":" + checkOut;
+        return "ROOM:"
+                + roomId + ":"
+                + checkIn + ":"
+                + checkOut + ":"
+                + guestCount;
     }
 }

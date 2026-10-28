@@ -269,4 +269,42 @@ public class GlobalExceptionHandler {
                 Map.of()
         );
     }
+    @ExceptionHandler(
+            org.springframework.web.server.ResponseStatusException.class
+    )
+    public ResponseEntity<ErrorResponse> handleResponseStatus(
+            org.springframework.web.server.ResponseStatusException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.valueOf(
+                ex.getStatusCode().value()
+        );
+
+        return buildError(
+                status,
+                status == HttpStatus.NOT_FOUND
+                        ? "NOT_FOUND" : "REQUEST_ERROR",
+                ex.getReason() == null
+                        ? status.getReasonPhrase()
+                        : ex.getReason(),
+                request,
+                Map.of()
+        );
+    }
+
+        @ExceptionHandler(
+            org.springframework.web.multipart.MaxUploadSizeExceededException.class
+    )
+    public ResponseEntity<ErrorResponse> handleMaxUpload(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex,
+            HttpServletRequest request
+    ) {
+        return buildError(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "PHOTO_TOO_LARGE",
+                "Maximum photo upload size is 5 MB",
+                request,
+                Map.of()
+        );
+    }
 }

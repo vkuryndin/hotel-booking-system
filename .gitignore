@@ -49,3 +49,6 @@ bin/
 .idea/workspace.xml
 .idea/runConfigurations/
 .run/
+
+/storage/
+**/storage/

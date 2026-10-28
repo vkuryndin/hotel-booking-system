@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.client;
 
 import com.hotelbooking.booking.dto.client.HotelRoomResponse;
+import com.hotelbooking.booking.dto.request.RoomSelectionMode;
 import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
 import com.hotelbooking.booking.exception.RoomNotFoundException;
 import org.springframework.stereotype.Component;
@@ -75,11 +76,29 @@ public class HotelServiceClient {
             throw new HotelServiceUnavailableException(ex);
         }
     }
+    // Старый метод — сохраняем для совместимости
     public HotelReservationResponse reserveRoom(
             Long roomId,
             UUID reservationId,
             LocalDate checkIn,
             LocalDate checkOut
+    ) {
+        return reserveRoom(
+                roomId,
+                reservationId,
+                checkIn,
+                checkOut,
+                1
+        );
+    }
+
+    // Новый метод — учитывает количество гостей
+    public HotelReservationResponse reserveRoom(
+            Long roomId,
+            UUID reservationId,
+            LocalDate checkIn,
+            LocalDate checkOut,
+            int guestCount
     ) {
         HotelReservationResponse response = hotelRestClient.post()
                 .uri("/api/rooms/{id}/confirm-availability", roomId)
@@ -87,16 +106,19 @@ public class HotelServiceClient {
                         serviceTokenProvider.generateToken()
                 ))
                 .body(new HotelReservationRequest(
-                        reservationId, checkIn, checkOut
+                        reservationId,
+                        checkIn,
+                        checkOut,
+                        guestCount
                 ))
                 .retrieve()
                 .body(HotelReservationResponse.class);
 
         return Objects.requireNonNull(
-                response, "Empty reservation response from Hotel Service"
+                response,
+                "Empty reservation response from Hotel Service"
         );
     }
-
     public HotelReservationResponse releaseRoom(
             Long roomId,
             UUID reservationId
@@ -117,7 +139,9 @@ public class HotelServiceClient {
     public List<HotelRoomResponse> recommendRooms(
             Long hotelId,
             LocalDate checkIn,
-            LocalDate checkOut
+            LocalDate checkOut,
+            RoomSelectionMode strategy,
+            int guestCount
     ) {
         try {
             List<HotelRoomResponse> response = hotelRestClient.get()
@@ -126,6 +150,8 @@ public class HotelServiceClient {
                             .queryParam("hotelId", hotelId)
                             .queryParam("checkIn", checkIn)
                             .queryParam("checkOut", checkOut)
+                            .queryParam("strategy", strategy.name())
+                            .queryParam("guestCount", guestCount)
                             .build())
                     .headers(headers -> headers.setBearerAuth(
                             serviceTokenProvider.generateToken()
@@ -145,5 +171,18 @@ public class HotelServiceClient {
         } catch (HttpClientErrorException.NotFound ex) {
             throw new HotelNotFoundException(hotelId);
         }
+    }
+    public List<HotelRoomResponse> recommendRooms(
+            Long hotelId,
+            LocalDate checkIn,
+            LocalDate checkOut
+    ) {
+        return recommendRooms(
+                hotelId,
+                checkIn,
+                checkOut,
+                RoomSelectionMode.LEAST_BOOKED,
+                1
+        );
     }
 }

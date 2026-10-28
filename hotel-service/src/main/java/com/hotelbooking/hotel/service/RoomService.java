@@ -22,6 +22,10 @@ import java.util.List;
 import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
 import com.hotelbooking.hotel.exception.ResourceInUseException;
 import com.hotelbooking.hotel.repository.RoomReservationRepository;
+import com.hotelbooking.hotel.strategy.MostExpensiveStrategy;
+import com.hotelbooking.hotel.strategy.RoomSelectionMode;
+import org.springframework.beans.factory.annotation.Qualifier;
+
 @Service
 public class RoomService {
 
@@ -30,19 +34,23 @@ public class RoomService {
     private final RoomMapper roomMapper;
     private final RoomReservationRepository reservationRepository;
     private final RoomSelectionStrategy selectionStrategy;
+    private final MostExpensiveStrategy mostExpensiveStrategy;
 
     public RoomService(
             RoomRepository roomRepository,
             HotelRepository hotelRepository,
             RoomMapper roomMapper,
             RoomReservationRepository reservationRepository,
-            RoomSelectionStrategy selectionStrategy
+            @Qualifier("leastBookedStrategy")
+            RoomSelectionStrategy selectionStrategy,
+            MostExpensiveStrategy mostExpensiveStrategy
     ) {
         this.roomRepository = roomRepository;
         this.hotelRepository = hotelRepository;
         this.roomMapper = roomMapper;
         this.reservationRepository = reservationRepository;
         this.selectionStrategy = selectionStrategy;
+        this.mostExpensiveStrategy = mostExpensiveStrategy;
     }
 
     @Transactional
@@ -55,6 +63,12 @@ public class RoomService {
         String number = request.number().trim();
 
         Room room = new Room(hotel, number);
+        room.changeRoomDetails(
+                request.category(),
+                request.capacity(),
+                request.pricePerNight(),
+                request.amenities()
+        );
 
         try {
             Room savedRoom = roomRepository.saveAndFlush(room);
@@ -164,28 +178,60 @@ public class RoomService {
             LocalDate checkIn,
             LocalDate checkOut
     ) {
+        return recommendRooms(
+                hotelId,
+                checkIn,
+                checkOut,
+                RoomSelectionMode.LEAST_BOOKED,
+                1
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomResponse> recommendRooms(
+            Long hotelId,
+            LocalDate checkIn,
+            LocalDate checkOut,
+            RoomSelectionMode strategy,
+            int guestCount
+    ) {
         if (hotelId == null || hotelId <= 0) {
             throw new IllegalArgumentException("Invalid hotelId");
         }
 
-        if (checkIn == null || checkOut == null
+        if (checkIn == null
+                || checkOut == null
                 || checkIn.isBefore(LocalDate.now())
                 || !checkOut.isAfter(checkIn)) {
             throw new IllegalArgumentException("Invalid booking dates");
+        }
+
+        if (guestCount < 1) {
+            throw new IllegalArgumentException(
+                    "guestCount must be positive"
+            );
         }
 
         if (!hotelRepository.existsById(hotelId)) {
             throw new HotelNotFoundException(hotelId);
         }
 
-        List<Room> rooms = roomRepository.findAvailableForPeriod(
-                hotelId, checkIn, checkOut
-        );
-
-        return selectionStrategy.rank(rooms)
+        List<Room> available = roomRepository
+                .findAvailableForPeriod(hotelId, checkIn, checkOut)
                 .stream()
+                .filter(room -> room.getCapacity() >= guestCount)
+                .toList();
+
+        RoomSelectionMode mode = strategy == null
+                ? RoomSelectionMode.LEAST_BOOKED
+                : strategy;
+
+        List<Room> ranked = mode == RoomSelectionMode.MOST_EXPENSIVE
+                ? mostExpensiveStrategy.rank(available)
+                : selectionStrategy.rank(available);
+
+        return ranked.stream()
                 .map(roomMapper::toResponse)
                 .toList();
     }
-
 }

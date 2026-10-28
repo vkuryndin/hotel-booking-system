@@ -1,6 +1,10 @@
 package com.hotelbooking.hotel.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(
@@ -20,6 +24,27 @@ public class Hotel {
 
     @Column(nullable = false)
     private String address;
+
+    @Column(length = 3000)
+    private String description;
+
+    @Column(precision = 2, scale = 1)
+    private BigDecimal rating;
+
+    @Column(name = "check_in_time", nullable = false)
+    private LocalTime checkInTime = LocalTime.of(14, 0);
+
+    @Column(name = "check_out_time", nullable = false)
+    private LocalTime checkOutTime = LocalTime.of(12, 0);
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "hotel_amenities",
+            joinColumns = @JoinColumn(name = "hotel_id")
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "amenity", nullable = false, length = 40)
+    private Set<HotelAmenity> amenities = new LinkedHashSet<>();
 
     protected Hotel() {
     }
@@ -44,5 +69,54 @@ public class Hotel {
     public void updateDetails(String name, String address) {
         this.name = name;
         this.address = address;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public BigDecimal getRating() {
+        return rating;
+    }
+
+    public LocalTime getCheckInTime() {
+        return checkInTime;
+    }
+
+    public LocalTime getCheckOutTime() {
+        return checkOutTime;
+    }
+
+    public Set<HotelAmenity> getAmenities() {
+        return amenities;
+    }
+
+    public void changePresentation(
+            String description,
+            BigDecimal rating,
+            Set<HotelAmenity> amenities,
+            LocalTime checkInTime,
+            LocalTime checkOutTime
+    ) {
+        if (description != null) {
+            this.description = description.trim();
+        }
+
+        if (rating != null) {
+            this.rating = rating;
+        }
+
+        if (amenities != null) {
+            this.amenities.clear();
+            this.amenities.addAll(amenities);
+        }
+
+        if (checkInTime != null) {
+            this.checkInTime = checkInTime;
+        }
+
+        if (checkOutTime != null) {
+            this.checkOutTime = checkOutTime;
+        }
     }
 }

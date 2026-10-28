@@ -86,6 +86,7 @@ public class BookingService {
 
         HotelRoomResponse room = hotelServiceClient.getRoom(roomId);
 
+
         if (!room.available()) {
             throw new RoomUnavailableException(roomId);
         }
@@ -159,8 +160,11 @@ public class BookingService {
                 recommendations = hotelServiceClient.recommendRooms(
                         request.hotelId(),
                         request.checkIn(),
-                        request.checkOut()
+                        request.checkOut(),
+                        request.strategy(),
+                        request.guestCount()
                 );
+
             } catch (RestClientException ex) {
                 throw new HotelServiceUnavailableException(ex);
             } catch (IllegalStateException ex) {
@@ -193,7 +197,14 @@ public class BookingService {
                 );
             }
 
-            validateRoom(request.roomId());
+            HotelRoomResponse room = validateRoom(request.roomId());
+
+            if (room.capacity() < request.guestCount()) {
+                throw new IllegalArgumentException(
+                        "Room capacity is less than guestCount"
+                );
+            }
+
             candidateIds = List.of(request.roomId());
         }
 
@@ -228,7 +239,8 @@ public class BookingService {
                         pending.roomId(),
                         pending.reservationId(),
                         pending.checkIn(),
-                        pending.checkOut()
+                        pending.checkOut(),
+                        request.guestCount()
                 );
 
                 if (!"RESERVED".equals(reservation.status())
@@ -363,17 +375,16 @@ public class BookingService {
     ) {
         BookingResponse booking = existing.booking();
 
-        return switch (existing.outcome()) {
-            case SUCCESS -> new BookingResponse(
-                    booking.id(),
-                    booking.userId(),
-                    booking.roomId(),
-                    booking.checkIn(),
-                    booking.checkOut(),
-                    BookingStatus.CONFIRMED,
-                    booking.createdAt()
-            );
-
+        return switch (existing.outcome()) {case SUCCESS -> new BookingResponse(
+                booking.id(),
+                booking.userId(),
+                booking.roomId(),
+                booking.checkIn(),
+                booking.checkOut(),
+                BookingStatus.CONFIRMED,
+                booking.createdAt(),
+                booking.guestCount()
+        );
             case ROOM_CONFLICT -> throw new RoomAlreadyBookedException(booking.roomId());
 
             case NO_AVAILABLE_ROOMS -> throw new NoAvailableRoomsException();

@@ -29,7 +29,8 @@ public class RoomReservationController {
                 request.reservationId(),
                 id,
                 request.checkIn(),
-                request.checkOut()
+                request.checkOut(),
+                request.guestCount()
         );
 
         RoomReservationResponse response = new RoomReservationResponse(

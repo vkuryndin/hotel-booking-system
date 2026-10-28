@@ -31,12 +31,25 @@ public class RoomReservationService {
         this.nightRepository = nightRepository;
     }
 
+    // Старый метод: бронирование на одного гостя
     @Transactional
     public RoomReservation reserve(
             UUID reservationId,
             Long roomId,
             LocalDate checkIn,
             LocalDate checkOut
+    ) {
+        return reserve(reservationId, roomId, checkIn, checkOut, 1);
+    }
+
+    // Новый метод: бронирование с учётом количества гостей
+    @Transactional
+    public RoomReservation reserve(
+            UUID reservationId,
+            Long roomId,
+            LocalDate checkIn,
+            LocalDate checkOut,
+            int guestCount
     ) {
         if (reservationId == null || roomId == null
                 || checkIn == null || checkOut == null
@@ -64,11 +77,26 @@ public class RoomReservationService {
             );
         }
 
+        // НОВОЕ: проверяем количество гостей
+        if (guestCount < 1) {
+            throw new IllegalArgumentException(
+                    "guestCount must be positive"
+            );
+        }
+
+        // НОВОЕ: проверяем вместимость номера
+        if (room.getCapacity() < guestCount) {
+            throw new RoomReservationConflictException(
+                    "Room capacity is less than guestCount: " + roomId
+            );
+        }
+
         if (!room.isAvailable()) {
             throw new RoomReservationConflictException(
                     "Room is unavailable: " + roomId
             );
         }
+
         if (nightRepository.existsOccupiedNights(roomId, checkIn, checkOut)) {
             throw new RoomReservationConflictException(
                     "Room is already booked for selected dates: " + roomId

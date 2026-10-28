@@ -56,7 +56,7 @@ public class BookingSagaStateService {
 
         booking.assignIdempotencyKey(idempotencyKey);
         booking.assignRequestFingerprint(request.fingerprint());
-
+        booking.assignGuestCount(request.guestCount());
         bookingRepository.saveAndFlush(booking);
 
         return snapshot(booking);

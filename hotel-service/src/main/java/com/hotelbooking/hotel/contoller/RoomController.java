@@ -5,6 +5,7 @@ import com.hotelbooking.hotel.dto.request.RoomRequest;
 import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
 import com.hotelbooking.hotel.dto.response.RoomResponse;
 import com.hotelbooking.hotel.service.RoomService;
+import com.hotelbooking.hotel.strategy.RoomSelectionMode;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -89,15 +90,29 @@ public class RoomController {
     @GetMapping("/recommend")
     public ResponseEntity<List<RoomResponse>> recommendRooms(
             @RequestParam Long hotelId,
+
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate checkIn,
+
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate checkOut
+            LocalDate checkOut,
+
+            @RequestParam(defaultValue = "LEAST_BOOKED")
+            RoomSelectionMode strategy,
+
+            @RequestParam(defaultValue = "1")
+            int guestCount
     ) {
         return ResponseEntity.ok(
-                roomService.recommendRooms(hotelId, checkIn, checkOut)
+                roomService.recommendRooms(
+                        hotelId,
+                        checkIn,
+                        checkOut,
+                        strategy,
+                        guestCount
+                )
         );
     }
 }

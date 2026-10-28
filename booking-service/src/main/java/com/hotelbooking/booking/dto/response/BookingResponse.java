@@ -11,6 +11,7 @@ public record BookingResponse(
         LocalDate checkIn,
         LocalDate checkOut,
         BookingStatus status,
-        Instant createdAt
+        Instant createdAt,
+        int guestCount
 ) {
 }

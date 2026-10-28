@@ -2355,3 +2355,588 @@ Content-Type: application/json
   "email": "profile-test01@example.com",
   "password": "Profile123!"
 }
+
+
+
+
+### S12-01 — Создать отель: 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "S12 Test Hotel",
+  "address": "12 Study Street, Yerevan"
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201));
+    client.global.set("s12HotelId", response.body.id);
+%}
+
+
+### S12-02 — Описание, рейтинг, удобства: 200
+PATCH {{baseUrl}}/api/hotels/{{s12HotelId}}/presentation
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "description": "Small educational hotel with several room categories.",
+  "rating": 4.7,
+  "amenities": ["WIFI", "PARKING", "POOL"],
+  "checkInTime": "14:00:00",
+  "checkOutTime": "12:00:00"
+}
+
+> {%
+    client.test("Hotel updated", () => {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.rating) === 4.7);
+        client.assert(response.body.amenities.includes("POOL"));
+    });
+%}
+
+
+### S12-03 — Получить отель: 200
+GET {{baseUrl}}/api/hotels/{{s12HotelId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("Hotel details", () => {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.rating) === 4.7);
+    });
+%}
+
+
+### S12-04 — Рейтинг >5: 400
+PATCH {{baseUrl}}/api/hotels/{{s12HotelId}}/presentation
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"rating": 5.5}
+
+> {% client.test("400", () => client.assert(response.status === 400)); %}
+
+
+### S12-05 — Неизвестное удобство: 400
+PATCH {{baseUrl}}/api/hotels/{{s12HotelId}}/presentation
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"amenities": ["UNKNOWN"]}
+
+> {% client.test("400", () => client.assert(response.status === 400)); %}
+
+
+### S12-06 — SUITE, 2 гостя, цена 350: 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "number": "101",
+  "category": "SUITE",
+  "capacity": 2,
+  "pricePerNight": 350,
+  "amenities": ["TV", "AIR_CONDITIONING", "MINIBAR"]
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201));
+    client.global.set("s12Suite2", response.body.id);
+%}
+
+
+### S12-07 — SUITE, 4 гостя, цена 300: 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "number": "102",
+  "category": "SUITE",
+  "capacity": 4,
+  "pricePerNight": 300,
+  "amenities": ["WIFI", "BALCONY"]
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201));
+    client.global.set("s12Suite4", response.body.id);
+%}
+
+
+### S12-08 — DELUXE, 5 гостей, цена 500: 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "number": "201",
+  "category": "DELUXE",
+  "capacity": 5,
+  "pricePerNight": 500,
+  "amenities": ["TV", "WIFI"]
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201));
+    client.global.set("s12Deluxe", response.body.id);
+%}
+
+
+### S12-09 — STANDARD, 8 гостей, цена 200: 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "number": "301",
+  "category": "STANDARD",
+  "capacity": 8,
+  "pricePerNight": 200
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201));
+    client.global.set("s12Standard", response.body.id);
+%}
+
+
+### S12-10 — Второй SUITE, 3 гостя, цена 300: 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "number": "103",
+  "category": "SUITE",
+  "capacity": 3,
+  "pricePerNight": 300
+}
+
+> {%
+    client.test("201", () => client.assert(response.status === 201));
+    client.global.set("s12Suite3", response.body.id);
+%}
+
+
+### S12-11 — Вместимость 0: 400
+PATCH {{baseUrl}}/api/rooms/{{s12Suite4}}/details
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"capacity": 0}
+
+> {% client.test("400", () => client.assert(response.status === 400)); %}
+
+
+### S12-12 — Отрицательная цена: 400
+PATCH {{baseUrl}}/api/rooms/{{s12Suite4}}/details
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"pricePerNight": -5}
+
+> {% client.test("400", () => client.assert(response.status === 400)); %}
+
+
+### S12-13 — Изменить удобства номера: 200
+PATCH {{baseUrl}}/api/rooms/{{s12Standard}}/details
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"amenities": ["TV", "AIR_CONDITIONING"]}
+
+> {%
+    client.test("Amenities", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.amenities.includes("AIR_CONDITIONING"));
+    });
+%}
+
+
+### S12-14 — MOST_EXPENSIVE, 3 гостя
+### Ожидаем: SUITE 102, SUITE 103, DELUXE, STANDARD
+GET {{baseUrl}}/api/rooms/recommend?hotelId={{s12HotelId}}&checkIn=2040-02-10&checkOut=2040-02-12&strategy=MOST_EXPENSIVE&guestCount=3
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("Correct category ranking", () => {
+        client.assert(response.status === 200);
+        const actual = response.body.map(r => r.id);
+        const expected = [
+            Number(client.global.get("s12Suite4")),
+            Number(client.global.get("s12Suite3")),
+            Number(client.global.get("s12Deluxe")),
+            Number(client.global.get("s12Standard"))
+        ];
+        client.assert(
+            JSON.stringify(actual) === JSON.stringify(expected),
+            "Wrong ranking: " + JSON.stringify(actual)
+        );
+    });
+%}
+
+
+### S12-15 — MOST_EXPENSIVE, 1 гость
+### Самый дорогой SUITE 101 должен быть первым
+GET {{baseUrl}}/api/rooms/recommend?hotelId={{s12HotelId}}&checkIn=2040-03-10&checkOut=2040-03-12&strategy=MOST_EXPENSIVE&guestCount=1
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("Expensive suite first", () => {
+        client.assert(response.status === 200);
+        client.assert(
+            response.body[0].id === Number(client.global.get("s12Suite2"))
+        );
+    });
+%}
+
+
+### S12-16 — LEAST_BOOKED, 3 гостя
+### Двухместный SUITE 101 исключён
+GET {{baseUrl}}/api/rooms/recommend?hotelId={{s12HotelId}}&checkIn=2040-04-10&checkOut=2040-04-12&strategy=LEAST_BOOKED&guestCount=3
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("Capacity filter", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.length === 4);
+        client.assert(
+            !response.body.some(
+                r => r.id === Number(client.global.get("s12Suite2"))
+            )
+        );
+    });
+%}
+
+
+### S12-17 — Для 9 гостей номеров нет: 200 []
+GET {{baseUrl}}/api/rooms/recommend?hotelId={{s12HotelId}}&checkIn=2040-04-10&checkOut=2040-04-12&strategy=MOST_EXPENSIVE&guestCount=9
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("Empty recommendation", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.length === 0);
+    });
+%}
+
+
+### S12-18 — guestCount=0: 400
+GET {{baseUrl}}/api/rooms/recommend?hotelId={{s12HotelId}}&checkIn=2040-04-10&checkOut=2040-04-12&strategy=MOST_EXPENSIVE&guestCount=0
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("400", () => client.assert(response.status === 400)); %}
+
+
+### S12-19 — Неизвестная стратегия: 400
+GET {{baseUrl}}/api/rooms/recommend?hotelId={{s12HotelId}}&checkIn=2040-04-10&checkOut=2040-04-12&strategy=UNKNOWN&guestCount=1
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("400", () => client.assert(response.status === 400)); %}
+
+
+### S12-20 — Старый API рекомендаций: 200
+GET {{baseUrl}}/api/rooms/recommend?hotelId={{s12HotelId}}&checkIn=2040-04-10&checkOut=2040-04-12
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("200", () => client.assert(response.status === 200)); %}
+
+
+
+### S12-21 — Регистрация пользователя: 201
+POST {{baseUrl}}/api/users/register
+Content-Type: application/json
+
+{
+  "email": "s12user@example.com",
+  "password": "Study12345!",
+  "username": "s12user",
+  "firstName": "Test",
+  "lastName": "Guest"
+}
+
+> {% client.test("201", () => client.assert(response.status === 201)); %}
+
+
+### S12-22 — Вход по email: 200
+POST {{baseUrl}}/api/users/login
+Content-Type: application/json
+
+{
+  "email": "s12user@example.com",
+  "password": "Study12345!"
+}
+
+> {%
+    client.test("200", () => client.assert(response.status === 200));
+    client.global.set("s12UserToken", response.body.accessToken);
+%}
+
+
+### S12-23 — USER не может менять рейтинг: 403
+PATCH {{baseUrl}}/api/hotels/{{s12HotelId}}/presentation
+Authorization: Bearer {{s12UserToken}}
+Content-Type: application/json
+
+{"rating": 5.0}
+
+> {% client.test("403", () => client.assert(response.status === 403)); %}
+
+
+### S12-24 — USER не может менять категорию: 403
+PATCH {{baseUrl}}/api/rooms/{{s12Deluxe}}/details
+Authorization: Bearer {{s12UserToken}}
+Content-Type: application/json
+
+{"category": "SUITE"}
+
+> {% client.test("403", () => client.assert(response.status === 403)); %}
+
+
+### S12-25 — MANUAL, 3 гостя в двухместный номер: 400
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000025
+Content-Type: application/json
+
+{
+  "roomId": {{s12Suite2}},
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {% client.test("400", () => client.assert(response.status === 400)); %}
+
+
+### S12-26 — AUTO MOST_EXPENSIVE: SUITE 102, 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000026
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "strategy": "MOST_EXPENSIVE",
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {%
+    client.test("Suite selected", () => {
+        client.assert(response.status === 201);
+        client.assert(
+            response.body.roomId === Number(client.global.get("s12Suite4"))
+        );
+    });
+    client.global.set("s12FirstBooking", response.body.id);
+%}
+
+
+### S12-27 — Повтор AUTO с тем же ключом: 201
+### roomId в AUTO игнорируется
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000026
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "roomId": 999999,
+  "strategy": "MOST_EXPENSIVE",
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {%
+    client.test("Same booking", () => {
+        client.assert(response.status === 201);
+        client.assert(
+            response.body.id === Number(client.global.get("s12FirstBooking"))
+        );
+    });
+%}
+
+
+### S12-28 — Тот же ключ, другое число гостей: 409
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000026
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "strategy": "MOST_EXPENSIVE",
+  "guestCount": 4,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {% client.test("409", () => client.assert(response.status === 409)); %}
+
+
+### S12-29 — Тот же ключ, другая стратегия: 409
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000026
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "strategy": "LEAST_BOOKED",
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {% client.test("409", () => client.assert(response.status === 409)); %}
+
+
+### S12-30 — Второе AUTO, выбираем SUITE 103: 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000030
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "strategy": "MOST_EXPENSIVE",
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {%
+    client.test("Second suite", () => {
+        client.assert(response.status === 201);
+        client.assert(
+            response.body.roomId === Number(client.global.get("s12Suite3"))
+        );
+    });
+%}
+
+
+### S12-31 — SUITE закончились: DELUXE, 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000031
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "strategy": "MOST_EXPENSIVE",
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {%
+    client.test("Deluxe fallback", () => {
+        client.assert(response.status === 201);
+        client.assert(
+            response.body.roomId === Number(client.global.get("s12Deluxe"))
+        );
+    });
+%}
+
+
+### S12-32 — DELUXE закончились: STANDARD, 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000032
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "strategy": "MOST_EXPENSIVE",
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {%
+    client.test("Standard fallback", () => {
+        client.assert(response.status === 201);
+        client.assert(
+            response.body.roomId === Number(client.global.get("s12Standard"))
+        );
+    });
+%}
+
+
+### S12-33 — Все подходящие номера заняты
+### Ожидаем NO_AVAILABLE_ROOMS
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000033
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "autoSelect": true,
+  "strategy": "MOST_EXPENSIVE",
+  "guestCount": 3,
+  "checkIn": "2040-02-10",
+  "checkOut": "2040-02-12"
+}
+
+> {%
+    client.test("No rooms", () => {
+        client.assert(response.status !== 201);
+        client.assert(response.body.code === "NO_AVAILABLE_ROOMS");
+    });
+%}
+
+
+### S12-34 — Старый MANUAL JSON без новых полей: 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{s12UserToken}}
+Idempotency-Key: 12e00000-0000-4000-8000-000000000034
+Content-Type: application/json
+
+{
+  "roomId": {{s12Suite2}},
+  "checkIn": "2040-05-10",
+  "checkOut": "2040-05-12"
+}
+
+> {% client.test("201", () => client.assert(response.status === 201)); %}
+
+
+### S12-35 — Старое создание номера без новых полей: 201
+### category STANDARD, capacity 2, pricePerNight 0
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s12HotelId}},
+  "number": "999"
+}
+
+> {%
+    client.test("Legacy room creation", () => {
+        client.assert(response.status === 201);
+        client.assert(response.body.category === "STANDARD");
+        client.assert(response.body.capacity === 2);
+        client.assert(Number(response.body.pricePerNight) === 0);
+    });
+%}

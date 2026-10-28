@@ -59,6 +59,20 @@ public class Booking {
     @Column(name = "reservation_id", nullable = false, unique = true, updatable = false)
     private UUID reservationId;
 
+    @Column(name = "guest_count", nullable = false)
+    private int guestCount = 1;
+
+    public int getGuestCount() {
+        return guestCount;
+    }
+
+    public void assignGuestCount(int guestCount) {
+        if (guestCount < 1) {
+            throw new IllegalArgumentException("Invalid guestCount");
+        }
+        this.guestCount = guestCount;
+    }
+
     protected Booking() {
     }
 
