@@ -6,6 +6,9 @@ spring:
     name: booking-service
 
   cloud:
+    loadbalancer:
+      cache:
+        enabled: false
     circuitbreaker:
       resilience4j:
         disable-time-limiter: true
@@ -25,6 +28,7 @@ spring:
 
 eureka:
   client:
+    registry-fetch-interval-seconds: 2
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
 
@@ -32,7 +36,7 @@ logging:
   level:
     com.hotelbooking: INFO
   pattern:
-      level: "%5p [traceId=%X{traceId}]"
+    level: "%5p [traceId=%X{traceId}]"
 
 app:
   jwt:

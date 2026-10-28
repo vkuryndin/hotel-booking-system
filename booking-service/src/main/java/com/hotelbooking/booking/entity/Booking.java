@@ -105,7 +105,8 @@ public class Booking {
     public Instant getCreatedAt() { return createdAt; }
 
     public void confirm() {
-        if (status != BookingStatus.PENDING) {
+        if (status != BookingStatus.PENDING
+                || creationOutcome != BookingCreationOutcome.PROCESSING) {
             throw new IllegalStateException("Booking is not pending");
         }
         status = BookingStatus.CONFIRMED;

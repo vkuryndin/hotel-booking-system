@@ -3328,3 +3328,266 @@ Authorization: Bearer {{accessToken}}
 ### photos
 GET http://localhost:8080/api/hotels/1/photos
 Authorization: Bearer {{accessToken}}
+
+
+### S5-01 — Выбрать комнату демоотеля
+GET {{baseUrl}}/api/rooms?hotelId=1
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S5-01: room exists", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.length > 0);
+    });
+    client.global.set("s5RoomId", response.body[0].id);
+%}
+
+### S5-02 — Создать бронирование: 201 CONFIRMED
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 55550000-0000-4000-8000-000000000001
+Content-Type: application/json
+
+{
+  "roomId": {{s5RoomId}},
+  "checkIn": "2053-05-10",
+  "checkOut": "2053-05-12"
+}
+
+> {%
+    client.test("S5-02: confirmed", () => {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+    client.global.set("s5BookingId", response.body.id);
+%}
+
+### S5-03 — Проверить статус: 200 CONFIRMED
+GET {{baseUrl}}/api/bookings/{{s5BookingId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S5-03: booking confirmed", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+### S5-04 — Повторная бронь той же комнаты: 409
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 55550000-0000-4000-8000-000000000002
+Content-Type: application/json
+
+{
+  "roomId": {{s5RoomId}},
+  "checkIn": "2053-05-10",
+  "checkOut": "2053-05-12"
+}
+
+> {%
+    client.test("S5-04: room conflict", () => {
+        client.assert(response.status === 409);
+        client.assert(response.body.code === "ROOM_ALREADY_BOOKED");
+    });
+%}
+
+### S5-05 — Отмена подтвержденной брони: 200 CANCELLED
+PATCH {{baseUrl}}/api/bookings/{{s5BookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S5-05: cancelled", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+### S5-06 — Повторная отмена: 200 CANCELLED
+PATCH {{baseUrl}}/api/bookings/{{s5BookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S5-06: idempotent cancellation", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+### S5-07 — После отмены комнату можно забронировать: 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 55550000-0000-4000-8000-000000000003
+Content-Type: application/json
+
+{
+  "roomId": {{s5RoomId}},
+  "checkIn": "2053-05-10",
+  "checkOut": "2053-05-12"
+}
+
+> {%
+    client.test("S5-07: room released", () => {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+### S5-08 — Бронирование для имитации Recovery
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 55550000-0000-4000-8000-000000000008
+Content-Type: application/json
+
+{
+  "roomId": {{s5RoomId}},
+  "checkIn": "2053-06-10",
+  "checkOut": "2053-06-12"
+}
+
+> {%
+    client.test("S5-08: created", () => {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+    client.global.set("s5RecoveryId", response.body.id);
+%}
+
+### S5-09 — PENDING нельзя отменить через API
+PATCH {{baseUrl}}/api/bookings/{{s5RecoveryId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S5-09: pending cancellation blocked", () => {
+        client.assert(response.status === 409);
+        client.assert(response.body.code === "INVALID_BOOKING_STATUS");
+    });
+%}
+### S5-10 — Recovery завершился отменой
+GET {{baseUrl}}/api/bookings/{{s5RecoveryId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S5-10: recovered booking cancelled", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+### S5-11 — Можно забронировать освободившуюся комнату
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 55550000-0000-4000-8000-000000000011
+Content-Type: application/json
+
+{
+  "roomId": {{s5RoomId}},
+  "checkIn": "2053-06-10",
+  "checkOut": "2053-06-12"
+}
+
+> {%
+    client.test("S5-11: room released by recovery", () => {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+### S5-12 — Финальное состояние после Recovery
+GET {{baseUrl}}/api/bookings/4
+Authorization: Bearer {{adminToken}}
+
+### S6-01 — Создать бронь
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 66000000-0000-4000-8000-000000000002
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2055-08-10",
+  "checkOut": "2055-08-12"
+}
+
+> {%
+    client.test("S6-01: booking created", () => {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+    client.global.set("s6BookingId", response.body.id);
+%}
+
+### S6-02 — Найти экземпляр Hotel Service
+GET http://localhost:8761/eureka/apps/HOTEL-SERVICE
+Accept: application/json
+
+> {%
+    client.assert(response.status === 200);
+
+    const instances = response.body.application.instance;
+    const instance = Array.isArray(instances)
+        ? instances[0] : instances;
+
+    client.global.set("s6HotelInstanceId", instance.instanceId);
+%}
+
+### S6-03 — Hotel Service OUT_OF_SERVICE
+PUT http://localhost:8761/eureka/apps/HOTEL-SERVICE/{{s6HotelInstanceId}}/status?value=OUT_OF_SERVICE
+
+### S6-04 — Ожидаем 503
+PATCH {{baseUrl}}/api/bookings/{{s6BookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S6-04: cancellation unavailable", () => {
+        client.assert(response.status === 503);
+        client.assert(response.body.code === "BOOKING_SAGA_UNAVAILABLE");
+    });
+%}
+
+### S6-05 — Ожидаем CONFIRMED
+GET {{baseUrl}}/api/bookings/{{s6BookingId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S6-05: booking still confirmed", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+### S6-06 — Восстановить Hotel Service
+DELETE http://localhost:8761/eureka/apps/HOTEL-SERVICE/{{s6HotelInstanceId}}/status?value=UP
+
+### S6-07 — Отмена после восстановления
+PATCH {{baseUrl}}/api/bookings/{{s6BookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S6-07: cancellation successful", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+### S6-08 — Повторное бронирование
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: 66000000-0000-4000-8000-000000000008
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "checkIn": "2055-08-10",
+  "checkOut": "2055-08-12"
+}
+
+> {%
+    client.test("S6-08: room available again", () => {
+        client.assert(response.status === 201);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+###
+GET http://localhost:8761/eureka/apps/HOTEL-SERVICE
+Accept: application/json

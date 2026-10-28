@@ -1,5 +1,5 @@
 package com.hotelbooking.booking.service;
-
+import java.util.List;
 import com.hotelbooking.booking.client.HotelServiceClient;
 import com.hotelbooking.booking.entity.Booking;
 import com.hotelbooking.booking.entity.BookingCreationOutcome;
@@ -40,28 +40,41 @@ public class BookingSagaRecoveryService {
         Instant cutoff = Instant.now().minus(Duration.ofMinutes(2));
 
         var pending = bookingRepository
-                .findTop10ByStatusAndCreationOutcomeAndCreatedAtBeforeOrderByCreatedAtAsc(
+                .findTop10ByStatusAndCreationOutcomeInAndCreatedAtBeforeOrderByCreatedAtAsc(
                         BookingStatus.PENDING,
-                        BookingCreationOutcome.PROCESSING,
+                        List.of(
+                                BookingCreationOutcome.PROCESSING,
+                                BookingCreationOutcome.RECOVERING
+                        ),
                         cutoff
                 );
 
         for (Booking booking : pending) {
             try {
+                var candidate = sagaStateService.prepareRecovery(
+                        booking.getId(), cutoff
+                );
+
+                if (candidate.isEmpty()) {
+                    continue;
+                }
+
+                var recovery = candidate.get();
+
                 hotelServiceClient.releaseRoom(
-                        booking.getRoomId(),
-                        booking.getReservationId()
+                        recovery.roomId(),
+                        recovery.reservationId()
                 );
 
                 sagaStateService.cancelCreation(
-                        booking.getId(),
+                        recovery.bookingId(),
                         BookingCreationOutcome.FAILED
                 );
 
                 log.info(
                         "Saga recovered: bookingId={}, reservationId={}",
-                        booking.getId(),
-                        booking.getReservationId()
+                        recovery.bookingId(),
+                        recovery.reservationId()
                 );
 
             } catch (Exception ex) {

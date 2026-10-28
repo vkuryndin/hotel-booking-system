@@ -17,7 +17,8 @@ import com.hotelbooking.booking.exception.IdempotencyKeyConflictException;
 
 import java.time.LocalDate;
 import java.util.UUID;
-
+import com.hotelbooking.booking.entity.BookingStatus;
+import java.time.Instant;
 @Service
 public class BookingSagaStateService {
 
@@ -94,7 +95,9 @@ public class BookingSagaStateService {
         if (!isAdmin && !booking.getUserId().equals(userId)) {
             throw new AccessDeniedException("Access denied to booking: " + bookingId);
         }
-
+        if (booking.getStatus() == BookingStatus.PENDING) {
+            throw new InvalidBookingStatusException(bookingId, "cancel");
+        }
         return snapshot(booking);
     }
 
@@ -149,7 +152,14 @@ public class BookingSagaStateService {
         }
 
         Booking booking = find(bookingId);
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            return bookingMapper.toResponse(booking);
+        }
 
+        if (booking.getStatus() == BookingStatus.CONFIRMED
+                || booking.getCreationOutcome() == BookingCreationOutcome.SUCCESS) {
+            throw new InvalidBookingStatusException(bookingId, "compensate");
+        }
         booking.cancel();
         booking.markCreationOutcome(outcome);
 
@@ -166,6 +176,28 @@ public class BookingSagaStateService {
         bookingRepository.flush();
 
         return snapshot(booking);
+    }
+    @Transactional
+    public Optional<SagaBooking> prepareRecovery(
+            Long bookingId,
+            Instant cutoff
+    ) {
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+                .orElse(null);
+
+        if (booking == null
+                || booking.getStatus() != BookingStatus.PENDING
+                || !booking.getCreatedAt().isBefore(cutoff)
+                || (booking.getCreationOutcome() != BookingCreationOutcome.PROCESSING
+                && booking.getCreationOutcome() != BookingCreationOutcome.RECOVERING)) {
+            return Optional.empty();
+        }
+
+        if (booking.getCreationOutcome() == BookingCreationOutcome.PROCESSING) {
+            booking.markCreationOutcome(BookingCreationOutcome.RECOVERING);
+        }
+
+        return Optional.of(snapshot(booking));
     }
 
 }

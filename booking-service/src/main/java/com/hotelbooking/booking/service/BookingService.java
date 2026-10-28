@@ -395,7 +395,7 @@ public class BookingService {
 
             case NO_AVAILABLE_ROOMS -> throw new NoAvailableRoomsException();
 
-            case PROCESSING -> throw new RequestInProgressException();
+            case PROCESSING, RECOVERING -> throw new RequestInProgressException();
 
             case FAILED -> throw new BookingSagaUnavailableException(
                     "Booking creation failed",

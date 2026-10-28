@@ -17,6 +17,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import java.time.LocalDate;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
@@ -44,10 +46,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             Long userId,
             UUID idempotencyKey
     );
-    List<Booking> findTop10ByStatusAndCreationOutcomeAndCreatedAtBeforeOrderByCreatedAtAsc(
+    List<Booking>
+    findTop10ByStatusAndCreationOutcomeInAndCreatedAtBeforeOrderByCreatedAtAsc(
             BookingStatus status,
-            BookingCreationOutcome creationOutcome,
+            List<BookingCreationOutcome> outcomes,
             Instant createdAt
     );
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.id = :id")
+    Optional<Booking> findByIdForUpdate(@Param("id") Long id);
     boolean existsByUserId(Long userId);
 }
