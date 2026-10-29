@@ -157,11 +157,7 @@ public class RoomReservationService {
 
         if (reservation.getStatus() == ReservationStatus.RESERVED) {
             nightRepository.deleteByReservationId(reservationId);
-
-            if (compensation) {
-                room.decrementTimesBooked();
-            }
-
+            room.decrementTimesBooked();
             reservation.release();
         }
         return reservation;

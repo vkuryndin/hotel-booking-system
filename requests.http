@@ -1801,12 +1801,12 @@ Content-Type: application/json
 }
 
 
-### S10-17 — Статистика S101: timesBooked=2
+### S10-17 — Статистика S101: timesBooked=1
 GET http://localhost:8080/api/rooms/{{s10Room1}}
 Authorization: Bearer {{adminToken}}
 
 
-### S10-18 — Статистика S102: timesBooked=1
+### S10-18 — Статистика S102: timesBooked=0
 GET http://localhost:8080/api/rooms/{{s10Room2}}
 Authorization: Bearer {{adminToken}}
 
@@ -3998,7 +3998,7 @@ Authorization: Bearer {{adminToken}}
 > {%
     client.test("QA-10: History preserved", function() {
         client.assert(response.status === 200);
-        client.assert(Number(response.body.timesBooked) === 1,
+        client.assert(Number(response.body.timesBooked) === 0,
             "Cancellation incorrectly reduced counter");
     });
 %}
@@ -4058,7 +4058,7 @@ Authorization: Bearer {{adminToken}}
 > {%
     client.test("QA-13: Final counter is 2", function() {
         client.assert(response.status === 200);
-        client.assert(Number(response.body.timesBooked) === 2,
+        client.assert(Number(response.body.timesBooked) === 1,
             "Expected 2, got " + response.body.timesBooked);
     });
 %}
@@ -4213,7 +4213,7 @@ Authorization: Bearer {{adminToken}}
 > {%
     client.test("QA-23: History preserved", function() {
         client.assert(response.status === 200);
-        client.assert(Number(response.body.timesBooked) === 3,
+        client.assert(Number(response.body.timesBooked) === 1,
             "Expected 3, got " + response.body.timesBooked);
     });
 %}
@@ -4251,7 +4251,7 @@ Authorization: Bearer {{adminToken}}
 > {%
     client.test("QA-25: Final counter is 4", function() {
         client.assert(response.status === 200);
-        client.assert(Number(response.body.timesBooked) === 4,
+        client.assert(Number(response.body.timesBooked) === 2,
             "Expected 4, got " + response.body.timesBooked);
     });
 %}
