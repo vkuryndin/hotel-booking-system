@@ -4194,7 +4194,7 @@ Content-Type: application/json
 
 
 ### QA-13 — Итоговый счётчик
-### Ожидаем: 200, timesBooked = 2
+### Ожидаем: 200, timesBooked = 1
 
 GET {{baseUrl}}/api/rooms/{{qaRoomId}}
 Authorization: Bearer {{adminToken}}

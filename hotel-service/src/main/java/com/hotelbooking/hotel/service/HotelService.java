@@ -198,6 +198,8 @@ public class HotelService {
         String name = request.name().trim();
         String address = request.address().trim();
 
+        hotel.updateDetails(name, address);
+
         try {
             hotelRepository.saveAndFlush(hotel);
         } catch (DataIntegrityViolationException ex) {
@@ -205,14 +207,6 @@ public class HotelService {
                 throw new HotelAlreadyExistsException(name, address);
             }
             throw ex;
-        }
-
-        hotel.updateDetails(name, address);
-
-        try {
-            hotelRepository.saveAndFlush(hotel);
-        } catch (DataIntegrityViolationException ex) {
-            throw new HotelAlreadyExistsException(name, address);
         }
 
         log.info("Hotel updated: id={}", id);

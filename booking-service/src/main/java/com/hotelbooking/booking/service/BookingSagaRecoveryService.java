@@ -22,6 +22,17 @@ public class BookingSagaRecoveryService {
     private static final Logger log =
             LoggerFactory.getLogger(BookingSagaRecoveryService.class);
 
+    // Размер одной выборки из БД.
+    private static final int PAGE_SIZE = 10;
+
+    // Максимум кандидатов за один цикл каждого процесса.
+    private static final int MAX_CANDIDATES_PER_CYCLE = 100;
+
+    // Мягкий лимит времени: уже начатый HTTP-вызов
+    // не прерываем.
+    private static final Duration MAX_CYCLE_DURATION =
+            Duration.ofSeconds(20);
+
     private final BookingRepository bookingRepository;
     private final HotelServiceClient hotelServiceClient;
     private final BookingSagaStateService sagaStateService;
@@ -42,54 +53,102 @@ public class BookingSagaRecoveryService {
         Instant now = Instant.now();
         Instant cutoff = now.minus(Duration.ofMinutes(2));
 
-        var pending = bookingRepository.findPendingRecoveryCandidates(
-                BookingStatus.PENDING,
-                List.of(
-                        BookingCreationOutcome.PROCESSING,
-                        BookingCreationOutcome.RECOVERING
-                ),
-                cutoff,
-                now,
-                BookingSagaStateService.MAX_RECOVERY_ATTEMPTS,
-                PageRequest.of(0, 10)
-        );
+        long deadline = System.nanoTime()
+                + MAX_CYCLE_DURATION.toNanos();
 
-        for (Booking booking : pending) {
-            try {
-                var candidate = sagaStateService.prepareRecovery(
-                        booking.getId(),
-                        cutoff
-                );
+        // Начальный курсор.
+        Instant cursorTime = Instant.EPOCH;
+        Long cursorId = 0L;
 
-                if (candidate.isEmpty()) {
-                    continue;
+        int scanned = 0;
+
+        // Обходим несколько пакетов, но не более 100 записей
+        // и не более 20 секунд до начала следующей операции.
+        recoveryLoop:
+        while (scanned < MAX_CANDIDATES_PER_CYCLE
+                && System.nanoTime() < deadline) {
+
+            int pageSize = Math.min(
+                    PAGE_SIZE,
+                    MAX_CANDIDATES_PER_CYCLE - scanned
+            );
+
+            var pending = bookingRepository
+                    .findPendingRecoveryCandidates(
+                            BookingStatus.PENDING,
+                            List.of(
+                                    BookingCreationOutcome.PROCESSING,
+                                    BookingCreationOutcome.RECOVERING
+                            ),
+                            cutoff,
+                            now,
+                            BookingSagaStateService.MAX_RECOVERY_ATTEMPTS,
+                            cursorTime,
+                            cursorId,
+                            PageRequest.of(0, pageSize)
+                    );
+
+            if (pending.isEmpty()) {
+                break;
+            }
+
+            for (Booking booking : pending) {
+
+                if (System.nanoTime() >= deadline) {
+                    break recoveryLoop;
                 }
 
-                var recovery = candidate.get();
+                scanned++;
 
-                hotelServiceClient.compensateRoom(
-                        recovery.roomId(),
-                        recovery.reservationId()
-                );
+                // Сдвигаем курсор независимо от результата.
+                // Это предотвращает повторное взятие одной
+                // проблемной записи в этом же цикле.
+                cursorTime = booking.getSagaUpdatedAt();
+                cursorId = booking.getId();
 
-                sagaStateService.cancelCreation(
-                        recovery.bookingId(),
-                        BookingCreationOutcome.FAILED
-                );
+                try {
+                    var candidate = sagaStateService.prepareRecovery(
+                            booking.getId(),
+                            cutoff
+                    );
 
-                log.info(
-                        "Saga recovered: bookingId={}, reservationId={}",
-                        recovery.bookingId(),
-                        recovery.reservationId()
-                );
+                    if (candidate.isEmpty()) {
+                        continue;
+                    }
 
-            } catch (Exception ex) {
-                log.warn(
-                        "Saga recovery failed: bookingId={}",
-                        booking.getId(),
-                        ex
-                );
+                    var recovery = candidate.get();
+
+                    hotelServiceClient.compensateRoom(
+                            recovery.roomId(),
+                            recovery.reservationId()
+                    );
+
+                    sagaStateService.cancelCreation(
+                            recovery.bookingId(),
+                            BookingCreationOutcome.FAILED
+                    );
+
+                    log.info(
+                            "Saga recovered: bookingId={}, reservationId={}",
+                            recovery.bookingId(),
+                            recovery.reservationId()
+                    );
+
+                } catch (Exception ex) {
+                    log.warn(
+                            "Saga recovery failed: bookingId={}",
+                            booking.getId(),
+                            ex
+                    );
+                }
             }
+        }
+
+        if (scanned > 0) {
+            log.info(
+                    "Pending Recovery cycle finished: scanned={}",
+                    scanned
+            );
         }
     }
 
@@ -99,46 +158,91 @@ public class BookingSagaRecoveryService {
         Instant now = Instant.now();
         Instant cutoff = now.minus(Duration.ofMinutes(2));
 
-        var cancelling = bookingRepository.findCancellationRecoveryCandidates(
-                BookingStatus.CANCELLING,
-                cutoff,
-                now,
-                BookingSagaStateService.MAX_RECOVERY_ATTEMPTS,
-                PageRequest.of(0, 10)
-        );
+        long deadline = System.nanoTime()
+                + MAX_CYCLE_DURATION.toNanos();
 
-        for (Booking booking : cancelling) {
-            try {
-                var candidate = sagaStateService.prepareCancellationRecovery(
-                        booking.getId(),
-                        cutoff
-                );
+        Instant cursorTime = Instant.EPOCH;
+        Long cursorId = 0L;
 
-                if (candidate.isEmpty()) {
-                    continue;
+        int scanned = 0;
+
+        recoveryLoop:
+        while (scanned < MAX_CANDIDATES_PER_CYCLE
+                && System.nanoTime() < deadline) {
+
+            int pageSize = Math.min(
+                    PAGE_SIZE,
+                    MAX_CANDIDATES_PER_CYCLE - scanned
+            );
+
+            var cancelling = bookingRepository
+                    .findCancellationRecoveryCandidates(
+                            BookingStatus.CANCELLING,
+                            cutoff,
+                            now,
+                            BookingSagaStateService.MAX_RECOVERY_ATTEMPTS,
+                            cursorTime,
+                            cursorId,
+                            PageRequest.of(0, pageSize)
+                    );
+
+            if (cancelling.isEmpty()) {
+                break;
+            }
+
+            for (Booking booking : cancelling) {
+
+                if (System.nanoTime() >= deadline) {
+                    break recoveryLoop;
                 }
 
-                var recovery = candidate.get();
+                scanned++;
 
-                hotelServiceClient.releaseRoom(
-                        recovery.roomId(),
-                        recovery.reservationId()
-                );
+                cursorTime = booking.getCancellationRequestedAt();
+                cursorId = booking.getId();
 
-                sagaStateService.finishCancellation(recovery.bookingId());
+                try {
+                    var candidate =
+                            sagaStateService.prepareCancellationRecovery(
+                                    booking.getId(),
+                                    cutoff
+                            );
 
-                log.info(
-                        "Cancellation recovered: bookingId={}",
-                        recovery.bookingId()
-                );
+                    if (candidate.isEmpty()) {
+                        continue;
+                    }
 
-            } catch (Exception ex) {
-                log.warn(
-                        "Cancellation recovery failed: bookingId={}",
-                        booking.getId(),
-                        ex
-                );
+                    var recovery = candidate.get();
+
+                    hotelServiceClient.releaseRoom(
+                            recovery.roomId(),
+                            recovery.reservationId()
+                    );
+
+                    sagaStateService.finishCancellation(
+                            recovery.bookingId()
+                    );
+
+                    log.info(
+                            "Cancellation recovered: bookingId={}",
+                            recovery.bookingId()
+                    );
+
+                } catch (Exception ex) {
+                    log.warn(
+                            "Cancellation recovery failed: bookingId={}",
+                            booking.getId(),
+                            ex
+                    );
+                }
             }
+        }
+
+        if (scanned > 0) {
+            log.info(
+                    "Cancellation Recovery cycle finished: scanned={}",
+                    scanned
+            );
         }
     }
 }

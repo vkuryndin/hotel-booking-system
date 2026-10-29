@@ -42,7 +42,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
           AND b.sagaUpdatedAt < :cutoff
           AND b.recoveryAttempts < :maxAttempts
           AND b.nextRecoveryAt <= :now
-        ORDER BY b.sagaUpdatedAt ASC
+          AND (
+              b.sagaUpdatedAt > :cursorTime
+              OR (
+                  b.sagaUpdatedAt = :cursorTime
+                  AND b.id > :cursorId
+              )
+          )
+        ORDER BY b.sagaUpdatedAt ASC, b.id ASC
         """)
     List<Booking> findPendingRecoveryCandidates(
             @Param("status") BookingStatus status,
@@ -50,6 +57,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("cutoff") Instant cutoff,
             @Param("now") Instant now,
             @Param("maxAttempts") int maxAttempts,
+            @Param("cursorTime") Instant cursorTime,
+            @Param("cursorId") Long cursorId,
             Pageable pageable
     );
 
@@ -59,16 +68,24 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
           AND b.cancellationRequestedAt < :cutoff
           AND b.recoveryAttempts < :maxAttempts
           AND b.nextRecoveryAt <= :now
-        ORDER BY b.cancellationRequestedAt ASC
+          AND (
+              b.cancellationRequestedAt > :cursorTime
+              OR (
+                  b.cancellationRequestedAt = :cursorTime
+                  AND b.id > :cursorId
+              )
+          )
+        ORDER BY b.cancellationRequestedAt ASC, b.id ASC
         """)
     List<Booking> findCancellationRecoveryCandidates(
             @Param("status") BookingStatus status,
             @Param("cutoff") Instant cutoff,
             @Param("now") Instant now,
             @Param("maxAttempts") int maxAttempts,
+            @Param("cursorTime") Instant cursorTime,
+            @Param("cursorId") Long cursorId,
             Pageable pageable
     );
-
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.id = :id")

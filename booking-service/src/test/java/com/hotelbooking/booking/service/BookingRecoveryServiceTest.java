@@ -1,3 +1,4 @@
+
 package com.hotelbooking.booking.service;
 
 import com.hotelbooking.booking.client.HotelServiceClient;
@@ -8,6 +9,7 @@ import com.hotelbooking.booking.repository.BookingRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
@@ -15,7 +17,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.LongStream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -47,8 +51,19 @@ class BookingRecoveryServiceTest {
     }
 
     private Booking candidateEntity() {
+        return candidateEntity(
+                11L,
+                Instant.parse("2020-01-01T00:00:00Z")
+        );
+    }
+
+    private Booking candidateEntity(long id, Instant time) {
         Booking booking = mock(Booking.class);
-        when(booking.getId()).thenReturn(11L);
+
+        when(booking.getId()).thenReturn(id);
+        when(booking.getSagaUpdatedAt()).thenReturn(time);
+        when(booking.getCancellationRequestedAt()).thenReturn(time);
+
         return booking;
     }
 
@@ -73,8 +88,10 @@ class BookingRecoveryServiceTest {
                 any(Instant.class),
                 any(Instant.class),
                 eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
                 any(Pageable.class)
-        )).thenReturn(List.of(candidate));
+        )).thenReturn(List.of(candidate), List.of());
 
         when(state.prepareRecovery(
                 eq(11L),
@@ -109,8 +126,10 @@ class BookingRecoveryServiceTest {
                 any(Instant.class),
                 any(Instant.class),
                 eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
                 any(Pageable.class)
-        )).thenReturn(List.of(candidate));
+        )).thenReturn(List.of(candidate), List.of());
 
         when(state.prepareRecovery(
                 eq(11L),
@@ -139,8 +158,10 @@ class BookingRecoveryServiceTest {
                 any(Instant.class),
                 any(Instant.class),
                 eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
                 any(Pageable.class)
-        )).thenReturn(List.of(candidate));
+        )).thenReturn(List.of(candidate), List.of());
 
         when(state.prepareRecovery(
                 eq(11L),
@@ -162,8 +183,10 @@ class BookingRecoveryServiceTest {
                 any(Instant.class),
                 any(Instant.class),
                 eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
                 any(Pageable.class)
-        )).thenReturn(List.of(candidate));
+        )).thenReturn(List.of(candidate), List.of());
 
         when(state.prepareCancellationRecovery(
                 eq(11L),
@@ -194,8 +217,10 @@ class BookingRecoveryServiceTest {
                 any(Instant.class),
                 any(Instant.class),
                 eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
                 any(Pageable.class)
-        )).thenReturn(List.of(candidate));
+        )).thenReturn(List.of(candidate), List.of());
 
         when(state.prepareCancellationRecovery(
                 eq(11L),
@@ -220,8 +245,10 @@ class BookingRecoveryServiceTest {
                 any(Instant.class),
                 any(Instant.class),
                 eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
                 any(Pageable.class)
-        )).thenReturn(List.of(candidate));
+        )).thenReturn(List.of(candidate), List.of());
 
         when(state.prepareCancellationRecovery(
                 eq(11L),
@@ -229,6 +256,127 @@ class BookingRecoveryServiceTest {
         )).thenReturn(Optional.empty());
 
         recovery.recoverCancellingBookings();
+
+        verifyNoInteractions(hotel);
+    }
+
+    @Test
+    void pendingRecoveryProcessesMoreThanTenCandidates() {
+
+        Instant start = Instant.parse("2020-01-01T00:00:00Z");
+
+        List<Booking> candidates = LongStream.rangeClosed(1, 12)
+                .mapToObj(id ->
+                        candidateEntity(id, start.plusSeconds(id))
+                )
+                .toList();
+
+        when(repository.findPendingRecoveryCandidates(
+                eq(BookingStatus.PENDING),
+                anyList(),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
+                any(Pageable.class)
+        )).thenReturn(
+                candidates.subList(0, 10),
+                candidates.subList(10, 12),
+                List.of()
+        );
+
+        when(state.prepareRecovery(
+                anyLong(),
+                any(Instant.class)
+        )).thenReturn(Optional.empty());
+
+        recovery.recoverPendingBookings();
+
+        verify(state, times(12)).prepareRecovery(
+                anyLong(),
+                any(Instant.class)
+        );
+
+        ArgumentCaptor<Long> cursorIds =
+                ArgumentCaptor.forClass(Long.class);
+
+        verify(repository, times(3))
+                .findPendingRecoveryCandidates(
+                        eq(BookingStatus.PENDING),
+                        anyList(),
+                        any(Instant.class),
+                        any(Instant.class),
+                        eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                        any(Instant.class),
+                        cursorIds.capture(),
+                        any(Pageable.class)
+                );
+
+        assertEquals(
+                List.of(0L, 10L, 12L),
+                cursorIds.getAllValues()
+        );
+
+        verifyNoInteractions(hotel);
+    }
+
+    @Test
+    void cancellationRecoveryProcessesMoreThanTenCandidates() {
+
+        Instant start = Instant.parse("2020-01-01T00:00:00Z");
+
+        List<Booking> candidates = LongStream.rangeClosed(1, 12)
+                .mapToObj(id ->
+                        candidateEntity(id, start.plusSeconds(id))
+                )
+                .toList();
+
+        when(repository.findCancellationRecoveryCandidates(
+                eq(BookingStatus.CANCELLING),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Instant.class),
+                anyLong(),
+                any(Pageable.class)
+        )).thenReturn(
+                candidates.subList(0, 10),
+                candidates.subList(10, 12),
+                List.of()
+        );
+
+        when(state.prepareCancellationRecovery(
+                anyLong(),
+                any(Instant.class)
+        )).thenReturn(Optional.empty());
+
+        recovery.recoverCancellingBookings();
+
+        verify(state, times(12))
+                .prepareCancellationRecovery(
+                        anyLong(),
+                        any(Instant.class)
+                );
+
+        ArgumentCaptor<Long> cursorIds =
+                ArgumentCaptor.forClass(Long.class);
+
+        verify(repository, times(3))
+                .findCancellationRecoveryCandidates(
+                        eq(BookingStatus.CANCELLING),
+                        any(Instant.class),
+                        any(Instant.class),
+                        eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                        any(Instant.class),
+                        cursorIds.capture(),
+                        any(Pageable.class)
+                );
+
+        assertEquals(
+                List.of(0L, 10L, 12L),
+                cursorIds.getAllValues()
+        );
 
         verifyNoInteractions(hotel);
     }
