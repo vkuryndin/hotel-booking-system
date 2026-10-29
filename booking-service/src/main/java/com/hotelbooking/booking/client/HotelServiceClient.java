@@ -38,6 +38,9 @@ import java.util.function.Supplier;
                 HttpServerErrorException.GatewayTimeout.class,
                 HotelServiceUnavailableException.class
         },
+        excludes = {
+                CallNotPermittedException.class
+        },
         maxRetries = 2,
         delay = 200,
         multiplier = 2.0,
