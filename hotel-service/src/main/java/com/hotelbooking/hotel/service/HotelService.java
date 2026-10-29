@@ -69,7 +69,19 @@ public class HotelService {
                     request.address()
             );
         }
-        Hotel savedHotel = hotelRepository.save(hotel);
+        Hotel savedHotel;
+
+        try {
+            savedHotel = hotelRepository.saveAndFlush(hotel);
+        } catch (DataIntegrityViolationException ex) {
+            if (isHotelUniquenessViolation(ex)) {
+                throw new HotelAlreadyExistsException(
+                        request.name(),
+                        request.address()
+                );
+            }
+            throw ex;
+        }
 
         log.info("Hotel created: id={}, name={}",
                 savedHotel.getId(),
@@ -186,10 +198,13 @@ public class HotelService {
         String name = request.name().trim();
         String address = request.address().trim();
 
-        if (hotelRepository
-                .existsByNameIgnoreCaseAndAddressIgnoreCaseAndIdNot(
-                        name, address, id)) {
-            throw new HotelAlreadyExistsException(name, address);
+        try {
+            hotelRepository.saveAndFlush(hotel);
+        } catch (DataIntegrityViolationException ex) {
+            if (isHotelUniquenessViolation(ex)) {
+                throw new HotelAlreadyExistsException(name, address);
+            }
+            throw ex;
         }
 
         hotel.updateDetails(name, address);
@@ -228,5 +243,31 @@ public class HotelService {
         }
 
         log.info("Hotel deleted: id={}", id);
+    }
+    private boolean isHotelUniquenessViolation(
+            DataIntegrityViolationException ex
+    ) {
+        for (Throwable cause = ex;
+             cause != null;
+             cause = cause.getCause()) {
+
+            if (cause instanceof
+                    org.hibernate.exception.ConstraintViolationException c) {
+
+                String name = c.getConstraintName();
+
+                if (name != null) {
+                    String normalized = name.toLowerCase(Locale.ROOT);
+
+                    if (normalized.contains("uk_hotel_name_address")
+                            || normalized.contains(
+                            "uk_hotel_normalized_name_address")) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 }

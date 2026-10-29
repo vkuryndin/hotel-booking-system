@@ -4,14 +4,24 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 
 @Entity
 @Table(
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_hotel_name_address",
-                columnNames = {"name", "address"}
-        )
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_hotel_name_address",
+                        columnNames = {"name", "address"}
+                ),
+                @UniqueConstraint(
+                        name = "uk_hotel_normalized_name_address",
+                        columnNames = {
+                                "normalized_name",
+                                "normalized_address"
+                        }
+                )
+        }
 )
 public class Hotel {
 
@@ -24,6 +34,13 @@ public class Hotel {
 
     @Column(nullable = false)
     private String address;
+
+    // Нормализованные значения для уникального ограничения БД.
+    @Column(name = "normalized_name", nullable = false, length = 150)
+    private String normalizedName;
+
+    @Column(name = "normalized_address", nullable = false, length = 255)
+    private String normalizedAddress;
 
     @Column(length = 3000)
     private String description;
@@ -52,6 +69,15 @@ public class Hotel {
     public Hotel(String name, String address) {
         this.name = name;
         this.address = address;
+    }
+
+    // JPA автоматически обновляет нормализованные поля
+    // перед INSERT и UPDATE.
+    @PrePersist
+    @PreUpdate
+    private void updateNormalizedFields() {
+        normalizedName = name.trim().toLowerCase(Locale.ROOT);
+        normalizedAddress = address.trim().toLowerCase(Locale.ROOT);
     }
 
     public Long getId() {

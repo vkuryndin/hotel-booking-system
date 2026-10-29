@@ -4514,3 +4514,99 @@ Authorization: Bearer {{adminToken}}
         );
     });
 %}
+
+### A20-01 создать отель: 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Case Test Hotel 20261029",
+  "address": "Case Test Street 20261029"
+}
+
+> {%
+    client.test("A20-01 hotel created", () => {
+        client.assert(response.status === 201);
+        client.global.set("a20Hotel1", response.body.id);
+    });
+%}
+
+### A20-02  тот же отель, другой регистр: 409
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CASE TEST HOTEL 20261029",
+  "address": "CASE TEST STREET 20261029"
+}
+
+> {%
+    client.test("A20-02 duplicate rejected", () => {
+        client.assert(response.status === 409);
+        client.assert(response.body.code === "HOTEL_ALREADY_EXISTS");
+    });
+%}
+
+### A20-03 создать другой отель: 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Second Case Test Hotel 20261029",
+  "address": "Second Case Street 20261029"
+}
+
+> {%
+    client.test("A20-03 second hotel created", () => {
+        client.assert(response.status === 201);
+        client.global.set("a20Hotel2", response.body.id);
+    });
+%}
+
+### A20-04 попытка переименовать в дубликат: 409
+PUT {{baseUrl}}/api/hotels/{{a20Hotel2}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CASE TEST HOTEL 20261029",
+  "address": "CASE TEST STREET 20261029"
+}
+
+> {%
+    client.test("A20-04 duplicate update rejected", () => {
+        client.assert(response.status === 409);
+        client.assert(response.body.code === "HOTEL_ALREADY_EXISTS");
+    });
+%}
+
+### A20-05 после ошибки второй отель не изменился: 200
+GET {{baseUrl}}/api/hotels/{{a20Hotel2}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("A20-05 hotel unchanged", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.name ===
+            "Second Case Test Hotel 20261029");
+    });
+%}
+
+### A20-06  одинаковое название, другой адрес: 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CASE TEST HOTEL 20261029",
+  "address": "Different Case Street 20261029"
+}
+
+> {%
+    client.test("A20-06 different address allowed", () => {
+        client.assert(response.status === 201);
+    });
+%}
