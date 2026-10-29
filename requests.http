@@ -4753,3 +4753,76 @@ Authorization: Bearer {{adminToken}}
         client.assert(Number(response.body.timesBooked) === 1, "Expected 1, got " + response.body.timesBooked);
     });
 %}
+
+### STAGE 16 — HTTP checks for Hotel statistics (after stage15-requests.http)
+### Execute S15-01...S15-07 first without restarting H2, and log in as ADMIN.
+### Technical tombstone cannot be created through Gateway: internal /release requires SERVICE JWT.
+### It is tested in HotelStatisticsTombstoneJpaTest.
+
+
+### S16-01 — Before cancellation: 1 active reservation, 0 tombstones
+GET {{baseUrl}}/api/hotels/{{s15HotelId}}/statistics
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S16-01: active booking statistics", () => {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+        client.assert(Number(response.body.totalReservations) === 1);
+        client.assert(Number(response.body.reservedReservations) === 1);
+        client.assert(Number(response.body.releasedReservations) === 0);
+        client.assert(Number(response.body.tombstoneReservations) === 0);
+        client.assert(Number(response.body.totalTimesBooked) === 1);
+    });
+%}
+
+### S16-02 — Cancel the booking created by S15-03
+PATCH {{baseUrl}}/api/bookings/{{s15BookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S16-02: booking cancelled", () => {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+### S16-03 — Cancelled booking is real RELEASED, not tombstone
+GET {{baseUrl}}/api/hotels/{{s15HotelId}}/statistics
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S16-03: released booking statistics", () => {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+        client.assert(Number(response.body.totalReservations) === 1);
+        client.assert(Number(response.body.reservedReservations) === 0);
+        client.assert(Number(response.body.releasedReservations) === 1);
+        client.assert(Number(response.body.tombstoneReservations) === 0);
+        client.assert(Number(response.body.totalTimesBooked) === 0);
+    });
+%}
+
+### S16-04 — Repeated cancellation must not change the statistics
+PATCH {{baseUrl}}/api/bookings/{{s15BookingId}}/cancel
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S16-04: cancellation is idempotent", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.status === "CANCELLED");
+    });
+%}
+
+### S16-05 — Counts remain unchanged after repeated cancellation
+GET {{baseUrl}}/api/hotels/{{s15HotelId}}/statistics
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S16-05: statistics remain stable", () => {
+        client.assert(response.status === 200);
+        client.assert(Number(response.body.totalReservations) === 1);
+        client.assert(Number(response.body.reservedReservations) === 0);
+        client.assert(Number(response.body.releasedReservations) === 1);
+        client.assert(Number(response.body.tombstoneReservations) === 0);
+        client.assert(Number(response.body.totalTimesBooked) === 0);
+    });
+%}

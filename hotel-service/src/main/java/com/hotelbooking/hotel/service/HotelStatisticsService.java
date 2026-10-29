@@ -51,19 +51,23 @@ public class HotelStatisticsService {
                 nightRepository.countOccupiedRoomsOnDate(hotelId, today);
 
         long totalReservations =
-                reservationRepository.countByRoom_Hotel_Id(hotelId);
+                reservationRepository.countByRoom_Hotel_IdAndTombstoneFalse(hotelId);
 
         long reservedReservations =
-                reservationRepository.countByRoom_Hotel_IdAndStatus(
+                reservationRepository.countByRoom_Hotel_IdAndStatusAndTombstoneFalse(
                         hotelId,
                         ReservationStatus.RESERVED
                 );
 
         long releasedReservations =
-                reservationRepository.countByRoom_Hotel_IdAndStatus(
+                reservationRepository.countByRoom_Hotel_IdAndStatusAndTombstoneFalse(
                         hotelId,
                         ReservationStatus.RELEASED
                 );
+
+        // Keep technical release-before-reserve markers out of business metrics.
+        long tombstoneReservations =
+                reservationRepository.countByRoom_Hotel_IdAndTombstoneTrue(hotelId);
 
         Long totalTimesBooked =
                 roomRepository.sumTimesBookedByHotelId(hotelId);
@@ -78,7 +82,8 @@ public class HotelStatisticsService {
                 totalReservations,
                 reservedReservations,
                 releasedReservations,
-                totalTimesBooked == null ? 0L : totalTimesBooked
+                totalTimesBooked == null ? 0L : totalTimesBooked,
+                tombstoneReservations
         );
     }
 }

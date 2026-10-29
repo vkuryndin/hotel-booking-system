@@ -26,6 +26,11 @@ public class RoomReservation {
     @Column(nullable = false)
     private ReservationStatus status;
 
+    // A release request may arrive before reserve(). Such a row exists only
+    // to reject late arrivals using the same reservationId; it is not a booking.
+    @Column(name = "tombstone", nullable = false)
+    private boolean tombstone;
+
     @Version
     private Long version;
 
@@ -52,6 +57,7 @@ public class RoomReservation {
         reservation.reservationId = reservationId;
         reservation.room = room;
         reservation.status = ReservationStatus.RELEASED;
+        reservation.tombstone = true;
         return reservation;
     }
 
@@ -81,5 +87,9 @@ public class RoomReservation {
 
     public ReservationStatus getStatus() {
         return status;
+    }
+
+    public boolean isTombstone() {
+        return tombstone;
     }
 }

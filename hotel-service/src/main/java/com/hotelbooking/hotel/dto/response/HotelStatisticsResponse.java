@@ -12,6 +12,7 @@ public record HotelStatisticsResponse(
         long totalReservations,
         long reservedReservations,
         long releasedReservations,
-        long totalTimesBooked
+        long totalTimesBooked,
+        long tombstoneReservations
 ) {
 }
