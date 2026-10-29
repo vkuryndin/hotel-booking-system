@@ -354,16 +354,8 @@ public class BookingService {
     ) {
         BookingResponse booking = existing.booking();
 
-        return switch (existing.outcome()) {case SUCCESS -> new BookingResponse(
-                booking.id(),
-                booking.userId(),
-                booking.roomId(),
-                booking.checkIn(),
-                booking.checkOut(),
-                BookingStatus.CONFIRMED,
-                booking.createdAt(),
-                booking.guestCount()
-        );
+        return switch (existing.outcome()) {case SUCCESS -> booking;
+
             case ROOM_CONFLICT -> throw new RoomAlreadyBookedException(booking.roomId());
 
             case NO_AVAILABLE_ROOMS -> throw new NoAvailableRoomsException();

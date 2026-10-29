@@ -290,4 +290,44 @@ class BookingServiceSagaTest {
                 StandardCharsets.UTF_8
         );
     }
+    @Test
+    void replayOfCancelledBookingReturnsActualStatus() {
+
+        BookingResponse cancelled = new BookingResponse(
+                BOOKING,
+                USER,
+                ROOM,
+                IN,
+                OUT,
+                BookingStatus.CANCELLED,
+                Instant.now(),
+                1
+        );
+
+        when(state.findByIdempotencyKey(
+                eq(USER),
+                eq(KEY),
+                any()
+        )).thenReturn(Optional.of(
+                new BookingSagaStateService.ExistingCreation(
+                        cancelled,
+                        BookingCreationOutcome.SUCCESS
+                )
+        ));
+
+        BookingResponse response =
+                service.createBooking(USER, manual(), KEY);
+
+        assertEquals(BOOKING, response.id());
+        assertEquals(BookingStatus.CANCELLED, response.status());
+
+        verifyNoInteractions(hotel);
+
+        verify(state, never()).createPending(
+                anyLong(),
+                any(),
+                anyLong(),
+                any()
+        );
+    }
 }

@@ -1706,6 +1706,16 @@ Content-Type: application/json
   "checkOut": "2031-03-12"
 }
 
+> {%
+    client.test("Idempotency replay keeps original booking ID", function() {
+        client.assert(response.status === 201);
+        client.assert(
+            Number(response.body.id) ===
+            Number(client.global.get("s10Booking1"))
+        );
+    });
+%}
+
 
 ### S10-07 — Проверка S101: 200, timesBooked=1
 GET http://localhost:8080/api/rooms/{{s10Room1}}
