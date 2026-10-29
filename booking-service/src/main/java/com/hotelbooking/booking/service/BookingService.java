@@ -138,13 +138,6 @@ public class BookingService {
 
             } catch (RestClientException ex) {
                 throw new HotelServiceUnavailableException(ex);
-            } catch (IllegalStateException ex) {
-                if (ex.getMessage() != null
-                        && ex.getMessage().startsWith(
-                        "No instances available for ")) {
-                    throw new HotelServiceUnavailableException(ex);
-                }
-                throw ex;
             }
 
             candidateIds = recommendations.stream()

@@ -10,7 +10,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import org.slf4j.MDC;
-
+import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
 @Configuration
 public class RestClientConfig {
 
@@ -33,8 +33,20 @@ public class RestClientConfig {
         return builder
                 .baseUrl("http://hotel-service")
                 .requestFactory(hotelRequestFactory())
-                .requestInterceptor((request, body, execution) -> {
 
+                // Перехватываем исключение внутри HTTP-транспорта,
+                // а не по тексту сообщения.
+                .requestInterceptors(interceptors ->
+                        interceptors.add(0, (request, body, execution) -> {
+                            try {
+                                return execution.execute(request, body);
+                            } catch (IllegalStateException ex) {
+                                throw new HotelServiceUnavailableException(ex);
+                            }
+                        })
+                )
+
+                .requestInterceptor((request, body, execution) -> {
                     String traceId = MDC.get("traceId");
 
                     if (traceId != null) {

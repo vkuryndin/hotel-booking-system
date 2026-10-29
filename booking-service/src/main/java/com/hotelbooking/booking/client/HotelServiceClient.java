@@ -235,13 +235,6 @@ public class HotelServiceClient {
                         throw new HotelServiceUnavailableException(error);
                     }
 
-                    if (error instanceof IllegalStateException
-                            && error.getMessage() != null
-                            && error.getMessage().startsWith(
-                            "No instances available for ")) {
-                        throw new HotelServiceUnavailableException(error);
-                    }
-
                     if (error instanceof RuntimeException runtimeError) {
                         throw runtimeError;
                     }

@@ -259,26 +259,7 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalState(
-            IllegalStateException ex,
-            HttpServletRequest request
-    ) {
-        if (!"No instances available for hotel-service".equals(ex.getMessage())) {
-            throw ex;
-        }
 
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(new ErrorResponse(
-                        Instant.now(),
-                        503,
-                        "BOOKING_SAGA_UNAVAILABLE",
-                        "Hotel Service is unavailable",
-                        request.getRequestURI(),
-                        null,
-                        null
-                ));
-    }
     @ExceptionHandler(HotelNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleHotelNotFound(
             HotelNotFoundException ex,

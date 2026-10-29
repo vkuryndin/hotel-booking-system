@@ -33,11 +33,6 @@ public class HotelCircuitBreakerConfig {
                         error instanceof ResourceAccessException
                                 || error instanceof HttpServerErrorException
                                 || error instanceof HotelServiceUnavailableException
-                                || (error instanceof IllegalStateException
-                                && error.getMessage() != null
-                                && error.getMessage().startsWith(
-                                "No instances available for "
-                        ))
                 )
 
                 .ignoreExceptions(HttpClientErrorException.class)
