@@ -18,6 +18,10 @@ public class RoomReservation {
     private LocalDate checkIn;
     private LocalDate checkOut;
 
+    // Nullable for RELEASED tombstones created before reserve().
+    @Column(name = "guest_count")
+    private Integer guestCount;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReservationStatus status;
@@ -32,12 +36,14 @@ public class RoomReservation {
             UUID reservationId,
             Room room,
             LocalDate checkIn,
-            LocalDate checkOut
+            LocalDate checkOut,
+            int guestCount
     ) {
         this.reservationId = reservationId;
         this.room = room;
         this.checkIn = checkIn;
         this.checkOut = checkOut;
+        this.guestCount = guestCount;
         this.status = ReservationStatus.RESERVED;
     }
 
@@ -67,6 +73,10 @@ public class RoomReservation {
 
     public LocalDate getCheckOut() {
         return checkOut;
+    }
+
+    public Integer getGuestCount() {
+        return guestCount;
     }
 
     public ReservationStatus getStatus() {

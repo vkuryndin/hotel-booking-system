@@ -4610,3 +4610,146 @@ Content-Type: application/json
         client.assert(response.status === 201);
     });
 %}
+
+
+### STAGE 15 — HTTP regression tests via API Gateway
+### Run the existing "Login as ADMIN" request first (it sets adminToken).
+### Run S15-01 through S15-07 in order.
+### For a repeat run against the same H2, change s15Key to a new UUID.
+
+@s15Key = 9d7a1598-bf1d-4500-8b6f-1b4dc4715015
+
+### S15-01 — Create test hotel: 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Stage15 Hotel {{$uuid}}",
+  "address": "Yerevan, Stage15 Test Street"
+}
+
+> {%
+    client.test("S15-01: hotel created", () => {
+        client.assert(response.status === 201, "Expected 201, got " + response.status);
+        client.assert(Number(response.body.id) > 0);
+    });
+    if (response.status === 201) client.global.set("s15HotelId", response.body.id);
+%}
+
+### S15-02 — Create room with capacity 3: 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s15HotelId}},
+  "number": "S15-101",
+  "category": "STANDARD",
+  "capacity": 3,
+  "pricePerNight": 100
+}
+
+> {%
+    client.test("S15-02: room created", () => {
+        client.assert(response.status === 201, "Expected 201, got " + response.status);
+        client.assert(Number(response.body.id) > 0);
+    });
+    if (response.status === 201) client.global.set("s15RoomId", response.body.id);
+%}
+
+### S15-03 — New booking, guestCount=1: 201 CONFIRMED
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{s15Key}}
+Content-Type: application/json
+
+{
+  "roomId": {{s15RoomId}},
+  "checkIn": "2027-07-12",
+  "checkOut": "2027-07-15",
+  "guestCount": 1
+}
+
+> {%
+    client.test("S15-03: booking confirmed", () => {
+        client.assert(response.status === 201, "Expected 201, got " + response.status);
+        client.assert(response.body.status === "CONFIRMED");
+        client.assert(Number(response.body.id) > 0);
+    });
+    if (response.status === 201) client.global.set("s15BookingId", response.body.id);
+%}
+
+### S15-04 — Identical replay: 201, same booking ID
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{s15Key}}
+Content-Type: application/json
+
+{
+  "roomId": {{s15RoomId}},
+  "checkIn": "2027-07-12",
+  "checkOut": "2027-07-15",
+  "guestCount": 1
+}
+
+> {%
+    client.test("S15-04: identical replay", () => {
+        client.assert(response.status === 201, "Expected 201, got " + response.status);
+        client.assert(Number(response.body.id) === Number(client.global.get("s15BookingId")), "Booking ID changed");
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+### S15-05 — Same idempotency key, changed guestCount=2: 409
+### This exercises BookingRequest fingerprint, NOT direct Hotel Service reservation replay.
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{s15Key}}
+Content-Type: application/json
+
+{
+  "roomId": {{s15RoomId}},
+  "checkIn": "2027-07-12",
+  "checkOut": "2027-07-15",
+  "guestCount": 2
+}
+
+> {%
+    client.test("S15-05: changed guestCount rejected", () => {
+        client.assert(response.status === 409, "Expected 409, got " + response.status);
+        client.assert(response.body.code === "IDEMPOTENCY_KEY_CONFLICT", "Unexpected code: " + response.body.code);
+    });
+%}
+
+### S15-06 — Past checkIn: 400 VALIDATION_ERROR
+### Through public Booking API (BookingRequest @FutureOrPresent).
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{s15RoomId}},
+  "checkIn": "2025-01-12",
+  "checkOut": "2025-01-15",
+  "guestCount": 1
+}
+
+> {%
+    client.test("S15-06: past checkIn rejected", () => {
+        client.assert(response.status === 400, "Expected 400, got " + response.status);
+        client.assert(response.body.code === "VALIDATION_ERROR", "Unexpected code: " + response.body.code);
+    });
+%}
+
+### S15-07 — Failed/replayed requests did not increment counter: 200, timesBooked=1
+GET {{baseUrl}}/api/rooms/{{s15RoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S15-07: timesBooked remains 1", () => {
+        client.assert(response.status === 200, "Expected 200, got " + response.status);
+        client.assert(Number(response.body.timesBooked) === 1, "Expected 1, got " + response.body.timesBooked);
+    });
+%}

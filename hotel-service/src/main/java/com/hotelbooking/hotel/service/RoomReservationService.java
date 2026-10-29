@@ -7,9 +7,11 @@ import com.hotelbooking.hotel.repository.RoomRepository;
 import com.hotelbooking.hotel.repository.RoomReservationRepository;
 import com.hotelbooking.hotel.repository.RoomReservationNightRepository;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
@@ -32,7 +34,6 @@ public class RoomReservationService {
     }
 
 
-    // Новый метод: бронирование с учётом количества гостей
     @Transactional
     public RoomReservation reserve(
             UUID reservationId,
@@ -51,6 +52,9 @@ public class RoomReservationService {
                     "Reservation cannot exceed 365 nights"
             );
         }
+        if (guestCount < 1) {
+            throw new IllegalArgumentException("guestCount must be positive");
+        }
 
         Room room = roomRepository.findByIdForUpdate(roomId)
                 .orElseThrow(() -> new RoomNotFoundException(roomId));
@@ -63,7 +67,8 @@ public class RoomReservationService {
             if (previous.getStatus() == ReservationStatus.RESERVED
                     && previous.getRoom().getId().equals(roomId)
                     && Objects.equals(previous.getCheckIn(), checkIn)
-                    && Objects.equals(previous.getCheckOut(), checkOut)) {
+                    && Objects.equals(previous.getCheckOut(), checkOut)
+                    && Objects.equals(previous.getGuestCount(), guestCount)) {
                 return previous;
             }
 
@@ -75,14 +80,13 @@ public class RoomReservationService {
             );
         }
 
-        // НОВОЕ: проверяем количество гостей
-        if (guestCount < 1) {
-            throw new IllegalArgumentException(
-                    "guestCount must be positive"
-            );
+        // Existing reservations are allowed to replay after their check-in
+        // date. Reject past dates only when creating a NEW reservation.
+        if (checkIn.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("checkIn must be today or later");
         }
 
-        // НОВОЕ: проверяем вместимость номера
+        // Проверяем вместимость номера.
         if (room.getCapacity() < guestCount) {
             throw new RoomReservationConflictException(
                     "ROOM_UNAVAILABLE",
@@ -104,8 +108,8 @@ public class RoomReservationService {
             );
         }
 
-        RoomReservation reservation = reservationRepository.saveAndFlush(
-                new RoomReservation(reservationId, room, checkIn, checkOut)
+        RoomReservation reservation = saveNewReservation(
+                new RoomReservation(reservationId, room, checkIn, checkOut, guestCount)
         );
 
         var nights = checkIn.datesUntil(checkOut)
@@ -117,6 +121,34 @@ public class RoomReservationService {
         room.incrementTimesBooked();
 
         return reservation;
+    }
+
+    // A new RoomReservation has one uniqueness rule: its reservationId PK.
+    // Used for both regular reservations and release-before-reserve tombstones.
+    private RoomReservation saveNewReservation(RoomReservation reservation) {
+        try {
+            return reservationRepository.saveAndFlush(reservation);
+        } catch (DataIntegrityViolationException ex) {
+            if (isUniqueConstraintViolation(ex)) {
+                throw new RoomReservationConflictException(
+                        "RESERVATION_ID_CONFLICT",
+                        "Reservation ID already used: " + reservation.getReservationId()
+                );
+            }
+            throw ex;
+        }
+    }
+
+    // SQLSTATE 23505 means unique-constraint violation in H2 and PostgreSQL.
+    // Do not convert FK/NOT NULL and other integrity errors into a 409.
+    private boolean isUniqueConstraintViolation(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql
+                    && "23505".equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Transactional
@@ -143,7 +175,7 @@ public class RoomReservationService {
                 .orElse(null);
 
         if (reservation == null) {
-            return reservationRepository.saveAndFlush(
+            return saveNewReservation(
                     RoomReservation.released(reservationId, room)
             );
         }
