@@ -6,7 +6,6 @@ import com.hotelbooking.hotel.entity.Room;
 import com.hotelbooking.hotel.exception.RoomReservationConflictException;
 import com.hotelbooking.hotel.repository.HotelRepository;
 import com.hotelbooking.hotel.repository.RoomRepository;
-import com.hotelbooking.hotel.repository.RoomReservationNightRepository;
 import com.hotelbooking.hotel.repository.RoomReservationRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +29,6 @@ class RoomReservationRulesJpaTest {
     @Autowired HotelRepository hotels;
     @Autowired RoomRepository rooms;
     @Autowired RoomReservationRepository reservations;
-    @Autowired RoomReservationNightRepository nights;
     @Autowired EntityManager em;
     private Long first;
     private Long second;
@@ -52,10 +50,23 @@ class RoomReservationRulesJpaTest {
         return rooms.findById(roomId).orElseThrow().getTimesBooked();
     }
 
+    // Count only nights belonging to rooms created by this test.
+    // Another non-transactional JPA test may share the embedded H2 context.
+    private long nightsForTestRooms() {
+        em.flush();
+        return em.createQuery("""
+                SELECT COUNT(n) FROM RoomReservationNight n
+                WHERE n.room.id = :firstId OR n.room.id = :secondId
+                """, Long.class)
+                .setParameter("firstId", first)
+                .setParameter("secondId", second)
+                .getSingleResult();
+    }
+
     @Test void successfulReservationCreatesTwoNightsAndCountsOnce() {
         UUID id = UUID.randomUUID();
         reserve(id, first, IN, OUT);
-        assertEquals(2L, nights.count());
+        assertEquals(2L, nightsForTestRooms());
         assertEquals(1L, counter(first));
         assertEquals(ReservationStatus.RESERVED, reservations.findById(id).orElseThrow().getStatus());
     }
@@ -63,7 +74,7 @@ class RoomReservationRulesJpaTest {
         UUID id = UUID.randomUUID();
         reserve(id, first, IN, OUT);
         reserve(id, first, IN, OUT);
-        assertEquals(2L, nights.count());
+        assertEquals(2L, nightsForTestRooms());
         assertEquals(1L, counter(first));
     }
     @Test void sameIdCannotBeReusedWithDifferentDatesOrRoom() {
@@ -85,21 +96,21 @@ class RoomReservationRulesJpaTest {
         reserve(UUID.randomUUID(), first, IN, OUT);
         reserve(UUID.randomUUID(), first, OUT, OUT.plusDays(2));
         assertEquals(2L, counter(first));
-        assertEquals(4L, nights.count());
+        assertEquals(4L, nightsForTestRooms());
     }
     @Test void differentRoomsCanBeBookedOverIdenticalDates() {
         reserve(UUID.randomUUID(), first, IN, OUT);
         reserve(UUID.randomUUID(), second, IN, OUT);
         assertEquals(1L, counter(first));
         assertEquals(1L, counter(second));
-        assertEquals(4L, nights.count());
+        assertEquals(4L, nightsForTestRooms());
     }
     @Test void confirmedCancellationFreesNightsButPreservesHistoricalCount() {
         UUID id = UUID.randomUUID();
         reserve(id, first, IN, OUT);
         reservation.release(id, first, false);
         assertEquals(1L, counter(first));
-        assertEquals(0L, nights.count());
+        assertEquals(0L, nightsForTestRooms());
         assertEquals(ReservationStatus.RELEASED, reservations.findById(id).orElseThrow().getStatus());
         reserve(UUID.randomUUID(), first, IN, OUT);
         assertEquals(2L, counter(first));
@@ -110,7 +121,7 @@ class RoomReservationRulesJpaTest {
         assertEquals(1L, counter(first));
         reservation.release(id, first, true);
         assertEquals(0L, counter(first));
-        assertEquals(0L, nights.count());
+        assertEquals(0L, nightsForTestRooms());
         reservation.release(id, first, true);
         assertEquals(0L, counter(first));
     }
@@ -136,7 +147,7 @@ class RoomReservationRulesJpaTest {
         assertThrows(RoomReservationConflictException.class,
                 () -> reservation.release(id, second, true));
         assertEquals(1L, counter(first));
-        assertEquals(2L, nights.count());
+        assertEquals(2L, nightsForTestRooms());
     }
     @Test void unavailableRoomCannotBeReserved() {
         Room room = rooms.findById(first).orElseThrow();
