@@ -215,7 +215,7 @@ public class BookingSagaStateService {
 
         if (booking == null
                 || booking.getStatus() != BookingStatus.PENDING
-                || !booking.getCreatedAt().isBefore(cutoff)
+                || !booking.getSagaUpdatedAt().isBefore(cutoff)
                 || (booking.getCreationOutcome() != BookingCreationOutcome.PROCESSING
                 && booking.getCreationOutcome() != BookingCreationOutcome.RECOVERING)) {
             return Optional.empty();

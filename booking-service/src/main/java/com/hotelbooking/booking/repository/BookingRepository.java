@@ -36,10 +36,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             UUID idempotencyKey
     );
     List<Booking>
-    findTop10ByStatusAndCreationOutcomeInAndCreatedAtBeforeOrderByCreatedAtAsc(
+    findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
             BookingStatus status,
             List<BookingCreationOutcome> outcomes,
-            Instant createdAt
+            Instant sagaUpdatedAt
     );
 
     List<Booking>

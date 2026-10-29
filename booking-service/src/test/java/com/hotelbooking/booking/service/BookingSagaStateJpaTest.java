@@ -51,8 +51,18 @@ class BookingSagaStateJpaTest {
     }
 
     private void backdate(long id) {
-        jdbc.update("UPDATE bookings SET created_at = ? WHERE id = ?",
-                Timestamp.from(Instant.now().minus(Duration.ofMinutes(5))), id);
+        Timestamp oldTime = Timestamp.from(
+                Instant.now().minus(Duration.ofMinutes(5))
+        );
+
+        jdbc.update(
+                """
+                UPDATE bookings
+                SET created_at = ?, saga_updated_at = ?
+                WHERE id = ?
+                """,
+                oldTime, oldTime, id
+        );
     }
 
     @Test

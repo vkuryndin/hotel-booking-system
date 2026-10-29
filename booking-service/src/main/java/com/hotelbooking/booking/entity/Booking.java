@@ -12,14 +12,20 @@ import jakarta.persistence.UniqueConstraint;
 @Entity
 @Table(name = "bookings", indexes = {
         @Index(name = "idx_booking_room_dates",
-                columnList = "room_id, check_in, check_out")
+                columnList = "room_id, check_in, check_out"),
+        @Index(
+                name = "idx_booking_saga_recovery",
+                columnList = "status, creation_outcome, saga_updated_at"
+        )
 },
+
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_booking_user_idempotency",
                         columnNames = {"user_id", "idempotency_key"}
                 )
         }
+
 )
 
 public class Booking {
@@ -55,6 +61,9 @@ public class Booking {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "saga_updated_at", nullable = false)
+    private Instant sagaUpdatedAt;
 
     @Column(name = "cancellation_requested_at")
     private Instant cancellationRequestedAt;
@@ -98,6 +107,7 @@ public class Booking {
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();
+        sagaUpdatedAt = createdAt;
     }
 
     public Long getId() { return id; }
@@ -110,6 +120,9 @@ public class Booking {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getCancellationRequestedAt() {
         return cancellationRequestedAt;
+    }
+    public Instant getSagaUpdatedAt() {
+        return sagaUpdatedAt;
     }
     public void confirm() {
         if (status != BookingStatus.PENDING
@@ -170,6 +183,8 @@ public class Booking {
         }
 
         this.roomId = Objects.requireNonNull(newRoomId);
+        this.sagaUpdatedAt = Instant.now();
     }
+
 
 }

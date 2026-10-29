@@ -40,7 +40,7 @@ public class BookingSagaRecoveryService {
         Instant cutoff = Instant.now().minus(Duration.ofMinutes(2));
 
         var pending = bookingRepository
-                .findTop10ByStatusAndCreationOutcomeInAndCreatedAtBeforeOrderByCreatedAtAsc(
+                .findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
                         BookingStatus.PENDING,
                         List.of(
                                 BookingCreationOutcome.PROCESSING,

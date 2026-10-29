@@ -47,7 +47,7 @@ class BookingRecoveryServiceTest {
     @Test
     void pendingRecoveryCompensatesBeforeMarkingFailed() {
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCreationOutcomeInAndCreatedAtBeforeOrderByCreatedAtAsc(
+        when(repository.findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
                 eq(BookingStatus.PENDING), anyList(), any(Instant.class)))
                 .thenReturn(List.of(candidate));
         when(state.prepareRecovery(eq(11L), any(Instant.class)))
@@ -64,7 +64,7 @@ class BookingRecoveryServiceTest {
     @Test
     void failedCompensationLeavesPendingForNextRecovery() {
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCreationOutcomeInAndCreatedAtBeforeOrderByCreatedAtAsc(
+        when(repository.findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
                 any(), anyList(), any())).thenReturn(List.of(candidate));
         when(state.prepareRecovery(eq(11L), any())).thenReturn(Optional.of(snapshot()));
         when(hotel.compensateRoom(2L, RID)).thenThrow(new IllegalStateException("network down"));
@@ -77,7 +77,7 @@ class BookingRecoveryServiceTest {
     @Test
     void confirmedOrFreshBookingIsSkippedByTransactionalRecheck() {
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCreationOutcomeInAndCreatedAtBeforeOrderByCreatedAtAsc(
+        when(repository.findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
                 any(), anyList(), any())).thenReturn(List.of(candidate));
         when(state.prepareRecovery(eq(11L), any())).thenReturn(Optional.empty());
 

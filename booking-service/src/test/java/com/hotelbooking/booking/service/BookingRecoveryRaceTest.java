@@ -169,14 +169,43 @@ class BookingRecoveryRaceTest {
                 UUID.randomUUID()
         ).bookingId();
 
+        Timestamp oldTime = Timestamp.from(
+                Instant.now().minus(Duration.ofMinutes(5))
+        );
+
         jdbc.update(
-                "UPDATE bookings SET created_at = ? WHERE id = ?",
-                Timestamp.from(
-                        Instant.now().minus(Duration.ofMinutes(5))
-                ),
+                """
+                UPDATE bookings
+                SET created_at = ?, saga_updated_at = ?
+                WHERE id = ?
+                """,
+                oldTime,
+                oldTime,
                 id
         );
 
         return id;
     }
+    @Test
+    void activeSagaMustNotBeRecoveredWhenCreatedAtIsOld() {
+
+        long id = createOldPendingBooking();
+
+        // Saga продолжила работу — выбрала другой номер
+        state.switchPendingRoom(id, 2L);
+
+        recovery.recoverPendingBookings();
+
+        var booking = bookings.findById(id).orElseThrow();
+
+        assertEquals(BookingStatus.PENDING, booking.getStatus());
+        assertEquals(
+                BookingCreationOutcome.PROCESSING,
+                booking.getCreationOutcome()
+        );
+
+        verify(hotel, never())
+                .compensateRoom(anyLong(), any(UUID.class));
+    }
+
 }

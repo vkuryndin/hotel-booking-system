@@ -29,6 +29,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import java.nio.charset.StandardCharsets;
 
 /** Unit tests of Booking -> Hotel Saga orchestration, without network or Spring context. */
 class BookingServiceSagaTest {
@@ -142,7 +143,7 @@ class BookingServiceSagaTest {
     void hotelConflictCompensatesAndRecordsRoomConflict() {
         prepareManualSuccess();
         when(hotel.reserveRoom(eq(ROOM), eq(RESERVATION), any(), any(), eq(1)))
-                .thenThrow(new HttpClientErrorException(HttpStatus.CONFLICT));
+                .thenThrow(roomOccupied());
         assertThrows(RoomAlreadyBookedException.class,
                 () -> service.createBooking(USER, manual(), KEY));
         verify(hotel).compensateRoom(ROOM, RESERVATION);
@@ -201,7 +202,7 @@ class BookingServiceSagaTest {
                 .thenReturn(pending(1L));
         when(state.switchPendingRoom(BOOKING, 2L)).thenReturn(pending(2L));
         when(hotel.reserveRoom(eq(1L), eq(RESERVATION), any(), any(), eq(1)))
-                .thenThrow(new HttpClientErrorException(HttpStatus.CONFLICT));
+                .thenThrow(roomOccupied());
         when(hotel.reserveRoom(eq(2L), eq(RESERVATION), any(), any(), eq(1)))
                 .thenReturn(new HotelReservationResponse(RESERVATION, 2L, IN, OUT, "RESERVED"));
         when(state.confirm(BOOKING)).thenReturn(confirmed(2L));
@@ -218,7 +219,7 @@ class BookingServiceSagaTest {
                 .thenReturn(pending(1L));
         when(state.switchPendingRoom(BOOKING, 2L)).thenReturn(pending(2L));
         when(hotel.reserveRoom(anyLong(), eq(RESERVATION), any(), any(), eq(1)))
-                .thenThrow(new HttpClientErrorException(HttpStatus.CONFLICT));
+                .thenThrow(roomOccupied());
         assertThrows(NoAvailableRoomsException.class,
                 () -> service.createBooking(USER, automatic(), KEY));
         verify(hotel).compensateRoom(2L, RESERVATION);
@@ -279,5 +280,14 @@ class BookingServiceSagaTest {
                 () -> service.createBooking(USER,
                         new BookingRequest(ROOM, null, false, IN, OUT, 3, null), KEY));
         verify(state, never()).createPending(anyLong(), any(), anyLong(), any());
+    }
+    private HttpClientErrorException roomOccupied() {
+        return new HttpClientErrorException(
+                HttpStatus.CONFLICT,
+                "Conflict",
+                "{\"code\":\"ROOM_OCCUPIED\"}"
+                        .getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8
+        );
     }
 }
