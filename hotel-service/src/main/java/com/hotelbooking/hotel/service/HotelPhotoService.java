@@ -60,7 +60,7 @@ public class HotelPhotoService {
             Long hotelId,
             MultipartFile file
     ) {
-        Hotel hotel = findHotel(hotelId);
+        Hotel hotel = lockHotel(hotelId);
 
         if (file == null
                 || file.isEmpty()
@@ -187,6 +187,7 @@ public class HotelPhotoService {
             Long hotelId,
             Long photoId
     ) {
+        lockHotel(hotelId);
         HotelPhoto selected = findPhoto(hotelId, photoId);
 
         List<HotelPhoto> photos = photoRepository
@@ -212,7 +213,7 @@ public class HotelPhotoService {
                     "sortOrder must be >= 0"
             );
         }
-
+        lockHotel(hotelId);
         HotelPhoto photo = findPhoto(hotelId, photoId);
         photo.setSortOrder(sortOrder);
 
@@ -224,6 +225,7 @@ public class HotelPhotoService {
             Long hotelId,
             Long photoId
     ) {
+        lockHotel(hotelId);
         HotelPhoto photo = findPhoto(hotelId, photoId);
 
         boolean wasPrimary = photo.isPrimaryPhoto();
@@ -315,5 +317,9 @@ public class HotelPhotoService {
         }
 
         return null;
+    }
+    private Hotel lockHotel(Long hotelId) {
+        return hotelRepository.findByIdForUpdate(hotelId)
+                .orElseThrow(() -> new HotelNotFoundException(hotelId));
     }
 }
