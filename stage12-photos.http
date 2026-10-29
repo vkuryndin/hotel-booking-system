@@ -1,0 +1,177 @@
+### PHOTO TESTS — Stage 12, tests S12-36..S12-47
+### Put this file and hotel-test.jpg, hotel-test2.png, stage12-invalid-photo.txt
+### in the same directory. Start Eureka, Gateway, Booking Service, Hotel Service.
+### Run the ADMIN login in your requests.http first to set {{adminToken}}.
+### Run S12-01, S12-21 (if needed), S12-22, then S12-36..S12-47 in order.
+
+@baseUrl = http://localhost:8080
+
+### S12-01 — Prepare: create test hotel: 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "S12 Test Hotel",
+  "address": "12 Study Street, Yerevan"
+}
+
+> {%
+client.test("S12-01 201", () => client.assert(response.status === 201));
+client.global.set("s12HotelId", response.body.id);
+%}
+
+### S12-21 — Prepare: register test USER: 201
+### If s12user@example.com already exists in H2, skip this and run S12-22.
+POST {{baseUrl}}/api/users/register
+Content-Type: application/json
+
+{
+  "email": "s12user@example.com", "password": "Study12345!",
+  "username": "s12user", "firstName": "Test", "lastName": "Guest"
+}
+
+> {% client.test("S12-21 201", () => client.assert(response.status === 201)); %}
+
+### S12-22 — Prepare: login test USER: 200
+POST {{baseUrl}}/api/users/login
+Content-Type: application/json
+
+{"email": "s12user@example.com", "password": "Study12345!"}
+
+> {%
+client.test("S12-22 login", () => client.assert(response.status === 200));
+client.global.set("s12UserToken", response.body.accessToken);
+%}
+
+### S12-36 — Photo 1 upload JPEG (hotel-test.jpg): 201, primary true
+POST {{baseUrl}}/api/hotels/{{s12HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=Boundary12
+
+--Boundary12
+Content-Disposition: form-data; name="file"; filename="hotel-test.jpg"
+Content-Type: image/jpeg
+
+< ./hotel-test.jpg
+--Boundary12--
+
+> {%
+client.test("S12-36 upload", () => {
+  client.assert(response.status === 201);
+  client.assert(response.body.primary === true);
+});
+client.global.set("s12Photo1", response.body.id);
+%}
+
+### S12-37 — Photo 2 upload PNG: 201, primary false
+POST {{baseUrl}}/api/hotels/{{s12HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=Boundary12
+
+--Boundary12
+Content-Disposition: form-data; name="file"; filename="hotel-test2.png"
+Content-Type: image/png
+
+< ./hotel-test2.png
+--Boundary12--
+
+> {%
+client.test("S12-37 upload2", () => {
+  client.assert(response.status === 201);
+  client.assert(response.body.primary === false);
+});
+client.global.set("s12Photo2", response.body.id);
+%}
+
+### S12-38 — Photo list: 200, two photos
+GET {{baseUrl}}/api/hotels/{{s12HotelId}}/photos
+Authorization: Bearer {{s12UserToken}}
+
+> {%
+client.test("S12-38 list", () => {
+  client.assert(response.status === 200);
+  client.assert(response.body.length === 2);
+  client.assert(response.body.filter(p => p.primary).length === 1);
+});
+%}
+
+### S12-39 — Download first JPEG: 200
+GET {{baseUrl}}/api/hotels/{{s12HotelId}}/photos/{{s12Photo1}}/file
+Authorization: Bearer {{s12UserToken}}
+
+> {% client.test("S12-39 jpeg", () => client.assert(response.status === 200)); %}
+
+### S12-40 — Set PNG as primary: 200
+PATCH {{baseUrl}}/api/hotels/{{s12HotelId}}/photos/{{s12Photo2}}/primary
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("S12-40 primary", () => {
+  client.assert(response.status === 200);
+  client.assert(response.body.primary === true);
+});
+%}
+
+### S12-41 — Change sortOrder for PNG: 200
+PATCH {{baseUrl}}/api/hotels/{{s12HotelId}}/photos/{{s12Photo2}}/order?sortOrder=0
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("S12-41 sortOrder", () => client.assert(response.status === 200)); %}
+
+### S12-42 — USER cannot upload photos: 403
+POST {{baseUrl}}/api/hotels/{{s12HotelId}}/photos
+Authorization: Bearer {{s12UserToken}}
+Content-Type: multipart/form-data; boundary=Boundary12
+
+--Boundary12
+Content-Disposition: form-data; name="file"; filename="hotel-test.jpg"
+Content-Type: image/jpeg
+
+< ./hotel-test.jpg
+--Boundary12--
+
+> {% client.test("S12-42 403", () => client.assert(response.status === 403)); %}
+
+### S12-43 — Invalid contents (text, not image): 400
+POST {{baseUrl}}/api/hotels/{{s12HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=Boundary12
+
+--Boundary12
+Content-Disposition: form-data; name="file"; filename="invalid.jpg"
+Content-Type: image/jpeg
+
+< ./stage12-invalid-photo.txt
+--Boundary12--
+
+> {% client.test("S12-43 invalid file", () => client.assert(response.status === 400)); %}
+
+### S12-44 — Wrong hotel/photo pair: 404
+GET {{baseUrl}}/api/hotels/999999/photos/{{s12Photo2}}/file
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("S12-44 404", () => client.assert(response.status === 404)); %}
+
+### S12-45 — Delete first photo: 204
+DELETE {{baseUrl}}/api/hotels/{{s12HotelId}}/photos/{{s12Photo1}}
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("S12-45 204", () => client.assert(response.status === 204)); %}
+
+### S12-46 — Delete second photo: 204
+DELETE {{baseUrl}}/api/hotels/{{s12HotelId}}/photos/{{s12Photo2}}
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("S12-46 204", () => client.assert(response.status === 204)); %}
+
+### S12-47 — Photo list now empty: 200 []
+GET {{baseUrl}}/api/hotels/{{s12HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("S12-47 empty", () => {
+  client.assert(response.status === 200);
+  client.assert(response.body.length === 0);
+});
+%}

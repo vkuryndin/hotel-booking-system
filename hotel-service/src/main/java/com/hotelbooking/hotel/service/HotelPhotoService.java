@@ -7,12 +7,16 @@ import com.hotelbooking.hotel.exception.HotelNotFoundException;
 import com.hotelbooking.hotel.repository.HotelPhotoRepository;
 import com.hotelbooking.hotel.repository.HotelRepository;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -26,6 +30,9 @@ import java.util.UUID;
 
 @Service
 public class HotelPhotoService {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(HotelPhotoService.class);
 
     private final HotelRepository hotelRepository;
     private final HotelPhotoRepository photoRepository;
@@ -60,6 +67,7 @@ public class HotelPhotoService {
             Long hotelId,
             MultipartFile file
     ) {
+        // №17: сериализуем изменения фотографий одного отеля.
         Hotel hotel = lockHotel(hotelId);
 
         if (file == null
@@ -70,6 +78,7 @@ public class HotelPhotoService {
             );
         }
 
+        // Проверяем лимит уже под блокировкой отеля.
         List<HotelPhoto> existing = photoRepository
                 .findByHotel_IdOrderBySortOrderAscIdAsc(hotelId);
 
@@ -106,6 +115,11 @@ public class HotelPhotoService {
         Path destination = hotelDirectory(hotelId)
                 .resolve(fileName);
 
+        // №17: если БД откатится, удаляем созданный файл.
+        // Регистрируем ДО копирования, чтобы убрать даже частично
+        // записанный файл при ошибке Files.copy().
+        registerRollbackCleanup(destination);
+
         try {
             Files.createDirectories(destination.getParent());
 
@@ -118,31 +132,23 @@ public class HotelPhotoService {
             );
         }
 
-        try {
-            int sortOrder = existing.stream()
-                    .mapToInt(HotelPhoto::getSortOrder)
-                    .max()
-                    .orElse(-1) + 1;
+        // Порядок и primary рассчитываются под блокировкой.
+        int sortOrder = existing.stream()
+                .mapToInt(HotelPhoto::getSortOrder)
+                .max()
+                .orElse(-1) + 1;
 
-            HotelPhoto photo = new HotelPhoto(
-                    hotel,
-                    fileName,
-                    contentType,
-                    existing.isEmpty(),
-                    sortOrder
-            );
+        HotelPhoto photo = new HotelPhoto(
+                hotel,
+                fileName,
+                contentType,
+                existing.isEmpty(),
+                sortOrder
+        );
 
-            HotelPhoto saved = photoRepository.saveAndFlush(photo);
+        HotelPhoto saved = photoRepository.saveAndFlush(photo);
 
-            return HotelPhotoResponse.from(saved);
-
-        } catch (RuntimeException ex) {
-            try {
-                Files.deleteIfExists(destination);
-            } catch (IOException ignored) {
-            }
-            throw ex;
-        }
+        return HotelPhotoResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -187,7 +193,10 @@ public class HotelPhotoService {
             Long hotelId,
             Long photoId
     ) {
+        // №17: два параллельных PATCH не смогут назначить
+        // две главные фотографии одновременно.
         lockHotel(hotelId);
+
         HotelPhoto selected = findPhoto(hotelId, photoId);
 
         List<HotelPhoto> photos = photoRepository
@@ -213,7 +222,10 @@ public class HotelPhotoService {
                     "sortOrder must be >= 0"
             );
         }
+
+        // №17: изменение порядка также сериализуем.
         lockHotel(hotelId);
+
         HotelPhoto photo = findPhoto(hotelId, photoId);
         photo.setSortOrder(sortOrder);
 
@@ -225,11 +237,25 @@ public class HotelPhotoService {
             Long hotelId,
             Long photoId
     ) {
+        // №17: защищаем удаление и выбор новой primary.
         lockHotel(hotelId);
+
         HotelPhoto photo = findPhoto(hotelId, photoId);
 
         boolean wasPrimary = photo.isPrimaryPhoto();
 
+        Path directory = hotelDirectory(hotelId);
+        Path file = directory
+                .resolve(photo.getFileName())
+                .normalize();
+
+        if (!file.startsWith(directory)) {
+            throw new IllegalArgumentException(
+                    "Invalid photo path"
+            );
+        }
+
+        // Сначала удаляем только метаданные в БД.
         photoRepository.delete(photo);
         photoRepository.flush();
 
@@ -242,20 +268,21 @@ public class HotelPhotoService {
             }
         }
 
-        try {
-            Files.deleteIfExists(
-                    hotelDirectory(hotelId)
-                            .resolve(photo.getFileName())
-            );
-        } catch (IOException ex) {
-            throw new IllegalStateException(
-                    "Cannot delete photo file", ex
-            );
-        }
+        // №17: физический файл удалится только после
+        // успешного COMMIT транзакции.
+        registerDeleteAfterCommit(file);
     }
 
     private Hotel findHotel(Long hotelId) {
         return hotelRepository.findById(hotelId)
+                .orElseThrow(
+                        () -> new HotelNotFoundException(hotelId)
+                );
+    }
+
+    // №17: единая блокировка для всех операций изменения фото.
+    private Hotel lockHotel(Long hotelId) {
+        return hotelRepository.findByIdForUpdate(hotelId)
                 .orElseThrow(
                         () -> new HotelNotFoundException(hotelId)
                 );
@@ -283,6 +310,53 @@ public class HotelPhotoService {
         return storageRoot
                 .resolve(String.valueOf(hotelId))
                 .normalize();
+    }
+
+    // №17: файл, созданный при неудачной транзакции,
+    // не должен остаться на диске.
+    private void registerRollbackCleanup(Path file) {
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != STATUS_COMMITTED) {
+                            try {
+                                Files.deleteIfExists(file);
+                            } catch (IOException ex) {
+                                log.warn(
+                                        "Cannot clean up photo after rollback: {}",
+                                        file,
+                                        ex
+                                );
+                            }
+                        }
+                    }
+                }
+        );
+    }
+
+    // №17: не удаляем файл до фиксации удаления в БД.
+    private void registerDeleteAfterCommit(Path file) {
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            Files.deleteIfExists(file);
+                        } catch (IOException ex) {
+                            // COMMIT уже произошёл: откатить БД нельзя.
+                            // Ошибку обязательно фиксируем в журнале.
+                            log.error(
+                                    "Cannot delete photo file after commit: {}",
+                                    file,
+                                    ex
+                            );
+                        }
+                    }
+                }
+        );
     }
 
     private String detectType(byte[] bytes) {
@@ -317,9 +391,5 @@ public class HotelPhotoService {
         }
 
         return null;
-    }
-    private Hotel lockHotel(Long hotelId) {
-        return hotelRepository.findByIdForUpdate(hotelId)
-                .orElseThrow(() -> new HotelNotFoundException(hotelId));
     }
 }
