@@ -12,6 +12,8 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import java.util.List;
 
 @Configuration
 public class GatewaySecurityConfig {
@@ -36,7 +38,17 @@ public class GatewaySecurityConfig {
                 NimbusReactiveJwtDecoder.withPublicKey(publicKey).build();
 
         decoder.setJwtValidator(
-                JwtValidators.createDefaultWithIssuer("hotel-booking")
+                new DelegatingOAuth2TokenValidator<>(
+                        JwtValidators.createDefaultWithIssuer("hotel-booking"),
+                        new JwtClaimValidator<List<String>>(
+                                "aud",
+                                aud -> aud != null && aud.contains("api-gateway")
+                        ),
+                        new JwtClaimValidator<String>(
+                                "role",
+                                role -> "USER".equals(role) || "ADMIN".equals(role)
+                        )
+                )
         );
 
         return decoder;

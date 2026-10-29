@@ -13,6 +13,9 @@ import java.nio.file.Path;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.interfaces.RSAPublicKey;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import java.util.List;
 
 @Configuration
 public class JwtDecoderConfig {
@@ -42,7 +45,17 @@ public class JwtDecoderConfig {
                 NimbusJwtDecoder.withPublicKey(publicKey).build();
 
         decoder.setJwtValidator(
-                JwtValidators.createDefaultWithIssuer(issuer)
+                new DelegatingOAuth2TokenValidator<>(
+                        JwtValidators.createDefaultWithIssuer(issuer),
+                        new JwtClaimValidator<List<String>>(
+                                "aud",
+                                aud -> aud != null && aud.contains("booking-service")
+                        ),
+                        new JwtClaimValidator<String>(
+                                "role",
+                                role -> "USER".equals(role) || "ADMIN".equals(role)
+                        )
+                )
         );
 
         return decoder;

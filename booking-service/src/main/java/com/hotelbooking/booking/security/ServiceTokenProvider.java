@@ -6,13 +6,16 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 @Component
 public class ServiceTokenProvider {
 
     private final JwtEncoder jwtEncoder;
 
-    public ServiceTokenProvider(JwtEncoder jwtEncoder) {
+    public ServiceTokenProvider(
+            @Qualifier("serviceJwtEncoder") JwtEncoder jwtEncoder
+    ) {
         this.jwtEncoder = jwtEncoder;
     }
 

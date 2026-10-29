@@ -46,3 +46,7 @@ app:
       path: ${JWT_KEYSTORE_PATH}
       password: ${JWT_KEYSTORE_PASSWORD}
       alias: jwt-signing
+    service-keystore:
+      path: ${SERVICE_JWT_KEYSTORE_PATH}
+      password: ${SERVICE_JWT_KEYSTORE_PASSWORD}
+      alias: service-jwt-signing

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-
+import java.util.List;
 @Service
 public class JwtService {
 
@@ -36,6 +36,11 @@ public class JwtService {
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
+                .audience(List.of(
+                        "api-gateway",
+                        "booking-service",
+                        "hotel-service"
+                ))
                 .subject(user.getId().toString())
                 .issuedAt(now)
                 .expiresAt(now.plus(tokenTtl))
