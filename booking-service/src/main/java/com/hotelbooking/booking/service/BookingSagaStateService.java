@@ -26,6 +26,7 @@ public class BookingSagaStateService {
 
     private final BookingRepository bookingRepository;
     private final BookingMapper bookingMapper;
+    public static final int MAX_RECOVERY_ATTEMPTS = 5;
 
     public BookingSagaStateService(
             BookingRepository bookingRepository,
@@ -216,6 +217,8 @@ public class BookingSagaStateService {
         if (booking == null
                 || booking.getStatus() != BookingStatus.PENDING
                 || !booking.getSagaUpdatedAt().isBefore(cutoff)
+                || booking.getRecoveryAttempts() >= MAX_RECOVERY_ATTEMPTS
+                || booking.getNextRecoveryAt().isAfter(Instant.now())
                 || (booking.getCreationOutcome() != BookingCreationOutcome.PROCESSING
                 && booking.getCreationOutcome() != BookingCreationOutcome.RECOVERING)) {
             return Optional.empty();
@@ -224,7 +227,7 @@ public class BookingSagaStateService {
         if (booking.getCreationOutcome() == BookingCreationOutcome.PROCESSING) {
             booking.markCreationOutcome(BookingCreationOutcome.RECOVERING);
         }
-
+        booking.registerRecoveryAttempt();
         return Optional.of(snapshot(booking));
     }
     @Transactional
@@ -237,11 +240,14 @@ public class BookingSagaStateService {
 
         if (booking == null
                 || booking.getStatus() != BookingStatus.CANCELLING
+                || booking.getRecoveryAttempts() >= MAX_RECOVERY_ATTEMPTS
+                || booking.getNextRecoveryAt().isAfter(Instant.now())
                 || booking.getCancellationRequestedAt() == null
                 || !booking.getCancellationRequestedAt().isBefore(cutoff)) {
             return Optional.empty();
         }
 
+        booking.registerRecoveryAttempt();
         return Optional.of(snapshot(booking));
     }
 

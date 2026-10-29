@@ -35,18 +35,41 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             Long userId,
             UUID idempotencyKey
     );
-    List<Booking>
-    findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
-            BookingStatus status,
-            List<BookingCreationOutcome> outcomes,
-            Instant sagaUpdatedAt
+    @Query("""
+        SELECT b FROM Booking b
+        WHERE b.status = :status
+          AND b.creationOutcome IN :outcomes
+          AND b.sagaUpdatedAt < :cutoff
+          AND b.recoveryAttempts < :maxAttempts
+          AND b.nextRecoveryAt <= :now
+        ORDER BY b.sagaUpdatedAt ASC
+        """)
+    List<Booking> findPendingRecoveryCandidates(
+            @Param("status") BookingStatus status,
+            @Param("outcomes") List<BookingCreationOutcome> outcomes,
+            @Param("cutoff") Instant cutoff,
+            @Param("now") Instant now,
+            @Param("maxAttempts") int maxAttempts,
+            Pageable pageable
     );
 
-    List<Booking>
-    findTop10ByStatusAndCancellationRequestedAtBeforeOrderByCancellationRequestedAtAsc(
-            BookingStatus status,
-            Instant cutoff
+    @Query("""
+        SELECT b FROM Booking b
+        WHERE b.status = :status
+          AND b.cancellationRequestedAt < :cutoff
+          AND b.recoveryAttempts < :maxAttempts
+          AND b.nextRecoveryAt <= :now
+        ORDER BY b.cancellationRequestedAt ASC
+        """)
+    List<Booking> findCancellationRecoveryCandidates(
+            @Param("status") BookingStatus status,
+            @Param("cutoff") Instant cutoff,
+            @Param("now") Instant now,
+            @Param("maxAttempts") int maxAttempts,
+            Pageable pageable
     );
+
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.id = :id")
     Optional<Booking> findByIdForUpdate(@Param("id") Long id);

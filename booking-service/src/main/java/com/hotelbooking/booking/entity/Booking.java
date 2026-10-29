@@ -8,7 +8,7 @@ import java.util.UUID;
 
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-
+import java.time.Duration;
 @Entity
 @Table(name = "bookings", indexes = {
         @Index(name = "idx_booking_room_dates",
@@ -65,6 +65,12 @@ public class Booking {
     @Column(name = "saga_updated_at", nullable = false)
     private Instant sagaUpdatedAt;
 
+    @Column(name = "recovery_attempts", nullable = false)
+    private int recoveryAttempts = 0;
+
+    @Column(name = "next_recovery_at", nullable = false)
+    private Instant nextRecoveryAt;
+
     @Column(name = "cancellation_requested_at")
     private Instant cancellationRequestedAt;
 
@@ -108,6 +114,7 @@ public class Booking {
     void onCreate() {
         createdAt = Instant.now();
         sagaUpdatedAt = createdAt;
+        nextRecoveryAt = createdAt;
     }
 
     public Long getId() { return id; }
@@ -184,6 +191,23 @@ public class Booking {
 
         this.roomId = Objects.requireNonNull(newRoomId);
         this.sagaUpdatedAt = Instant.now();
+    }
+
+    public int getRecoveryAttempts() {
+        return recoveryAttempts;
+    }
+
+    public Instant getNextRecoveryAt() {
+        return nextRecoveryAt;
+    }
+
+    public void registerRecoveryAttempt() {
+        recoveryAttempts++;
+
+        long delayMinutes = 1L << Math.min(recoveryAttempts - 1, 4);
+
+        nextRecoveryAt = Instant.now()
+                .plus(Duration.ofMinutes(delayMinutes));
     }
 
 

@@ -5,8 +5,10 @@ import com.hotelbooking.booking.entity.Booking;
 import com.hotelbooking.booking.entity.BookingCreationOutcome;
 import com.hotelbooking.booking.entity.BookingStatus;
 import com.hotelbooking.booking.repository.BookingRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,9 +19,15 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** Recovery must be retryable and distinguish creation compensation from normal cancellation. */
+/**
+ * Recovery must be retryable and distinguish creation compensation
+ * from normal cancellation.
+ */
 class BookingRecoveryServiceTest {
-    private static final UUID RID = UUID.fromString("40000000-0000-0000-0000-000000000004");
+
+    private static final UUID RID =
+            UUID.fromString("40000000-0000-0000-0000-000000000004");
+
     private BookingRepository repository;
     private HotelServiceClient hotel;
     private BookingSagaStateService state;
@@ -30,7 +38,12 @@ class BookingRecoveryServiceTest {
         repository = mock(BookingRepository.class);
         hotel = mock(HotelServiceClient.class);
         state = mock(BookingSagaStateService.class);
-        recovery = new BookingSagaRecoveryService(repository, hotel, state);
+
+        recovery = new BookingSagaRecoveryService(
+                repository,
+                hotel,
+                state
+        );
     }
 
     private Booking candidateEntity() {
@@ -40,46 +53,99 @@ class BookingRecoveryServiceTest {
     }
 
     private BookingSagaStateService.SagaBooking snapshot() {
-        return new BookingSagaStateService.SagaBooking(11L, 2L, RID,
-                LocalDate.of(2055, 1, 1), LocalDate.of(2055, 1, 3));
+        return new BookingSagaStateService.SagaBooking(
+                11L,
+                2L,
+                RID,
+                LocalDate.of(2055, 1, 1),
+                LocalDate.of(2055, 1, 3)
+        );
     }
 
     @Test
     void pendingRecoveryCompensatesBeforeMarkingFailed() {
+
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
-                eq(BookingStatus.PENDING), anyList(), any(Instant.class)))
-                .thenReturn(List.of(candidate));
-        when(state.prepareRecovery(eq(11L), any(Instant.class)))
-                .thenReturn(Optional.of(snapshot()));
+
+        when(repository.findPendingRecoveryCandidates(
+                eq(BookingStatus.PENDING),
+                anyList(),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Pageable.class)
+        )).thenReturn(List.of(candidate));
+
+        when(state.prepareRecovery(
+                eq(11L),
+                any(Instant.class)
+        )).thenReturn(Optional.of(snapshot()));
 
         recovery.recoverPendingBookings();
 
         var order = inOrder(hotel, state);
+
         order.verify(hotel).compensateRoom(2L, RID);
-        order.verify(state).cancelCreation(11L, BookingCreationOutcome.FAILED);
-        verify(hotel, never()).releaseRoom(anyLong(), any(UUID.class));
+
+        order.verify(state).cancelCreation(
+                11L,
+                BookingCreationOutcome.FAILED
+        );
+
+        verify(hotel, never()).releaseRoom(
+                anyLong(),
+                any(UUID.class)
+        );
     }
 
     @Test
     void failedCompensationLeavesPendingForNextRecovery() {
+
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
-                any(), anyList(), any())).thenReturn(List.of(candidate));
-        when(state.prepareRecovery(eq(11L), any())).thenReturn(Optional.of(snapshot()));
-        when(hotel.compensateRoom(2L, RID)).thenThrow(new IllegalStateException("network down"));
+
+        when(repository.findPendingRecoveryCandidates(
+                eq(BookingStatus.PENDING),
+                anyList(),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Pageable.class)
+        )).thenReturn(List.of(candidate));
+
+        when(state.prepareRecovery(
+                eq(11L),
+                any(Instant.class)
+        )).thenReturn(Optional.of(snapshot()));
+
+        when(hotel.compensateRoom(2L, RID))
+                .thenThrow(new IllegalStateException("network down"));
 
         recovery.recoverPendingBookings();
 
-        verify(state, never()).cancelCreation(anyLong(), any());
+        verify(state, never()).cancelCreation(
+                anyLong(),
+                any()
+        );
     }
 
     @Test
     void confirmedOrFreshBookingIsSkippedByTransactionalRecheck() {
+
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
-                any(), anyList(), any())).thenReturn(List.of(candidate));
-        when(state.prepareRecovery(eq(11L), any())).thenReturn(Optional.empty());
+
+        when(repository.findPendingRecoveryCandidates(
+                eq(BookingStatus.PENDING),
+                anyList(),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Pageable.class)
+        )).thenReturn(List.of(candidate));
+
+        when(state.prepareRecovery(
+                eq(11L),
+                any(Instant.class)
+        )).thenReturn(Optional.empty());
 
         recovery.recoverPendingBookings();
 
@@ -88,29 +154,56 @@ class BookingRecoveryServiceTest {
 
     @Test
     void cancellationRecoveryUsesReleaseNotCompensation() {
+
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCancellationRequestedAtBeforeOrderByCancellationRequestedAtAsc(
-                eq(BookingStatus.CANCELLING), any(Instant.class)))
-                .thenReturn(List.of(candidate));
-        when(state.prepareCancellationRecovery(eq(11L), any()))
-                .thenReturn(Optional.of(snapshot()));
+
+        when(repository.findCancellationRecoveryCandidates(
+                eq(BookingStatus.CANCELLING),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Pageable.class)
+        )).thenReturn(List.of(candidate));
+
+        when(state.prepareCancellationRecovery(
+                eq(11L),
+                any(Instant.class)
+        )).thenReturn(Optional.of(snapshot()));
 
         recovery.recoverCancellingBookings();
 
         var order = inOrder(hotel, state);
+
         order.verify(hotel).releaseRoom(2L, RID);
+
         order.verify(state).finishCancellation(11L);
-        verify(hotel, never()).compensateRoom(anyLong(), any(UUID.class));
+
+        verify(hotel, never()).compensateRoom(
+                anyLong(),
+                any(UUID.class)
+        );
     }
 
     @Test
     void failedCancellationReleaseLeavesCancellingForNextRecovery() {
+
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCancellationRequestedAtBeforeOrderByCancellationRequestedAtAsc(
-                any(), any())).thenReturn(List.of(candidate));
-        when(state.prepareCancellationRecovery(eq(11L), any()))
-                .thenReturn(Optional.of(snapshot()));
-        when(hotel.releaseRoom(2L, RID)).thenThrow(new IllegalStateException("network down"));
+
+        when(repository.findCancellationRecoveryCandidates(
+                eq(BookingStatus.CANCELLING),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Pageable.class)
+        )).thenReturn(List.of(candidate));
+
+        when(state.prepareCancellationRecovery(
+                eq(11L),
+                any(Instant.class)
+        )).thenReturn(Optional.of(snapshot()));
+
+        when(hotel.releaseRoom(2L, RID))
+                .thenThrow(new IllegalStateException("network down"));
 
         recovery.recoverCancellingBookings();
 
@@ -119,11 +212,21 @@ class BookingRecoveryServiceTest {
 
     @Test
     void cancellationRecoverySkipsBookingNoLongerCancelling() {
+
         Booking candidate = candidateEntity();
-        when(repository.findTop10ByStatusAndCancellationRequestedAtBeforeOrderByCancellationRequestedAtAsc(
-                any(), any())).thenReturn(List.of(candidate));
-        when(state.prepareCancellationRecovery(eq(11L), any()))
-                .thenReturn(Optional.empty());
+
+        when(repository.findCancellationRecoveryCandidates(
+                eq(BookingStatus.CANCELLING),
+                any(Instant.class),
+                any(Instant.class),
+                eq(BookingSagaStateService.MAX_RECOVERY_ATTEMPTS),
+                any(Pageable.class)
+        )).thenReturn(List.of(candidate));
+
+        when(state.prepareCancellationRecovery(
+                eq(11L),
+                any(Instant.class)
+        )).thenReturn(Optional.empty());
 
         recovery.recoverCancellingBookings();
 

@@ -1,5 +1,5 @@
 package com.hotelbooking.booking.service;
-import java.util.List;
+
 import com.hotelbooking.booking.client.HotelServiceClient;
 import com.hotelbooking.booking.entity.Booking;
 import com.hotelbooking.booking.entity.BookingCreationOutcome;
@@ -8,11 +8,13 @@ import com.hotelbooking.booking.repository.BookingRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 public class BookingSagaRecoveryService {
@@ -37,22 +39,26 @@ public class BookingSagaRecoveryService {
     @Scheduled(fixedDelay = 60000, initialDelay = 60000)
     public void recoverPendingBookings() {
 
-        Instant cutoff = Instant.now().minus(Duration.ofMinutes(2));
+        Instant now = Instant.now();
+        Instant cutoff = now.minus(Duration.ofMinutes(2));
 
-        var pending = bookingRepository
-                .findTop10ByStatusAndCreationOutcomeInAndSagaUpdatedAtBeforeOrderBySagaUpdatedAtAsc(
-                        BookingStatus.PENDING,
-                        List.of(
-                                BookingCreationOutcome.PROCESSING,
-                                BookingCreationOutcome.RECOVERING
-                        ),
-                        cutoff
-                );
+        var pending = bookingRepository.findPendingRecoveryCandidates(
+                BookingStatus.PENDING,
+                List.of(
+                        BookingCreationOutcome.PROCESSING,
+                        BookingCreationOutcome.RECOVERING
+                ),
+                cutoff,
+                now,
+                BookingSagaStateService.MAX_RECOVERY_ATTEMPTS,
+                PageRequest.of(0, 10)
+        );
 
         for (Booking booking : pending) {
             try {
                 var candidate = sagaStateService.prepareRecovery(
-                        booking.getId(), cutoff
+                        booking.getId(),
+                        cutoff
                 );
 
                 if (candidate.isEmpty()) {
@@ -86,15 +92,20 @@ public class BookingSagaRecoveryService {
             }
         }
     }
+
     @Scheduled(fixedDelay = 60000, initialDelay = 60000)
     public void recoverCancellingBookings() {
-        Instant cutoff = Instant.now().minus(Duration.ofMinutes(2));
 
-        var cancelling = bookingRepository
-                .findTop10ByStatusAndCancellationRequestedAtBeforeOrderByCancellationRequestedAtAsc(
-                        BookingStatus.CANCELLING,
-                        cutoff
-                );
+        Instant now = Instant.now();
+        Instant cutoff = now.minus(Duration.ofMinutes(2));
+
+        var cancelling = bookingRepository.findCancellationRecoveryCandidates(
+                BookingStatus.CANCELLING,
+                cutoff,
+                now,
+                BookingSagaStateService.MAX_RECOVERY_ATTEMPTS,
+                PageRequest.of(0, 10)
+        );
 
         for (Booking booking : cancelling) {
             try {
