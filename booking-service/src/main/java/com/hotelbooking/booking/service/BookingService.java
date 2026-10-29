@@ -38,6 +38,7 @@ import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.web.client.RestClientException;
 import java.time.temporal.ChronoUnit;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class BookingService {
@@ -47,6 +48,8 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final BookingMapper bookingMapper;
 
+    private static final JsonMapper HOTEL_ERROR_MAPPER =
+            JsonMapper.builder().build();
     private static final Logger log =
             LoggerFactory.getLogger(BookingService.class);
 
@@ -235,9 +238,11 @@ public class BookingService {
                 return sagaStateService.confirm(pending.bookingId());
 
             } catch (RuntimeException error) {
+                String conflictCode = hotelConflictCode(error);
+
                 boolean roomConflict =
-                        error instanceof RestClientResponseException httpError
-                                && httpError.getStatusCode().value() == 409;
+                        "ROOM_OCCUPIED".equals(conflictCode)
+                                || "ROOM_UNAVAILABLE".equals(conflictCode);
 
                 if (request.autoSelect()
                         && roomConflict
@@ -362,7 +367,8 @@ public class BookingService {
             case ROOM_CONFLICT -> throw new RoomAlreadyBookedException(booking.roomId());
 
             case NO_AVAILABLE_ROOMS -> throw new NoAvailableRoomsException();
-
+            case ROOM_UNAVAILABLE ->
+                    throw new RoomUnavailableException(booking.roomId());
             case PROCESSING, RECOVERING -> throw new RequestInProgressException();
 
             case FAILED -> throw new BookingSagaUnavailableException(
@@ -378,9 +384,11 @@ public class BookingService {
             RuntimeException error,
             boolean autoSelect
     ) {
-        boolean roomConflict =
-                error instanceof RestClientResponseException httpError
-                        && httpError.getStatusCode().value() == 409;
+        String conflictCode = hotelConflictCode(error);
+
+        boolean occupied = "ROOM_OCCUPIED".equals(conflictCode);
+        boolean unavailable = "ROOM_UNAVAILABLE".equals(conflictCode);
+        boolean roomConflict = occupied || unavailable;
 
         try {
             hotelServiceClient.compensateRoom(
@@ -388,11 +396,14 @@ public class BookingService {
                     pending.reservationId()
             );
 
-            BookingCreationOutcome outcome = roomConflict
-                    ? (autoSelect
-                    ? BookingCreationOutcome.NO_AVAILABLE_ROOMS
-                    : BookingCreationOutcome.ROOM_CONFLICT)
-                    : BookingCreationOutcome.FAILED;
+            BookingCreationOutcome outcome =
+                    autoSelect && roomConflict
+                            ? BookingCreationOutcome.NO_AVAILABLE_ROOMS
+                            : occupied
+                            ? BookingCreationOutcome.ROOM_CONFLICT
+                            : unavailable
+                            ? BookingCreationOutcome.ROOM_UNAVAILABLE
+                            : BookingCreationOutcome.FAILED;
 
             sagaStateService.cancelCreation(
                     pending.bookingId(),
@@ -420,7 +431,11 @@ public class BookingService {
                 throw new NoAvailableRoomsException();
             }
 
-            throw new RoomAlreadyBookedException(pending.roomId());
+            if (occupied) {
+                throw new RoomAlreadyBookedException(pending.roomId());
+            }
+
+            throw new RoomUnavailableException(pending.roomId());
         }
 
         throw new BookingSagaUnavailableException(
@@ -440,5 +455,26 @@ public class BookingService {
                 pageable.getPageSize(),
                 Sort.by(Sort.Direction.DESC, "id")
         );
+    }
+    private String hotelConflictCode(RuntimeException error) {
+
+        if (!(error instanceof RestClientResponseException httpError)
+                || httpError.getStatusCode().value() != 409) {
+            return null;
+        }
+
+        try {
+            var json = HOTEL_ERROR_MAPPER.readTree(
+                    httpError.getResponseBodyAsString()
+            );
+
+            return json == null
+                    ? null
+                    : json.path("code").asText(null);
+
+        } catch (Exception ex) {
+            log.warn("Cannot parse Hotel Service conflict response", ex);
+            return null;
+        }
     }
 }

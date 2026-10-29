@@ -68,6 +68,9 @@ public class RoomReservationService {
             }
 
             throw new RoomReservationConflictException(
+                    previous.getStatus() == ReservationStatus.RELEASED
+                            ? "RESERVATION_RELEASED"
+                            : "RESERVATION_ID_CONFLICT",
                     "Reservation ID already used or released: " + reservationId
             );
         }
@@ -82,18 +85,21 @@ public class RoomReservationService {
         // НОВОЕ: проверяем вместимость номера
         if (room.getCapacity() < guestCount) {
             throw new RoomReservationConflictException(
+                    "ROOM_UNAVAILABLE",
                     "Room capacity is less than guestCount: " + roomId
             );
         }
 
         if (!room.isAvailable()) {
             throw new RoomReservationConflictException(
+                    "ROOM_UNAVAILABLE",
                     "Room is unavailable: " + roomId
             );
         }
 
         if (nightRepository.existsOccupiedNights(roomId, checkIn, checkOut)) {
             throw new RoomReservationConflictException(
+                    "ROOM_OCCUPIED",
                     "Room is already booked for selected dates: " + roomId
             );
         }
@@ -144,6 +150,7 @@ public class RoomReservationService {
 
         if (!reservation.getRoom().getId().equals(roomId)) {
             throw new RoomReservationConflictException(
+                    "RESERVATION_ID_CONFLICT",
                     "Reservation belongs to another room"
             );
         }

@@ -173,6 +173,7 @@ public class BookingSagaStateService {
             BookingCreationOutcome outcome
     ) {
         if (outcome != BookingCreationOutcome.ROOM_CONFLICT
+                && outcome != BookingCreationOutcome.ROOM_UNAVAILABLE
                 && outcome != BookingCreationOutcome.NO_AVAILABLE_ROOMS
                 && outcome != BookingCreationOutcome.FAILED) {
             throw new IllegalArgumentException("Invalid creation outcome");

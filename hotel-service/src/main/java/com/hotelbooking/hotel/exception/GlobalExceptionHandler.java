@@ -180,7 +180,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 Instant.now(),
                 409,
-                "ROOM_RESERVATION_CONFLICT",
+                ex.getCode(),
                 ex.getMessage(),
                 request.getRequestURI(),
                 null,
@@ -212,7 +212,7 @@ public class GlobalExceptionHandler {
                 new ErrorResponse(
                         Instant.now(),
                         status.value(),
-                        nightConflict ? "ROOM_RESERVATION_CONFLICT" : "DATA_INTEGRITY_ERROR",
+                        nightConflict ? "ROOM_OCCUPIED" : "DATA_INTEGRITY_ERROR",
                         nightConflict
                                 ? "Room is already booked for selected dates"
                                 : "Database integrity constraint violated",
