@@ -71,7 +71,7 @@ class BookingRecoveryRaceTest {
 
                     if (!allowRelease.await(10, TimeUnit.SECONDS)) {
                         throw new IllegalStateException(
-                                "Test timeout: release was not resumed"
+                                "Test timeout: compensation was not resumed"
                         );
                     }
 
@@ -85,7 +85,7 @@ class BookingRecoveryRaceTest {
 
             assertTrue(
                     releaseStarted.await(10, TimeUnit.SECONDS),
-                    "Recovery did not reach releaseRoom"
+                    "Recovery did not reach compensateRoom"
             );
 
             var recovering = bookings.findById(id).orElseThrow();
