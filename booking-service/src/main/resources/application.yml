@@ -50,3 +50,7 @@ app:
       path: ${SERVICE_JWT_KEYSTORE_PATH}
       password: ${SERVICE_JWT_KEYSTORE_PASSWORD}
       alias: service-jwt-signing
+  rate-limit:
+    # In-memory, per Booking Service instance; behind a trusted proxy prefer gateway-level IP limiting.
+    login-per-minute: 20
+    registration-per-hour: 5

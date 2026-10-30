@@ -18,6 +18,8 @@ public class LoginService {
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    // Same BCrypt work for unknown email as for wrong password.
+    private static final String DUMMY_PASSWORD_HASH = "$2a$12$As7ZNhOUfphTzrrNdISEpuLNRxDV8rdqgtXAF8WKN7kNzN6NaoOhC";
 
     public LoginService(
             AppUserRepository userRepository,
@@ -36,16 +38,10 @@ public class LoginService {
                 .trim()
                 .toLowerCase(Locale.ROOT);
 
-        AppUser user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new BadCredentialsException(
-                                "Invalid email or password"
-                        )
-                );
-
-        if (!passwordEncoder.matches(
-                request.password(),
-                user.getPasswordHash())) {
+        AppUser user = userRepository.findByEmail(email).orElse(null);
+        String hash = user == null ? DUMMY_PASSWORD_HASH : user.getPasswordHash();
+        boolean matches = passwordEncoder.matches(request.password(), hash);
+        if (user == null || !matches) {
 
             throw new BadCredentialsException(
                     "Invalid email or password"

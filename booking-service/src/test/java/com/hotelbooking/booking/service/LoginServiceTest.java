@@ -52,6 +52,7 @@ class LoginServiceTest {
         when(users.findByEmail("missing@example.com")).thenReturn(Optional.empty());
         assertThrows(BadCredentialsException.class,
                 () -> loginService.login(new LoginRequest("missing@example.com", "password")));
+        verify(passwordEncoder).matches(eq("password"), anyString());
         verifyNoInteractions(jwtService);
     }
 

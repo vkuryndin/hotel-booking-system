@@ -62,6 +62,22 @@ public class GlobalExceptionHandler {
 
     // ---- Existing business contracts: statuses and error codes are unchanged ----
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimit(
+            RateLimitExceededException ex, HttpServletRequest request) {
+        return rateLimited(ex, request);
+    }
+
+    private ResponseEntity<ErrorResponse> rateLimited(RateLimitExceededException ex, HttpServletRequest request) {
+        ResponseEntity<ErrorResponse> result = error(
+                HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage(), request);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(result.getBody());
+    }
+
+
+
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateEmail(
             EmailAlreadyRegisteredException ex, HttpServletRequest request
