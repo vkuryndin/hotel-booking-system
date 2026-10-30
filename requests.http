@@ -5180,3 +5180,150 @@ Authorization: Bearer {{adminToken}}
         client.assert(!!response.body.traceId);
     });
 %}
+
+
+### Stage 26 — BookingRequest validation via API Gateway
+### Prerequisites: start your four services, run existing ADMIN login to set adminToken.
+### Run S26-01..S26-09 in order. Hotel/room setup uses unique name for reruns.
+
+### S26-01 — create hotel, 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Stage26 Hotel {{$uuid}}",
+  "address": "Stage26 Test Street, Yerevan"
+}
+
+> {%
+    client.test("S26-01 hotel", () => client.assert(response.status === 201, "Got " + response.status));
+    if (response.status === 201) client.global.set("s26HotelId", response.body.id);
+%}
+
+### S26-02 — create room with capacity 20, 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s26HotelId}},
+  "number": "S26-101",
+  "category": "STANDARD",
+  "capacity": 20,
+  "pricePerNight": 100
+}
+
+> {%
+    client.test("S26-02 room", () => client.assert(response.status === 201, "Got " + response.status));
+    if (response.status === 201) client.global.set("s26RoomId", response.body.id);
+%}
+
+### S26-03 — guestCount 0 -> 400 VALIDATION_ERROR
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{"roomId":{{s26RoomId}},"checkIn":"2054-07-10","checkOut":"2054-07-12","guestCount":0}
+
+> {%
+    client.test("S26-03 count 0", () => {
+        client.assert(response.status === 400, "Got " + response.status);
+        client.assert(response.body.code === "VALIDATION_ERROR");
+        client.assert(!!response.body.fieldErrors.guestCount);
+    });
+%}
+
+### S26-04 — guestCount 21 -> 400 VALIDATION_ERROR
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{"roomId":{{s26RoomId}},"checkIn":"2054-07-10","checkOut":"2054-07-12","guestCount":21}
+
+> {%
+    client.test("S26-04 count 21", () => {
+        client.assert(response.status === 400, "Got " + response.status);
+        client.assert(response.body.code === "VALIDATION_ERROR");
+        client.assert(!!response.body.fieldErrors.guestCount);
+    });
+%}
+
+### S26-05 — past checkOut -> 400 VALIDATION_ERROR and fieldErrors.checkOut
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{"roomId":{{s26RoomId}},"checkIn":"2054-07-10","checkOut":"2025-01-10","guestCount":1}
+
+> {%
+    client.test("S26-05 past checkout", () => {
+        client.assert(response.status === 400, "Got " + response.status);
+        client.assert(response.body.code === "VALIDATION_ERROR");
+        client.assert(!!response.body.fieldErrors.checkOut);
+    });
+%}
+
+### S26-06 — missing checkOut -> 400 VALIDATION_ERROR
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{"roomId":{{s26RoomId}},"checkIn":"2054-07-10","guestCount":1}
+
+> {%
+    client.test("S26-06 missing checkout", () => {
+        client.assert(response.status === 400, "Got " + response.status);
+        client.assert(response.body.code === "VALIDATION_ERROR");
+        client.assert(!!response.body.fieldErrors.checkOut);
+    });
+%}
+
+### S26-07 — valid upper boundary guestCount=20 -> 201 CONFIRMED
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{"roomId":{{s26RoomId}},"checkIn":"2054-07-10","checkOut":"2054-07-12","guestCount":20}
+
+> {%
+    client.test("S26-07 count 20 accepted", () => {
+        client.assert(response.status === 201, "Got " + response.status);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+### S26-08 — omitted guestCount defaults to 1 -> 201 CONFIRMED, different dates
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{"roomId":{{s26RoomId}},"checkIn":"2054-07-15","checkOut":"2054-07-16"}
+
+> {%
+    client.test("S26-08 default count accepted", () => {
+        client.assert(response.status === 201, "Got " + response.status);
+        client.assert(response.body.status === "CONFIRMED");
+    });
+%}
+
+### S26-09 — existing max 365 nights still enforced -> 400 INVALID_ARGUMENT
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{"roomId":{{s26RoomId}},"checkIn":"2054-01-01","checkOut":"2055-02-01","guestCount":1}
+
+> {%
+    client.test("S26-09 max nights unchanged", () => {
+        client.assert(response.status === 400, "Got " + response.status);
+        client.assert(response.body.code === "INVALID_ARGUMENT", "Got " + response.body.code);
+    });
+%}

@@ -1,6 +1,8 @@
 package com.hotelbooking.booking.dto.request;
 
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -11,8 +13,8 @@ public record BookingRequest(
         Long hotelId,
         Boolean autoSelect,
         @NotNull @FutureOrPresent LocalDate checkIn,
-        @NotNull LocalDate checkOut,
-        @Positive Integer guestCount,
+        @NotNull @Future LocalDate checkOut,
+        @Positive @Max(20) Integer guestCount,
         RoomSelectionMode strategy
 )
 {
