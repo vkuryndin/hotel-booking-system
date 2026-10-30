@@ -17,6 +17,7 @@ import com.hotelbooking.booking.repository.BookingRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -321,16 +322,12 @@ public class BookingService {
 
         return sagaStateService.finishCancellation(bookingId);
     }
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional(readOnly = true)
     public Page<BookingResponse> getAllBookings(
-            boolean isAdmin,
             BookingStatus status,
             Pageable pageable
     ) {
-        if (!isAdmin) {
-            throw new AccessDeniedException("Admin access required");
-        }
-
         Pageable pageRequest = bookingPageable(pageable);
 
         Page<Booking> bookings = status == null

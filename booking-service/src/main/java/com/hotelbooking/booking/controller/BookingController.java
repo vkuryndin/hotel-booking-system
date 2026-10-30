@@ -7,6 +7,7 @@ import com.hotelbooking.booking.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
@@ -83,15 +84,12 @@ public class BookingController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Page<BookingResponse> getAllBookings(
-            @CurrentSecurityContext(expression = "authentication")
-            Authentication authentication,
             @RequestParam(required = false) BookingStatus status,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        return bookingService.getAllBookings(
-                isAdmin(authentication), status, pageable
-        );
+        return bookingService.getAllBookings(status, pageable);
     }
     private boolean isAdmin(Authentication authentication) {
         return authentication != null
