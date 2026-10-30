@@ -1,6 +1,7 @@
 package com.hotelbooking.hotel.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -47,7 +48,8 @@ public class Room {
     )
     private BigDecimal pricePerNight = BigDecimal.ZERO;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
+    @BatchSize(size = 100)
     @CollectionTable(
             name = "room_amenities",
             joinColumns = @JoinColumn(name = "room_id")

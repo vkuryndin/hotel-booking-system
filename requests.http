@@ -5003,3 +5003,91 @@ Authorization: Bearer {{adminToken}}
         client.assert(response.body.length === 1);
     });
 %}
+### S19-01 — create hotel with unique label
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Stage19 Hotel SQL 20261029",
+  "address": "Stage19 Address SQL 20261029"
+}
+
+> {%
+    client.test("S19-01: hotel 201", () => client.assert(response.status === 201));
+    client.global.set("s19HotelId", response.body.id);
+%}
+
+### S19-02 — add hotel amenities
+PATCH {{baseUrl}}/api/hotels/{{s19HotelId}}/presentation
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "amenities": ["WIFI", "PARKING"]
+}
+
+> {%
+    client.test("S19-02: hotel amenities", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.amenities.includes("WIFI"));
+        client.assert(response.body.amenities.includes("PARKING"));
+    });
+%}
+
+### S19-03 — create room with amenities
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s19HotelId}},
+  "number": "S19-R101",
+  "category": "STANDARD",
+  "capacity": 2,
+  "pricePerNight": 100.00,
+  "amenities": ["WIFI", "TV"]
+}
+
+> {%
+    client.test("S19-03: room 201", () => client.assert(response.status === 201));
+    client.global.set("s19RoomId", response.body.id);
+%}
+
+### S19-04 — paginated hotel listing preserves amenities
+GET {{baseUrl}}/api/hotels?name=Stage19%20Hotel%20SQL%2020261029&page=0&size=20
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S19-04: hotel page with amenities", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.content.length === 1);
+        client.assert(response.body.content[0].amenities.includes("WIFI"));
+        client.assert(response.body.content[0].amenities.includes("PARKING"));
+    });
+%}
+
+### S19-05 — paginated room listing preserves amenities
+GET {{baseUrl}}/api/rooms?hotelId={{s19HotelId}}&page=0&size=20
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S19-05: room page with amenities", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.content.some(r =>
+            r.id === Number(client.global.get("s19RoomId")) &&
+            r.amenities.includes("WIFI") && r.amenities.includes("TV")
+        ));
+    });
+%}
+
+### S19-06 — individual room still exposes amenities
+GET {{baseUrl}}/api/rooms/{{s19RoomId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S19-06: room details with amenities", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.amenities.includes("WIFI"));
+    });
+%}

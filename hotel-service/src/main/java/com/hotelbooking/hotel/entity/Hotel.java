@@ -1,6 +1,7 @@
 package com.hotelbooking.hotel.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.LinkedHashSet;
@@ -54,7 +55,8 @@ public class Hotel {
     @Column(name = "check_out_time", nullable = false)
     private LocalTime checkOutTime = LocalTime.of(12, 0);
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
+    @BatchSize(size = 100)
     @CollectionTable(
             name = "hotel_amenities",
             joinColumns = @JoinColumn(name = "hotel_id")
