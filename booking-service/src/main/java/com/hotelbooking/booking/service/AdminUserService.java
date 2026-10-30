@@ -6,11 +6,11 @@ import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.repository.AppUserRepository;
 
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.booking.exception.UserOperationException;
 import com.hotelbooking.booking.repository.BookingRepository;
 
 import java.nio.charset.StandardCharsets;
@@ -53,15 +53,15 @@ public class AdminUserService {
         }
 
         if (userRepository.existsByEmail(email)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new UserOperationException(
+                    UserOperationException.Reason.CONFLICT,
                     "User already exists"
             );
         }
 
         if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new UserOperationException(
+                    UserOperationException.Reason.INVALID_INPUT,
                     "Password exceeds 72 UTF-8 bytes"
             );
         }
@@ -80,8 +80,8 @@ public class AdminUserService {
         try {
             user = userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new UserOperationException(
+                    UserOperationException.Reason.CONFLICT,
                     "User already exists",
                     ex
             );
@@ -102,22 +102,22 @@ public class AdminUserService {
                 userRepository.lockUsersByRole(Role.ADMIN);
 
         AppUser user = userRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
+                .orElseThrow(() -> new UserOperationException(
+                        UserOperationException.Reason.USER_NOT_FOUND,
                         "User not found: " + id
                 ));
 
         if (user.getRole() == Role.ADMIN
                 && lockedAdmins.size() <= 1) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new UserOperationException(
+                    UserOperationException.Reason.CONFLICT,
                     "Cannot delete the last administrator"
             );
         }
 
         if (bookingRepository.existsByUserId(id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new UserOperationException(
+                    UserOperationException.Reason.CONFLICT,
                     "Cannot delete user with booking history"
             );
         }

@@ -18,8 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+
+import com.hotelbooking.booking.exception.UserOperationException;
 @Service
 public class RegistrationService {
 
@@ -81,8 +81,8 @@ public class RegistrationService {
         try {
             savedUser = userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new UserOperationException(
+                    UserOperationException.Reason.CONFLICT,
                     "Email or username already exists",
                     ex
             );

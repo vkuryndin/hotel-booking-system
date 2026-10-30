@@ -101,6 +101,13 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.BAD_REQUEST, "MISSING_PART", "Required multipart part is missing", request, Map.of());
     }
 
+    @ExceptionHandler(PhotoNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePhotoNotFound(
+            PhotoNotFoundException ex, HttpServletRequest request
+    ) {
+        return buildError(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(
             Exception ex,

@@ -6,8 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import jakarta.persistence.OptimisticLockException;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -263,6 +261,25 @@ public class GlobalExceptionHandler {
 
     // Some existing user/admin services throw ResponseStatusException.
     // Preserve their HTTP statuses; do not accidentally turn them into 500.
+    @ExceptionHandler(UserOperationException.class)
+    public ResponseEntity<ErrorResponse> handleUserOperation(
+            UserOperationException ex, HttpServletRequest request
+    ) {
+        HttpStatus status = switch (ex.reason()) {
+            case INVALID_INPUT -> HttpStatus.BAD_REQUEST;
+            case USER_NOT_AUTHENTICATED -> HttpStatus.UNAUTHORIZED;
+            case USER_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+        };
+        String code = switch (ex.reason()) {
+            case INVALID_INPUT -> "BAD_REQUEST";
+            case USER_NOT_AUTHENTICATED -> "UNAUTHORIZED";
+            case USER_NOT_FOUND -> "RESOURCE_NOT_FOUND";
+            case CONFLICT -> "CONFLICT";
+        };
+        return error(status, code, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatus(
             ResponseStatusException ex, HttpServletRequest request
@@ -274,20 +291,12 @@ public class GlobalExceptionHandler {
             case 403 -> "ACCESS_DENIED";
             case 404 -> "RESOURCE_NOT_FOUND";
             case 409 -> "CONFLICT";
+            case 429 -> "TOO_MANY_REQUESTS";
             default -> "HTTP_ERROR";
         };
         String message = ex.getReason() == null || ex.getReason().isBlank()
                 ? "Request failed" : ex.getReason();
         return buildError(status, code, message, request, Map.of());
-    }
-
-    // Stale writes must not overwrite an administrator's role or token revocation.
-    @ExceptionHandler({ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})
-    public ResponseEntity<ErrorResponse> handleOptimisticLockConflict(
-            Exception ex, HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION",
-                "User was modified concurrently; reload and retry", request);
     }
 
     @ExceptionHandler(Exception.class)

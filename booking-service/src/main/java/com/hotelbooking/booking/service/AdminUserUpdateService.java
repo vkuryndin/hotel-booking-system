@@ -7,11 +7,11 @@ import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.repository.AppUserRepository;
 
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.booking.exception.UserOperationException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -51,8 +51,8 @@ public class AdminUserUpdateService {
                 && request.phone() == null
                 && request.firstName() == null
                 && request.lastName() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new UserOperationException(
+                    UserOperationException.Reason.INVALID_INPUT,
                     "No fields to update"
             );
         }
@@ -64,16 +64,16 @@ public class AdminUserUpdateService {
                     .toLowerCase(Locale.ROOT);
 
             if (email.isBlank()) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
+                throw new UserOperationException(
+                        UserOperationException.Reason.INVALID_INPUT,
                         "Email must not be blank"
                 );
             }
 
             if (!email.equals(user.getEmail())
                     && userRepository.existsByEmail(email)) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
+                throw new UserOperationException(
+                        UserOperationException.Reason.CONFLICT,
                         "Email already exists"
                 );
             }
@@ -93,8 +93,8 @@ public class AdminUserUpdateService {
                 }
 
                 if (lockedAdmins.size() <= 1) {
-                    throw new ResponseStatusException(
-                            HttpStatus.CONFLICT,
+                    throw new UserOperationException(
+                            UserOperationException.Reason.CONFLICT,
                             "Cannot demote the last administrator"
                     );
                 }
@@ -134,9 +134,9 @@ public class AdminUserUpdateService {
         try {
             userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException ex) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Email already exists",
+            throw new UserOperationException(
+                    UserOperationException.Reason.CONFLICT,
+                    "Email or username already exists",
                     ex
             );
         }
@@ -153,8 +153,8 @@ public class AdminUserUpdateService {
 
         if (request.newPassword()
                 .getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new UserOperationException(
+                    UserOperationException.Reason.INVALID_INPUT,
                     "Password exceeds 72 UTF-8 bytes"
             );
         }
@@ -171,8 +171,8 @@ public class AdminUserUpdateService {
 
     private AppUser findUser(Long id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
+                .orElseThrow(() -> new UserOperationException(
+                        UserOperationException.Reason.USER_NOT_FOUND,
                         "User not found: " + id
                 ));
     }

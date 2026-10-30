@@ -3,6 +3,7 @@ package com.hotelbooking.booking.service;
 import com.hotelbooking.booking.dto.request.BookingRequest;
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.entity.Role;
+import com.hotelbooking.booking.exception.UserOperationException;
 import com.hotelbooking.booking.mapper.BookingMapper;
 import com.hotelbooking.booking.repository.AppUserRepository;
 import com.hotelbooking.booking.repository.BookingRepository;
@@ -39,7 +40,8 @@ class R4UserBookingLockUnitTest {
         when(users.findByIdForUpdate(9L)).thenReturn(Optional.of(target));
         when(bookings.existsByUserId(9L)).thenReturn(true);
         var service = new AdminUserService(users, mock(PasswordEncoder.class), bookings);
-        assertThrows(ResponseStatusException.class, () -> service.deleteUser(9L, 1L));
+        var failure = assertThrows(UserOperationException.class, () -> service.deleteUser(9L, 1L));
+        assertEquals(UserOperationException.Reason.CONFLICT, failure.reason());
         var order = inOrder(users, bookings);
         order.verify(users).findByIdForUpdate(9L);
         order.verify(bookings).existsByUserId(9L);

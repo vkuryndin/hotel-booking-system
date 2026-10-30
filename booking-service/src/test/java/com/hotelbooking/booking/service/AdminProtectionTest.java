@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.booking.exception.UserOperationException;
 
 import java.util.List;
 import java.util.Optional;
@@ -45,8 +45,8 @@ class AdminProtectionTest {
     }
 
     private static void conflict(Runnable operation) {
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class, operation::run);
-        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        UserOperationException ex = assertThrows(UserOperationException.class, operation::run);
+        assertEquals(UserOperationException.Reason.CONFLICT, ex.reason());
     }
 
     @Test void adminCannotDemoteSelfEvenWithMultipleAdmins() {

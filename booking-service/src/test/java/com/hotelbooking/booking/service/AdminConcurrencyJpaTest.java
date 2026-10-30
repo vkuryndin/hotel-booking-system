@@ -12,7 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.booking.exception.UserOperationException;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -45,8 +45,8 @@ class AdminConcurrencyJpaTest {
             try {
                 update.updateUser(secondId, demote, firstId);
                 return true;
-            } catch (ResponseStatusException ex) {
-                assertEquals(409, ex.getStatusCode().value());
+            } catch (UserOperationException ex) {
+                assertEquals(UserOperationException.Reason.CONFLICT, ex.reason());
                 return false;
             }
         };
@@ -55,8 +55,8 @@ class AdminConcurrencyJpaTest {
             try {
                 update.updateUser(firstId, demote, secondId);
                 return true;
-            } catch (ResponseStatusException ex) {
-                assertEquals(409, ex.getStatusCode().value());
+            } catch (UserOperationException ex) {
+                assertEquals(UserOperationException.Reason.CONFLICT, ex.reason());
                 return false;
             }
         };

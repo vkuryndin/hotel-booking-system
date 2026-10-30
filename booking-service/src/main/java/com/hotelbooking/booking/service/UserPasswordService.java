@@ -4,11 +4,11 @@ import com.hotelbooking.booking.dto.request.ChangePasswordRequest;
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.repository.AppUserRepository;
 
-import org.springframework.http.HttpStatus;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.booking.exception.UserOperationException;
 
 import java.nio.charset.StandardCharsets;
 
@@ -32,8 +32,8 @@ public class UserPasswordService {
             ChangePasswordRequest request
     ) {
         AppUser user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
+                .orElseThrow(() -> new UserOperationException(
+                        UserOperationException.Reason.USER_NOT_AUTHENTICATED,
                         "User not found"
                 ));
 
@@ -41,8 +41,8 @@ public class UserPasswordService {
                 request.currentPassword(),
                 user.getPasswordHash()
         )) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new UserOperationException(
+                    UserOperationException.Reason.INVALID_INPUT,
                     "Current password is incorrect"
             );
         }
@@ -51,16 +51,16 @@ public class UserPasswordService {
                 request.newPassword(),
                 user.getPasswordHash()
         )) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new UserOperationException(
+                    UserOperationException.Reason.INVALID_INPUT,
                     "New password must differ from current password"
             );
         }
 
         if (request.newPassword()
                 .getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new UserOperationException(
+                    UserOperationException.Reason.INVALID_INPUT,
                     "Password exceeds 72 UTF-8 bytes"
             );
         }

@@ -8,10 +8,10 @@ import com.hotelbooking.booking.mapper.AppUserMapper;
 import com.hotelbooking.booking.repository.AppUserRepository;
 
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.booking.exception.UserOperationException;
 
 import java.util.Locale;
 
@@ -82,8 +82,8 @@ public class UserProfileService {
 
     private AppUser findUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
+                .orElseThrow(() -> new UserOperationException(
+                        UserOperationException.Reason.USER_NOT_AUTHENTICATED,
                         "User not found"
                 ));
     }

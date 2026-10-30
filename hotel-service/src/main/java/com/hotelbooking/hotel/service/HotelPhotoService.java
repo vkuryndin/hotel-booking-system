@@ -12,14 +12,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.hotel.exception.PhotoNotFoundException;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -184,8 +184,7 @@ public class HotelPhotoService {
         }
 
         if (!Files.isRegularFile(file)) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
+            throw new PhotoNotFoundException(
                     "Photo file not found"
             );
         }
@@ -378,8 +377,7 @@ public class HotelPhotoService {
                                 .equals(hotelId)
                 )
                 .orElseThrow(
-                        () -> new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
+                        () -> new PhotoNotFoundException(
                                 "Photo not found"
                         )
                 );

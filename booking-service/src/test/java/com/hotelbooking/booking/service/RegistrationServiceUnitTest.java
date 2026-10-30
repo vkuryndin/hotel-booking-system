@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
+import com.hotelbooking.booking.exception.UserOperationException;
 import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -25,5 +25,5 @@ class RegistrationServiceUnitTest {
  @Test void rejectsExistingUsernameBeforeEncoding(){when(repo.existsByUsername("testuser")).thenReturn(true);assertThrows(UsernameAlreadyRegisteredException.class,()->service.register(request()));verifyNoInteractions(encoder);verify(repo,never()).saveAndFlush(any());}
  @Test void rejectsExistingEmailBeforeEncoding(){when(repo.existsByEmail("user@example.com")).thenReturn(true);assertThrows(EmailAlreadyRegisteredException.class,()->service.register(request()));verifyNoInteractions(encoder);}
  @Test void rejectsMoreThan72Utf8Bytes(){String pw="é".repeat(37);var req=new RegisterRequest("x@example.com",pw,"testuser",null,"A","B");assertThrows(IllegalArgumentException.class,()->service.register(req));verifyNoInteractions(encoder);}
- @Test void convertsUniqueConstraintRaceIntoConflict(){when(encoder.encode(anyString())).thenReturn("hash");when(repo.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("unique"));ResponseStatusException e=assertThrows(ResponseStatusException.class,()->service.register(request()));assertEquals(HttpStatus.CONFLICT,e.getStatusCode());}
+ @Test void convertsUniqueConstraintRaceIntoConflict(){when(encoder.encode(anyString())).thenReturn("hash");when(repo.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("unique"));UserOperationException e=assertThrows(UserOperationException.class,()->service.register(request()));assertEquals(UserOperationException.Reason.CONFLICT,e.reason());}
 }
