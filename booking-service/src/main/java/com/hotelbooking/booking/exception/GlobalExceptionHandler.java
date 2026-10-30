@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import jakarta.persistence.OptimisticLockException;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -277,6 +279,15 @@ public class GlobalExceptionHandler {
         String message = ex.getReason() == null || ex.getReason().isBlank()
                 ? "Request failed" : ex.getReason();
         return buildError(status, code, message, request, Map.of());
+    }
+
+    // Stale writes must not overwrite an administrator's role or token revocation.
+    @ExceptionHandler({ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})
+    public ResponseEntity<ErrorResponse> handleOptimisticLockConflict(
+            Exception ex, HttpServletRequest request
+    ) {
+        return error(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION",
+                "User was modified concurrently; reload and retry", request);
     }
 
     @ExceptionHandler(Exception.class)

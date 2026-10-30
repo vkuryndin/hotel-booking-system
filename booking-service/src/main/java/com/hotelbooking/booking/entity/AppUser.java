@@ -36,6 +36,10 @@ public class AppUser {
     @Column(name = "password_change_required", nullable = false)
     private boolean passwordChangeRequired = false;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
     @Column(name = "token_version", nullable = false)
     private long tokenVersion = 0;
 
