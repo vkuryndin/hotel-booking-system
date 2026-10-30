@@ -3,6 +3,7 @@ package com.hotelbooking.booking.e2e;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * JWT authorization, Eureka and Hotel Service. No mocks.
  * The four applications must already be running.
  */
+@EnabledIfSystemProperty(named = "hotel.e2e", matches = "true")
 class HotelBookingSmokeE2ETest {
 
     private static final String BASE_URL = "http://localhost:8080";
