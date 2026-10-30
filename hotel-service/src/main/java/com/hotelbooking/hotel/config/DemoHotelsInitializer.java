@@ -140,7 +140,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                     photos.save(new HotelPhoto(
                             hotel,
                             photoSeed.fileName(),
-                            "image/jpeg",
+                            photoContentType(photoSeed.fileName()),
                             makePrimary,
                             sortOrder++
                     ));
@@ -151,6 +151,17 @@ public class DemoHotelsInitializer implements ApplicationRunner {
         }
 
         log.info("Demo initialized: 3 hotels and 9 rooms");
+    }
+
+    static String photoContentType(String fileName) {
+        String lower = fileName.toLowerCase(java.util.Locale.ROOT);
+        if (lower.endsWith(".png")) {
+            return "image/png";
+        }
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+            return "image/jpeg";
+        }
+        throw new IllegalArgumentException("Unsupported demo photo extension: " + fileName);
     }
 
     private static List<HotelSeed> demoHotels() {

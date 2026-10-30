@@ -10,7 +10,7 @@ import com.hotelbooking.hotel.repository.HotelRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
 import org.springframework.stereotype.Service;
@@ -183,13 +183,15 @@ public class HotelPhotoService {
             );
         }
 
-        if (!Files.isRegularFile(file)) {
-            throw new PhotoNotFoundException(
-                    "Photo file not found"
-            );
+        // Materialize the small (max 5 MB) photo before returning the resource.
+        // Streaming a filesystem resource would race with deletion after transaction end.
+        try {
+            return new ByteArrayResource(Files.readAllBytes(file));
+        } catch (java.nio.file.NoSuchFileException ex) {
+            throw new PhotoNotFoundException("Photo file not found");
+        } catch (IOException ex) {
+            throw new IllegalStateException("Cannot read photo file", ex);
         }
-
-        return new FileSystemResource(file);
     }
 
     @Transactional(readOnly = true)
