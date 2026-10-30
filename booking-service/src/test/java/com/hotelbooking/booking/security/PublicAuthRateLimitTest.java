@@ -45,6 +45,31 @@ class PublicAuthRateLimitTest {
         r.addHeader("X-Forwarded-For", "5.6.7.8");
         assertThrows(RateLimitExceededException.class, () -> check(r));
     }
+    @Test void trustedGatewaySeparatesClientAddresses() {
+        var trusted = new PublicAuthRateLimitInterceptor(limiter, 2, 1, "test-secret");
+        var first = request("/api/users/register", "127.0.0.1", "POST");
+        first.addHeader("X-Gateway-Internal-Secret", "test-secret");
+        first.addHeader("X-Verified-Client-IP", "10.20.30.1");
+        var second = request("/api/users/register", "127.0.0.1", "POST");
+        second.addHeader("X-Gateway-Internal-Secret", "test-secret");
+        second.addHeader("X-Verified-Client-IP", "10.20.30.2");
+        trusted.preHandle(first, new MockHttpServletResponse(), new Object());
+        trusted.preHandle(second, new MockHttpServletResponse(), new Object());
+        assertThrows(RateLimitExceededException.class,
+                () -> trusted.preHandle(first, new MockHttpServletResponse(), new Object()));
+    }
+    @Test void untrustedClientCannotSpoofVerifiedHeader() {
+        var trusted = new PublicAuthRateLimitInterceptor(limiter, 2, 1, "test-secret");
+        var first = request("/api/users/register", "10.10.10.1", "POST");
+        first.addHeader("X-Gateway-Internal-Secret", "wrong");
+        first.addHeader("X-Verified-Client-IP", "10.20.30.1");
+        var second = request("/api/users/register", "10.10.10.1", "POST");
+        second.addHeader("X-Gateway-Internal-Secret", "wrong");
+        second.addHeader("X-Verified-Client-IP", "10.20.30.2");
+        trusted.preHandle(first, new MockHttpServletResponse(), new Object());
+        assertThrows(RateLimitExceededException.class,
+                () -> trusted.preHandle(second, new MockHttpServletResponse(), new Object()));
+    }
     @Test void otherMethodsAndRoutesRemainUnaffected() {
         for (int i=0; i<10; i++) {
             check(request("/api/users/login", "10.0.0.1", "GET"));

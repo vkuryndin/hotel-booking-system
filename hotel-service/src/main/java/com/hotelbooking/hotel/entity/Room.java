@@ -27,6 +27,19 @@ public class Room {
     @Column(nullable = false, length = 20)
     private String number;
 
+    // Immutable identity for automatically seeded demo rooms; null for ordinary rooms.
+    @Column(name = "demo_seed_key", length = 100, unique = true)
+    private String demoSeedKey;
+
+    public String getDemoSeedKey() { return demoSeedKey; }
+
+    public void assignDemoSeedKey(String key) {
+        if (key == null || key.isBlank()) throw new IllegalArgumentException("Invalid demo seed key");
+        if (demoSeedKey != null && !demoSeedKey.equals(key))
+            throw new IllegalStateException("Demo seed key cannot be changed");
+        demoSeedKey = key;
+    }
+
     @Column(nullable = false)
     private boolean available = true;
 

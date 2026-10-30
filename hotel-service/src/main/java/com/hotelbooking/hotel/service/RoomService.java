@@ -42,30 +42,30 @@ import java.util.Locale;
 public class RoomService {
 
     private final RoomRepository roomRepository;
-    private final RoomPhotoService roomPhotoService;
     private final HotelRepository hotelRepository;
     private final RoomMapper roomMapper;
     private final RoomReservationRepository reservationRepository;
     private final RoomSelectionStrategy selectionStrategy;
     private final MostExpensiveStrategy mostExpensiveStrategy;
+    private final RoomPhotoService roomPhotoService;
 
     public RoomService(
             RoomRepository roomRepository,
-            RoomPhotoService roomPhotoService,
             HotelRepository hotelRepository,
             RoomMapper roomMapper,
             RoomReservationRepository reservationRepository,
             @Qualifier("leastBookedStrategy")
             RoomSelectionStrategy selectionStrategy,
-            MostExpensiveStrategy mostExpensiveStrategy
+            MostExpensiveStrategy mostExpensiveStrategy,
+            RoomPhotoService roomPhotoService
     ) {
         this.roomRepository = roomRepository;
-        this.roomPhotoService = roomPhotoService;
         this.hotelRepository = hotelRepository;
         this.roomMapper = roomMapper;
         this.reservationRepository = reservationRepository;
         this.selectionStrategy = selectionStrategy;
         this.mostExpensiveStrategy = mostExpensiveStrategy;
+        this.roomPhotoService = roomPhotoService;
     }
 
     @Transactional
@@ -349,9 +349,8 @@ public class RoomService {
             );
         }
 
-        if (!hotelRepository.existsById(hotelId)) {
-            throw new HotelNotFoundException(hotelId);
-        }
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new HotelNotFoundException(hotelId));
 
         List<Room> available = roomRepository
                 .findAvailableForPeriod(hotelId, checkIn, checkOut)
@@ -360,7 +359,7 @@ public class RoomService {
                 .toList();
 
         RoomSelectionMode mode = strategy == null
-                ? RoomSelectionMode.LEAST_BOOKED
+                ? hotel.getRoomSelectionStrategy()
                 : strategy;
 
         List<Room> ranked = mode == RoomSelectionMode.MOST_EXPENSIVE

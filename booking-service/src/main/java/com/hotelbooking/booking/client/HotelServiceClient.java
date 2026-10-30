@@ -187,7 +187,7 @@ public class HotelServiceClient {
                                 .queryParam("hotelId", hotelId)
                                 .queryParam("checkIn", checkIn)
                                 .queryParam("checkOut", checkOut)
-                                .queryParam("strategy", strategy.name())
+                                .queryParamIfPresent("strategy", java.util.Optional.ofNullable(strategy))
                                 .queryParam("guestCount", guestCount)
                                 .build())
                         .headers(headers -> headers.setBearerAuth(

@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import com.hotelbooking.hotel.entity.HotelAmenity;
 import java.math.BigDecimal;
+import com.hotelbooking.hotel.strategy.RoomSelectionMode;
 @RestController
 @RequestMapping("/api/hotels")
 public class HotelController {
@@ -75,6 +76,20 @@ public class HotelController {
         return ResponseEntity.ok(
                 hotelService.updateHotel(id, request)
         );
+    }
+
+    @GetMapping("/{id}/room-selection-strategy")
+    public ResponseEntity<RoomSelectionMode> getRoomSelectionStrategy(@PathVariable Long id) {
+        return ResponseEntity.ok(hotelService.getRoomSelectionStrategy(id));
+    }
+
+    @PutMapping("/{id}/room-selection-strategy")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoomSelectionMode> updateRoomSelectionStrategy(
+            @PathVariable Long id,
+            @Valid @RequestBody com.hotelbooking.hotel.dto.request.RoomSelectionStrategyRequest request
+    ) {
+        return ResponseEntity.ok(hotelService.updateRoomSelectionStrategy(id, request.strategy()));
     }
 
     @DeleteMapping("/{id}")

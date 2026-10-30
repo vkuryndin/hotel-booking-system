@@ -40,4 +40,20 @@ class GatewaySecretFilterTest {
         filter.filter(exchange, chain).block();
         assertEquals("trusted-secret", forwarded.get());
     }
+    @Test
+    void forgedVerifiedIpIsRemovedAndActualPeerIsUsed() {
+        var filter = new GatewaySecretFilter("trusted-secret");
+        var exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/users/login")
+                        .remoteAddress(new java.net.InetSocketAddress("10.0.0.17", 1234))
+                        .header("X-Verified-Client-IP", "192.0.2.123")
+                        .build());
+        var forwarded = new AtomicReference<String>();
+        GatewayFilterChain chain = current -> {
+            forwarded.set(current.getRequest().getHeaders().getFirst("X-Verified-Client-IP"));
+            return Mono.empty();
+        };
+        filter.filter(exchange, chain).block();
+        assertEquals("10.0.0.17", forwarded.get());
+    }
 }

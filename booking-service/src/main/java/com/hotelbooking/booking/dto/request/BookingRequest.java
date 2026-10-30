@@ -21,9 +21,6 @@ public record BookingRequest(
     public BookingRequest {
         autoSelect = Boolean.TRUE.equals(autoSelect);
         guestCount = guestCount == null ? 1 : guestCount;
-        strategy = strategy == null
-                ? RoomSelectionMode.LEAST_BOOKED
-                : strategy;
     }
     public String fingerprint() {
         if (Boolean.TRUE.equals(autoSelect)) {
@@ -32,7 +29,7 @@ public record BookingRequest(
                     + checkIn + ":"
                     + checkOut + ":"
                     + guestCount + ":"
-                    + strategy;
+                    + (strategy == null ? "HOTEL_DEFAULT" : strategy.name());
         }
 
         return "ROOM:"

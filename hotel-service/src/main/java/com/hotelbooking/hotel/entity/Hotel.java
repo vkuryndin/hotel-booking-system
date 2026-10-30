@@ -1,6 +1,7 @@
 package com.hotelbooking.hotel.entity;
 
 import jakarta.persistence.*;
+import com.hotelbooking.hotel.strategy.RoomSelectionMode;
 import org.hibernate.annotations.BatchSize;
 import java.math.BigDecimal;
 import java.time.LocalTime;
@@ -68,6 +69,18 @@ public class Hotel {
     @Enumerated(EnumType.STRING)
     @Column(name = "amenity", nullable = false, length = 40)
     private Set<HotelAmenity> amenities = new LinkedHashSet<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_selection_strategy", nullable = false, length = 32)
+    private RoomSelectionMode roomSelectionStrategy = RoomSelectionMode.LEAST_BOOKED;
+
+    public RoomSelectionMode getRoomSelectionStrategy() {
+        return roomSelectionStrategy;
+    }
+
+    public void changeRoomSelectionStrategy(RoomSelectionMode strategy) {
+        this.roomSelectionStrategy = java.util.Objects.requireNonNull(strategy, "strategy");
+    }
 
     protected Hotel() {
     }

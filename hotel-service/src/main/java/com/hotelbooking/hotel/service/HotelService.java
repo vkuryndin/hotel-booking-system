@@ -3,6 +3,7 @@ package com.hotelbooking.hotel.service;
 import com.hotelbooking.hotel.dto.request.HotelRequest;
 import com.hotelbooking.hotel.dto.response.HotelResponse;
 import com.hotelbooking.hotel.entity.Hotel;
+import com.hotelbooking.hotel.strategy.RoomSelectionMode;
 import com.hotelbooking.hotel.exception.HotelAlreadyExistsException;
 import com.hotelbooking.hotel.mapper.HotelMapper;
 import com.hotelbooking.hotel.repository.HotelRepository;
@@ -54,6 +55,21 @@ public class HotelService {
         this.roomRepository = roomRepository;
         this.hotelMapper = hotelMapper;
         this.hotelPhotoService = hotelPhotoService;
+    }
+
+    @Transactional(readOnly = true)
+    public RoomSelectionMode getRoomSelectionStrategy(Long hotelId) {
+        return hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new HotelNotFoundException(hotelId))
+                .getRoomSelectionStrategy();
+    }
+
+    @Transactional
+    public RoomSelectionMode updateRoomSelectionStrategy(Long hotelId, RoomSelectionMode strategy) {
+        Hotel hotel = hotelRepository.findByIdForUpdate(hotelId)
+                .orElseThrow(() -> new HotelNotFoundException(hotelId));
+        hotel.changeRoomSelectionStrategy(strategy);
+        return hotel.getRoomSelectionStrategy();
     }
 
     @Transactional

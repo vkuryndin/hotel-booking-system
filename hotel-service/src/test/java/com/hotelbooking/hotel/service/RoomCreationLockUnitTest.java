@@ -26,16 +26,18 @@ class RoomCreationLockUnitTest {
     private HotelRepository hotels;
     private RoomMapper mapper;
     private RoomService service;
+    private RoomPhotoService photos;
 
     @BeforeEach
     void setUp() {
         rooms = mock(RoomRepository.class);
         hotels = mock(HotelRepository.class);
         mapper = mock(RoomMapper.class);
-        service = new RoomService(rooms, mock(RoomPhotoService.class), hotels, mapper,
+        photos = mock(RoomPhotoService.class);
+        service = new RoomService(rooms, hotels, mapper,
                 mock(RoomReservationRepository.class),
                 mock(RoomSelectionStrategy.class),
-                mock(MostExpensiveStrategy.class));
+                mock(MostExpensiveStrategy.class), photos);
     }
 
     @Test
@@ -72,6 +74,20 @@ class RoomCreationLockUnitTest {
 
         assertThrows(RoomAlreadyExistsException.class, () -> service.createRoom(request()));
         verify(hotels).findByIdForUpdate(17L);
+    }
+
+    @Test
+    void deletingRoomWithPhotosRemovesMetadataBeforeRoomDeletion() {
+        var reservations = mock(RoomReservationRepository.class);
+        var local = new RoomService(rooms, hotels, mapper, reservations,
+                mock(RoomSelectionStrategy.class), mock(MostExpensiveStrategy.class), photos);
+        when(rooms.findByIdForUpdate(9L)).thenReturn(Optional.of(new Room(new Hotel("Example", "Street"), "101")));
+        when(reservations.existsByRoom_Id(9L)).thenReturn(false);
+        local.deleteRoom(9L);
+        var order = inOrder(photos, rooms);
+        order.verify(photos).removeAllForRoomDeletion(9L);
+        order.verify(rooms).delete(any(Room.class));
+        order.verify(rooms).flush();
     }
 
     private RoomRequest request() {

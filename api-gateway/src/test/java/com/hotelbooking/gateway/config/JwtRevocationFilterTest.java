@@ -141,4 +141,33 @@ class JwtRevocationFilterTest {
         assertEquals(1, result.forwarded());
         assertEquals(1, result.authChecks());
     }
+    @Test
+    void simultaneousRequestsWithSameTokenShareStatusCall() {
+        var checks = new AtomicInteger();
+        var sharedResponse = reactor.core.publisher.Sinks.<ClientResponse>one();
+        WebClient.Builder builder = WebClient.builder().exchangeFunction(request -> {
+            checks.incrementAndGet();
+            return sharedResponse.asMono();
+        });
+        var filter = new JwtRevocationFilter(builder, SECRET);
+        Jwt jwt = Jwt.withTokenValue("shared-token")
+                .header("alg", "RS256").subject("42").claim("role", "USER").build();
+        var request = MockServerHttpRequest.get("/api/hotels").build();
+        var first = MockServerWebExchange.builder(request)
+                .principal(new JwtAuthenticationToken(jwt)).build();
+        var second = MockServerWebExchange.builder(request)
+                .principal(new JwtAuthenticationToken(jwt)).build();
+        var forwarded = new AtomicInteger();
+        GatewayFilterChain chain = current -> {
+            forwarded.incrementAndGet();
+            return Mono.empty();
+        };
+        var both = Mono.when(filter.filter(first, chain), filter.filter(second, chain));
+        var running = both.subscribe();
+        assertEquals(1, checks.get());
+        sharedResponse.tryEmitValue(ClientResponse.create(HttpStatus.NO_CONTENT).build());
+        assertEquals(2, forwarded.get());
+        running.dispose();
+    }
+
 }

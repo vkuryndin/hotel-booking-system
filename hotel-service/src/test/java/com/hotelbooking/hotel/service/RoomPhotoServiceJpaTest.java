@@ -33,12 +33,14 @@ class RoomPhotoServiceJpaTest {
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
-        registry.add("app.photos.directory", STORAGE::toString);
+        registry.add("app.room-photos.directory", STORAGE::toString);
     }
 
     @Autowired HotelRepository hotels;
     @Autowired RoomRepository rooms;
     @Autowired RoomPhotoService photos;
+    @Autowired com.hotelbooking.hotel.repository.RoomReservationRepository reservations;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private Long roomId() {
         Hotel hotel = hotels.saveAndFlush(new Hotel("Photo test " + UUID.randomUUID(), "Address"));
@@ -76,4 +78,26 @@ class RoomPhotoServiceJpaTest {
         assertThrows(IllegalArgumentException.class, () -> photos.upload(roomId,
                 new MockMultipartFile("file", "bad.png", "image/png", new byte[] {1, 2, 3})));
     }
+    @Test
+    void deletingRoomWithPhotosRemovesDatabaseRowsAndDiskFiles() throws Exception {
+        Long id = roomId();
+        var uploaded = photos.upload(id, image());
+        Path folder = STORAGE.resolve(id.toString());
+        Path file;
+        try (var files = java.nio.file.Files.list(folder)) {
+            file = files.findFirst().orElseThrow();
+        }
+        assertTrue(java.nio.file.Files.exists(file));
+        var service = new RoomService(rooms, hotels,
+                org.mockito.Mockito.mock(com.hotelbooking.hotel.mapper.RoomMapper.class),
+                reservations,
+                org.mockito.Mockito.mock(com.hotelbooking.hotel.strategy.RoomSelectionStrategy.class),
+                org.mockito.Mockito.mock(com.hotelbooking.hotel.strategy.MostExpensiveStrategy.class), photos);
+        new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> service.deleteRoom(id));
+        assertFalse(rooms.existsById(id));
+        assertFalse(java.nio.file.Files.exists(file));
+        assertThrows(com.hotelbooking.hotel.exception.RoomNotFoundException.class, () -> photos.list(id));
+    }
+
 }

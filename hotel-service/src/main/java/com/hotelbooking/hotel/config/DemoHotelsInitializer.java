@@ -16,6 +16,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import java.io.IOException;
+import java.nio.file.StandardCopyOption;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -87,23 +91,26 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                     rooms.findByHotelId(hotel.getId());
 
             for (RoomSeed roomSeed : seed.rooms()) {
+                String key = seed.photoPrefix() + ":" + roomSeed.number();
                 Room room = existingRooms.stream()
-                        .filter(r -> r.getNumber().equals(roomSeed.number()))
-                        .findFirst()
-                        .orElse(null);
-
+                        .filter(r -> key.equals(r.getDemoSeedKey()))
+                        .findFirst().orElse(null);
+                if (room == null) {
+                    // One-time migration of previously seeded rooms that lack the identity marker.
+                    room = existingRooms.stream()
+                            .filter(r -> r.getDemoSeedKey() == null
+                                    && r.getNumber().equals(roomSeed.number()))
+                            .findFirst().orElse(null);
+                }
                 if (room == null) {
                     room = new Room(hotel, roomSeed.number());
-                    room.changeRoomDetails(
-                            roomSeed.category(),
-                            roomSeed.capacity(),
-                            roomSeed.pricePerNight(),
-                            roomSeed.amenities()
-                    );
-                    room = rooms.saveAndFlush(room);
+                    room.changeRoomDetails(roomSeed.category(), roomSeed.capacity(),
+                            roomSeed.pricePerNight(), roomSeed.amenities());
                 }
-
-                seedRoomPhotos(room, seed.photoPrefix());
+                room.assignDemoSeedKey(key);
+                room = rooms.saveAndFlush(room);
+                // Use original seed number; an admin may have renamed the room.
+                seedRoomPhotos(room, seed.photoPrefix(), roomSeed.number());
             }
 
             seedHotelPhotos(hotel, seed.photos());
@@ -136,12 +143,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
             if (!target.startsWith(directory)) {
                 throw new IllegalStateException("Invalid hotel photo path");
             }
-            Files.createDirectories(directory);
-            if (Files.notExists(target)) {
-                try (var input = resource.getInputStream()) {
-                    Files.copy(input, target);
-                }
-            }
+            copyDemoPhoto(resource, directory, target);
             photos.save(new HotelPhoto(hotel, photo.fileName(),
                     photoContentType(photo.fileName()), primary, order++));
             primary = false;
@@ -149,7 +151,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
     }
 
     /** Up to five demo room photos from HOTEL/ROOM/number/photo_1..5; stored with legacy unique names. */
-    private void seedRoomPhotos(Room room, String prefix) throws Exception {
+    private void seedRoomPhotos(Room room, String prefix, String seedNumber) throws Exception {
         List<RoomPhoto> existing = roomPhotos
                 .findByRoom_IdOrderBySortOrderAscIdAsc(room.getId());
         Path directory = roomPhotoStorage.resolve(room.getId().toString()).normalize();
@@ -160,12 +162,12 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                 .max().orElse(-1) + 1;
         boolean primary = existing.isEmpty();
         for (int i = 1; i <= 5; i++) {
-            String stem = prefix + "-room-" + room.getNumber() + (i == 1 ? "" : "-" + i);
+            String stem = prefix + "-room-" + seedNumber + (i == 1 ? "" : "-" + i);
             // Extension is determined by the actual classpath resource.
             String fileName = null;
             ClassPathResource resource = null;
             for (String extension : List.of(".jpg", ".jpeg", ".png")) {
-                ClassPathResource candidate = new ClassPathResource("demo/hotels/" + prefix + "/ROOM/" + room.getNumber() + "/photo_" + i + extension);
+                ClassPathResource candidate = new ClassPathResource("demo/hotels/" + prefix + "/ROOM/" + seedNumber + "/photo_" + i + extension);
                 if (candidate.exists()) {
                     fileName = stem + extension;
                     resource = candidate;
@@ -184,15 +186,42 @@ public class DemoHotelsInitializer implements ApplicationRunner {
             if (!target.startsWith(directory)) {
                 throw new IllegalStateException("Invalid room photo path");
             }
-            Files.createDirectories(directory);
-            if (Files.notExists(target)) {
-                try (var input = resource.getInputStream()) {
-                    Files.copy(input, target);
-                }
-            }
+            copyDemoPhoto(resource, directory, target);
             roomPhotos.save(new RoomPhoto(room, fileName,
                     photoContentType(fileName), primary, order++));
             primary = false;
+        }
+    }
+
+    /** Writes demo images atomically; if the surrounding DB transaction rolls back,
+     * remove newly copied files to avoid unreferenced on-disk data. */
+    private void copyDemoPhoto(ClassPathResource resource, Path directory, Path target) throws IOException {
+        Files.createDirectories(directory);
+        if (Files.exists(target)) return;
+        Path staged = Files.createTempFile(directory, ".demo-", ".tmp");
+        boolean installed = false;
+        try {
+            try (var input = resource.getInputStream()) {
+                Files.copy(input, staged, StandardCopyOption.REPLACE_EXISTING);
+            }
+            try {
+                Files.move(staged, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ex) {
+                Files.move(staged, target);
+            }
+            installed = true;
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) {
+                        if (status != STATUS_COMMITTED) {
+                            try { Files.deleteIfExists(target); }
+                            catch (IOException ex) { log.error("Cannot compensate demo photo {}", target, ex); }
+                        }
+                    }
+                });
+            }
+        } finally {
+            Files.deleteIfExists(staged);
         }
     }
 

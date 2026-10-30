@@ -77,6 +77,20 @@ class LoginServiceTest {
     }
 
     @Test
+    void repeatedWrongPasswordsBlockSameAccountAcrossCalls() {
+        var limiter = new com.hotelbooking.booking.security.FailedAccountLoginLimiter(5, 900);
+        org.springframework.test.util.ReflectionTestUtils.setField(loginService, "failedAccountLimiter", limiter);
+        when(users.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "stored-hash")).thenReturn(false);
+        for (int i = 0; i < 5; i++) {
+            assertThrows(BadCredentialsException.class,
+                    () -> loginService.login(new LoginRequest("test@example.com", "wrong")));
+        }
+        assertThrows(com.hotelbooking.booking.exception.RateLimitExceededException.class,
+                () -> loginService.login(new LoginRequest("test@example.com", "wrong")));
+    }
+
+    @Test
     void forcedPasswordChangeFlagIsVisibleInLoginResponse() {
         user.requirePasswordChange();
         when(users.findByEmail("test@example.com")).thenReturn(Optional.of(user));

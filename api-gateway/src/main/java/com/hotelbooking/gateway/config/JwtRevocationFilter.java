@@ -22,6 +22,8 @@ public class JwtRevocationFilter implements GlobalFilter, Ordered {
 
     private final WebClient webClient;
     private final String secret;
+    private final java.util.concurrent.ConcurrentHashMap<String, Mono<Integer>> inFlight =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     public JwtRevocationFilter(
             @LoadBalanced WebClient.Builder builder,
@@ -80,29 +82,7 @@ public class JwtRevocationFilter implements GlobalFilter, Ordered {
                                 "FORBIDDEN");
                     }
 
-                    return webClient.get()
-                            .uri("http://booking-service/api/users/token-status")
-                            .headers(headers -> {
-                                headers.setBearerAuth(jwt.getTokenValue());
-
-                                headers.set(
-                                        GatewaySecretFilter.HEADER,
-                                        secret
-                                );
-
-                                String traceId = exchange.getRequest()
-                                        .getHeaders()
-                                        .getFirst(TraceWebFilter.HEADER);
-
-                                if (traceId != null) {
-                                    headers.set(TraceWebFilter.HEADER, traceId);
-                                }
-                            })
-                            .exchangeToMono(response ->
-                                    Mono.just(
-                                            response.statusCode().value()))
-                            .timeout(Duration.ofSeconds(3))
-                            .onErrorReturn(503)
+                    return checkToken(jwt.getTokenValue(), exchange)
                             .flatMap(status -> {
 
                                 boolean changePassword =
@@ -132,6 +112,33 @@ public class JwtRevocationFilter implements GlobalFilter, Ordered {
                                         "AUTH_SERVICE_UNAVAILABLE");
                             });
                 });
+    }
+
+    /** Coalesce concurrent checks for the same token; never cache decisions after completion. */
+    private Mono<Integer> checkToken(String token, ServerWebExchange exchange) {
+        if (inFlight.size() > 2048) return fetchTokenStatus(token, exchange);
+        return inFlight.computeIfAbsent(token, key -> {
+            java.util.concurrent.atomic.AtomicReference<Mono<Integer>> self = new java.util.concurrent.atomic.AtomicReference<>();
+            Mono<Integer> check = fetchTokenStatus(key, exchange)
+                    .doFinally(signal -> inFlight.remove(key, self.get()))
+                    .cache();
+            self.set(check);
+            return check;
+        });
+    }
+
+    private Mono<Integer> fetchTokenStatus(String token, ServerWebExchange exchange) {
+        return webClient.get()
+                .uri("http://booking-service/api/users/token-status")
+                .headers(headers -> {
+                    headers.setBearerAuth(token);
+                    headers.set(GatewaySecretFilter.HEADER, secret);
+                    String traceId = exchange.getRequest().getHeaders().getFirst(TraceWebFilter.HEADER);
+                    if (traceId != null) headers.set(TraceWebFilter.HEADER, traceId);
+                })
+                .exchangeToMono(response -> Mono.just(response.statusCode().value()))
+                .timeout(Duration.ofSeconds(3))
+                .onErrorReturn(503);
     }
 
     private Mono<Void> reject(

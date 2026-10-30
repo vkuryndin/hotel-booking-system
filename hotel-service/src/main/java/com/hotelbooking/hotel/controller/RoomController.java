@@ -126,7 +126,7 @@ public class RoomController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate checkOut,
 
-            @RequestParam(defaultValue = "LEAST_BOOKED")
+            @RequestParam(required = false)
             RoomSelectionMode strategy,
 
             @RequestParam(defaultValue = "1")

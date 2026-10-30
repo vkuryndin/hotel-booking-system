@@ -39,7 +39,14 @@ public class GatewaySecretFilter implements GlobalFilter, Ordered {
     ) {
         var request = exchange.getRequest()
                 .mutate()
-                .headers(headers -> headers.set(HEADER, secret))
+                .headers(headers -> {
+                    headers.remove("X-Verified-Client-IP");
+                    headers.set(HEADER, secret);
+                    java.net.InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
+                    if (remote != null && remote.getAddress() != null) {
+                        headers.set("X-Verified-Client-IP", remote.getAddress().getHostAddress());
+                    }
+                })
                 .build();
 
         return chain.filter(
