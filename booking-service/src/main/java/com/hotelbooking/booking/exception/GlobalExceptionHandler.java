@@ -168,6 +168,14 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid email or password", request);
     }
 
+    @ExceptionHandler(BookingRequestValidationException.class)
+    public ResponseEntity<ErrorResponse> handleBookingRequestValidation(
+            BookingRequestValidationException ex, HttpServletRequest request
+    ) {
+        return buildError(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "Invalid request data", request, ex.getFieldErrors());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(
             MethodArgumentNotValidException ex, HttpServletRequest request

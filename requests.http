@@ -5348,3 +5348,123 @@ Authorization: Bearer {{adminToken}}
         client.assert(response.status === 200);
     });
 %}
+
+### Follow-up audit: Manual Saga recovery / replay / photo decoding
+### Put this file and files from test-fixtures into one directory.
+### Login ADMIN + USER in your existing requests.http first (adminToken / accessToken).
+
+### R30-01 — USER cannot list exhausted Sagas: 403
+GET {{baseUrl}}/api/bookings/recovery/exhausted
+Authorization: Bearer {{accessToken}}
+
+> {% client.test("R30-01 USER forbidden", () => client.assert(response.status === 403)); %}
+
+### R30-02 — ADMIN can list exhausted Sagas: 200, array (usually empty)
+GET {{baseUrl}}/api/bookings/recovery/exhausted
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("R30-02 ADMIN list", () => {
+        client.assert(response.status === 200);
+        client.assert(Array.isArray(response.body));
+    }); %}
+
+### R30-03 — ADMIN cannot requeue a nonexistent booking: 404
+POST {{baseUrl}}/api/bookings/999999/recovery/retry
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("R30-03 not found", () => client.assert(response.status === 404)); %}
+
+### R30-04 — Prepare a hotel for photo tests: 201
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"name":"Recovery Photo Validation 30-10-2026","address":"Photo Test Road 30"}
+
+> {% client.test("R30-04 created", () => {
+        client.assert(response.status === 201);
+        client.global.set("r30HotelId", response.body.id);
+    }); %}
+
+### R30-05 — Fake PNG header, corrupted body: 400
+POST {{baseUrl}}/api/hotels/{{r30HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=BoundaryR30
+
+--BoundaryR30
+Content-Disposition: form-data; name="file"; filename="corrupt.png"
+Content-Type: image/png
+
+< ./test-fixtures/corrupt-signature.png
+--BoundaryR30--
+
+> {% client.test("R30-05 invalid PNG", () => client.assert(response.status === 400)); %}
+
+### R30-06 — Fake JPEG header, corrupted body: 400
+POST {{baseUrl}}/api/hotels/{{r30HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=BoundaryR30
+
+--BoundaryR30
+Content-Disposition: form-data; name="file"; filename="corrupt.jpg"
+Content-Type: image/jpeg
+
+< ./test-fixtures/corrupt-signature.jpg
+--BoundaryR30--
+
+> {% client.test("R30-06 invalid JPEG", () => client.assert(response.status === 400)); %}
+
+### R30-07 — Valid JPEG: 201
+POST {{baseUrl}}/api/hotels/{{r30HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=BoundaryR30
+
+--BoundaryR30
+Content-Disposition: form-data; name="file"; filename="valid-photo.jpg"
+Content-Type: image/jpeg
+
+< ./test-fixtures/valid-photo.jpg
+--BoundaryR30--
+
+> {% client.test("R30-07 valid JPEG", () => client.assert(response.status === 201)); %}
+
+### R30-08 — Valid PNG: 201
+POST {{baseUrl}}/api/hotels/{{r30HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=BoundaryR30
+
+--BoundaryR30
+Content-Disposition: form-data; name="file"; filename="valid-photo.png"
+Content-Type: image/png
+
+< ./test-fixtures/valid-photo.png
+--BoundaryR30--
+
+> {% client.test("R30-08 valid PNG", () => client.assert(response.status === 201)); %}
+
+### R30-09 — Valid WebP: 201 (requires ImageIO WebP reader)
+POST {{baseUrl}}/api/hotels/{{r30HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=BoundaryR30
+
+--BoundaryR30
+Content-Disposition: form-data; name="file"; filename="valid-photo.webp"
+Content-Type: image/webp
+
+< ./test-fixtures/valid-photo.webp
+--BoundaryR30--
+
+> {% client.test("R30-09 valid WebP", () => client.assert(response.status === 201)); %}
+
+### R30-10 — Only 3 good photos were saved: 200
+GET {{baseUrl}}/api/hotels/{{r30HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("R30-10 only valid uploads", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.length === 3);
+    }); %}
+
+### Historical replay cannot be reproduced without a booking whose dates have already passed.
+### It is covered by HistoricalIdempotencyReplayTest (does not bypass new-booking validation).
+### Manual exhausted Saga requires 5 real failed attempts; covered by ManualBookingRecoveryJpaTest.

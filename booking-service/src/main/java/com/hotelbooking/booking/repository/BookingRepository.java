@@ -87,6 +87,21 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             Pageable pageable
     );
 
+    @Query("""
+            SELECT b FROM Booking b
+            WHERE b.recoveryAttempts >= :limit
+              AND (b.status = :cancelling
+                 OR (b.status = :pending AND b.creationOutcome IN :outcomes))
+            ORDER BY b.id ASC
+            """)
+    List<Booking> findExhaustedRecovery(
+            @Param("pending") BookingStatus pending,
+            @Param("cancelling") BookingStatus cancelling,
+            @Param("outcomes") List<BookingCreationOutcome> outcomes,
+            @Param("limit") int limit,
+            Pageable pageable
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.id = :id")
     Optional<Booking> findByIdForUpdate(@Param("id") Long id);

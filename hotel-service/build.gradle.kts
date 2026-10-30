@@ -21,6 +21,9 @@ dependencies {
     // REST API
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
 
+    // WebP reader for ImageIO (JPEG/PNG are supported by the JDK).
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.15.3")
+
     // Database
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("com.h2database:h2")

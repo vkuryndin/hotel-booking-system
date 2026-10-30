@@ -193,6 +193,15 @@ public class Booking {
         this.sagaUpdatedAt = Instant.now();
     }
 
+    /** Admin may requeue an exhausted Saga without altering its status or reservation UUID. */
+    public void requeueExhaustedRecovery() {
+        if (recoveryAttempts < 5) {
+            throw new IllegalStateException("Recovery attempts are not exhausted");
+        }
+        recoveryAttempts = 0;
+        nextRecoveryAt = Instant.now();
+    }
+
     public int getRecoveryAttempts() {
         return recoveryAttempts;
     }

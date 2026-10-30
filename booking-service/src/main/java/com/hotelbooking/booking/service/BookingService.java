@@ -1,5 +1,8 @@
 package com.hotelbooking.booking.service;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
+import com.hotelbooking.booking.exception.BookingRequestValidationException;
 import com.hotelbooking.booking.client.HotelServiceClient;
 import com.hotelbooking.booking.dto.client.HotelRoomResponse;
 import com.hotelbooking.booking.dto.request.BookingRequest;
@@ -54,19 +57,22 @@ public class BookingService {
             LoggerFactory.getLogger(BookingService.class);
 
     private final BookingSagaStateService sagaStateService;
+    private final Validator validator;
 
     public BookingService(
             HotelServiceClient hotelServiceClient,
             BookingRepository bookingRepository,
             BookingMapper bookingMapper,
 
-            BookingSagaStateService sagaStateService
+            BookingSagaStateService sagaStateService,
+            Validator validator
     ) {
         this.hotelServiceClient = hotelServiceClient;
         this.bookingRepository = bookingRepository;
         this.bookingMapper = bookingMapper;
 
         this.sagaStateService = sagaStateService;
+        this.validator = validator;
     }
 
     public void validateDates(BookingRequest request) {
@@ -114,6 +120,12 @@ public class BookingService {
             return responseForRepeatedRequest(existing.get());
         }
 
+        // MVC does not pre-validate this endpoint: an exact Idempotency-Key replay
+        // must succeed even after the original check-in/check-out have passed.
+        var violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            throw new BookingRequestValidationException(violations);
+        }
         validateDates(request);
 
         List<Long> candidateIds;

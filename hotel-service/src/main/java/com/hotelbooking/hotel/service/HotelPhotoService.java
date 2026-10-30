@@ -21,6 +21,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -108,6 +112,10 @@ public class HotelPhotoService {
                     "Only valid JPEG, PNG, WebP photos are allowed"
             );
         }
+
+        // A file with a valid signature may still be truncated or corrupted.
+        // Decode the complete image BEFORE writing it to storage or the database.
+        validateDecodedImage(file, contentType);
 
         String extension = switch (contentType) {
             case "image/jpeg" -> ".jpg";
@@ -428,6 +436,47 @@ public class HotelPhotoService {
                     }
                 }
         );
+    }
+
+    private void validateDecodedImage(MultipartFile file, String expectedType) {
+        try (InputStream stream = file.getInputStream();
+             ImageInputStream imageInput = ImageIO.createImageInputStream(stream)) {
+            if (imageInput == null) {
+                throw new IllegalArgumentException("Cannot decode photo");
+            }
+            var readers = ImageIO.getImageReaders(imageInput);
+            if (!readers.hasNext()) {
+                throw new IllegalArgumentException("Unsupported or corrupted image");
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(imageInput, true, true);
+                String decodedFormat = reader.getFormatName().toLowerCase(java.util.Locale.ROOT);
+                String expectedFormat = switch (expectedType) {
+                    case "image/jpeg" -> "jpeg";
+                    case "image/png" -> "png";
+                    case "image/webp" -> "webp";
+                    default -> throw new IllegalArgumentException("Unsupported image format");
+                };
+                if (!decodedFormat.equals(expectedFormat)
+                        && !(expectedFormat.equals("jpeg") && decodedFormat.equals("jpg"))) {
+                    throw new IllegalArgumentException("Image format does not match its signature");
+                }
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if (width <= 0 || height <= 0 || (long) width * height > 20_000_000L) {
+                    throw new IllegalArgumentException("Image dimensions are invalid or too large");
+                }
+                BufferedImage decoded = reader.read(0);
+                if (decoded == null || decoded.getWidth() != width || decoded.getHeight() != height) {
+                    throw new IllegalArgumentException("Cannot decode complete image");
+                }
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | RuntimeException ex) {
+            throw new IllegalArgumentException("Corrupted or unsupported photo", ex);
+        }
     }
 
     private String detectType(byte[] bytes) {

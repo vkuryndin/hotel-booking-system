@@ -33,7 +33,7 @@ public class BookingController {
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody BookingRequest request,
+            @RequestBody BookingRequest request,
             @RequestHeader("Idempotency-Key") UUID idempotencyKey
     ) {
         Long userId = Long.valueOf(jwt.getSubject());

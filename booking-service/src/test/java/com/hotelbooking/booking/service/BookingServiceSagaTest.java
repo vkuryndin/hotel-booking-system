@@ -1,5 +1,6 @@
 package com.hotelbooking.booking.service;
 
+import jakarta.validation.Validator;
 import com.hotelbooking.booking.client.HotelServiceClient;
 import com.hotelbooking.booking.dto.client.HotelReservationResponse;
 import com.hotelbooking.booking.dto.client.HotelRoomResponse;
@@ -53,7 +54,7 @@ class BookingServiceSagaTest {
         repository = mock(BookingRepository.class);
         mapper = mock(BookingMapper.class);
         state = mock(BookingSagaStateService.class);
-        service = new BookingService(hotel, repository, mapper, state);
+        service = new BookingService(hotel, repository, mapper, state, mock(Validator.class));
     }
 
     private BookingRequest manual() {
