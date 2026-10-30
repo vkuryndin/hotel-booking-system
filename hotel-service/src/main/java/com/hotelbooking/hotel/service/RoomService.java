@@ -68,7 +68,8 @@ public class RoomService {
     @Transactional
     public RoomResponse createRoom(RoomRequest request) {
 
-        Hotel hotel = hotelRepository.findById(request.hotelId())
+        // Coordinate room creation with HotelService.deleteHotel(): both lock the hotel row.
+        Hotel hotel = hotelRepository.findByIdForUpdate(request.hotelId())
                 .orElseThrow(() ->
                         new HotelNotFoundException(request.hotelId()));
 
