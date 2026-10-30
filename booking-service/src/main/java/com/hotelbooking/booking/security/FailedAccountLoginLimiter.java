@@ -3,6 +3,7 @@ package com.hotelbooking.booking.security;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ public class FailedAccountLoginLimiter {
     private final int maxFailures;
     private final long windowSeconds;
 
+    @Autowired
     public FailedAccountLoginLimiter(@Value("${app.rate-limit.failed-login-per-account:5}") int maxFailures,
                                      @Value("${app.rate-limit.failed-login-window-seconds:900}") long windowSeconds) {
         this(Clock.systemUTC(), maxFailures, windowSeconds);
