@@ -312,20 +312,6 @@ public class RoomService {
             );
         }
     }
-    @Transactional(readOnly = true)
-    public List<RoomResponse> recommendRooms(
-            Long hotelId,
-            LocalDate checkIn,
-            LocalDate checkOut
-    ) {
-        return recommendRooms(
-                hotelId,
-                checkIn,
-                checkOut,
-                RoomSelectionMode.LEAST_BOOKED,
-                1
-        );
-    }
 
     @Transactional(readOnly = true)
     public List<RoomResponse> recommendRooms(

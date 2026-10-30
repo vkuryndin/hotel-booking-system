@@ -151,10 +151,6 @@ public class RoomReservationService {
         return false;
     }
 
-    @Transactional
-    public RoomReservation release(UUID reservationId, Long roomId) {
-        return release(reservationId, roomId, false);
-    }
 
     @Transactional
     public RoomReservation release(

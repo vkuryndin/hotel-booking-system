@@ -211,19 +211,6 @@ public class HotelServiceClient {
         }
     }
 
-    public List<HotelRoomResponse> recommendRooms(
-            Long hotelId,
-            LocalDate checkIn,
-            LocalDate checkOut
-    ) {
-        return recommendRooms(
-                hotelId,
-                checkIn,
-                checkOut,
-                RoomSelectionMode.LEAST_BOOKED,
-                1
-        );
-    }
 
     private <T> T withCircuitBreaker(Supplier<T> operation) {
 
