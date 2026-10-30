@@ -3,6 +3,7 @@ package com.hotelbooking.booking.config;
 
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.repository.AppUserRepository;
+import org.slf4j.MDC;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -141,12 +142,17 @@ public class UserTokenStateWebConfig
                 .replace("\\", "\\\\")
                 .replace("\"", "\\\"");
 
+        String traceId = MDC.get("traceId");
+        // TraceIdFilter guarantees a valid UUID for real HTTP requests.
+        String traceField = traceId == null || traceId.isBlank()
+                ? "" : ",\"traceId\":\"" + traceId + "\"";
+
         response.getWriter().write(
                 "{\"timestamp\":\"" + Instant.now() + "\","
                         + "\"status\":" + status + ","
                         + "\"code\":\"" + code + "\","
                         + "\"message\":\"" + message + "\","
-                        + "\"path\":\"" + path + "\"}"
+                        + "\"path\":\"" + path + "\"" + traceField + "}"
         );
         return false;
     }

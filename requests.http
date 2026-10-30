@@ -5091,3 +5091,92 @@ Authorization: Bearer {{adminToken}}
         client.assert(response.body.amenities.includes("WIFI"));
     });
 %}
+
+
+### S22-01 — Validation error + traceId; expected 400 VALIDATION_ERROR
+POST {{baseUrl}}/api/users/register
+Content-Type: application/json
+X-Trace-Id: b14a7a28-0049-4933-8569-d82719ca7111
+
+{"email":"invalid","password":"123","username":"x","firstName":"","lastName":""}
+
+> {%
+    client.test("S22-01 validation and traceId", () => {
+        client.assert(response.status === 400);
+        client.assert(response.body.code === "VALIDATION_ERROR");
+        client.assert(response.body.traceId === "b14a7a28-0049-4933-8569-d82719ca7111");
+        client.assert(response.body.fieldErrors !== undefined);
+    });
+%}
+
+### S22-02 — Invalid JSON; expected 400 MALFORMED_JSON
+POST {{baseUrl}}/api/users/login
+Content-Type: application/json
+
+{"email": "broken
+
+> {%
+    client.test("S22-02 malformed JSON", () => {
+        client.assert(response.status === 400);
+        client.assert(response.body.code === "MALFORMED_JSON");
+        client.assert(typeof response.body.traceId === "string" && response.body.traceId.length === 36);
+    });
+%}
+
+### Before S22-03, run existing ADMIN login in requests.http (sets adminToken).
+
+### S22-03 — Wrong HTTP method; expected 405 METHOD_NOT_ALLOWED
+PUT {{baseUrl}}/api/bookings/my
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{}
+
+> {%
+    client.test("S22-03 method not allowed", () => {
+        client.assert(response.status === 405);
+        client.assert(response.body.code === "METHOD_NOT_ALLOWED");
+        client.assert(!!response.body.traceId);
+    });
+%}
+
+### S22-04 — Invalid credentials; expected 401 INVALID_CREDENTIALS
+POST {{baseUrl}}/api/users/login
+Content-Type: application/json
+
+{"email":"nobody@example.com","password":"12345678"}
+
+> {%
+    client.test("S22-04 invalid credentials", () => {
+        client.assert(response.status === 401);
+        client.assert(response.body.code === "INVALID_CREDENTIALS");
+        client.assert(!!response.body.traceId);
+    });
+%}
+
+### S22-05 — Missing Idempotency-Key header, expected 400 MISSING_REQUEST_HEADER
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"roomId":1,"checkIn":"2054-06-10","checkOut":"2054-06-12","guestCount":1}
+
+> {%
+    client.test("S22-05 missing header", () => {
+        client.assert(response.status === 400);
+        client.assert(response.body.code === "MISSING_REQUEST_HEADER");
+        client.assert(!!response.body.traceId);
+    });
+%}
+
+### S22-06 — Missing booking, expected 404 BOOKING_NOT_FOUND
+GET {{baseUrl}}/api/bookings/999999999
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S22-06 booking not found", () => {
+        client.assert(response.status === 404);
+        client.assert(response.body.code === "BOOKING_NOT_FOUND");
+        client.assert(!!response.body.traceId);
+    });
+%}
