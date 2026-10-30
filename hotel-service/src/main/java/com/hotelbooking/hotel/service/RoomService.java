@@ -42,6 +42,7 @@ import java.util.Locale;
 public class RoomService {
 
     private final RoomRepository roomRepository;
+    private final RoomPhotoService roomPhotoService;
     private final HotelRepository hotelRepository;
     private final RoomMapper roomMapper;
     private final RoomReservationRepository reservationRepository;
@@ -50,6 +51,7 @@ public class RoomService {
 
     public RoomService(
             RoomRepository roomRepository,
+            RoomPhotoService roomPhotoService,
             HotelRepository hotelRepository,
             RoomMapper roomMapper,
             RoomReservationRepository reservationRepository,
@@ -58,6 +60,7 @@ public class RoomService {
             MostExpensiveStrategy mostExpensiveStrategy
     ) {
         this.roomRepository = roomRepository;
+        this.roomPhotoService = roomPhotoService;
         this.hotelRepository = hotelRepository;
         this.roomMapper = roomMapper;
         this.reservationRepository = reservationRepository;
@@ -302,6 +305,8 @@ public class RoomService {
                     "Cannot delete room with reservation history: " + roomId
             );
         }
+
+        roomPhotoService.removeAllForRoomDeletion(roomId);
 
         try {
             roomRepository.delete(room);

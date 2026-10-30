@@ -32,7 +32,7 @@ class RoomCreationLockUnitTest {
         rooms = mock(RoomRepository.class);
         hotels = mock(HotelRepository.class);
         mapper = mock(RoomMapper.class);
-        service = new RoomService(rooms, hotels, mapper,
+        service = new RoomService(rooms, mock(RoomPhotoService.class), hotels, mapper,
                 mock(RoomReservationRepository.class),
                 mock(RoomSelectionStrategy.class),
                 mock(MostExpensiveStrategy.class));
