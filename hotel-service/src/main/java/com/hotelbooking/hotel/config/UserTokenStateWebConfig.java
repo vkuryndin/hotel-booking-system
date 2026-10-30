@@ -1,6 +1,7 @@
 
 package com.hotelbooking.hotel.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,10 +18,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Configuration
 public class UserTokenStateWebConfig
         implements WebMvcConfigurer, HandlerInterceptor {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final String GATEWAY_HEADER =
             "X-Gateway-Internal-Secret";
@@ -91,11 +96,11 @@ public class UserTokenStateWebConfig
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
-        response.getWriter().write(
-                "{\"timestamp\":\"" + Instant.now()
-                        + "\",\"status\":" + status
-                        + ",\"code\":\"" + code + "\"}"
-        );
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", status);
+        body.put("code", code);
+        response.getWriter().write(JSON.writeValueAsString(body));
 
         return false;
     }

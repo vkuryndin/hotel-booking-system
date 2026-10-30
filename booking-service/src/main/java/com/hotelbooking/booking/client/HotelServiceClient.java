@@ -127,7 +127,7 @@ public class HotelServiceClient {
     }
 
     // Обычная отмена подтверждённого бронирования
-    // timesBooked не уменьшается
+    // При освобождении активной брони timesBooked уменьшается ровно один раз
     public HotelReservationResponse releaseRoom(
             Long roomId,
             UUID reservationId
@@ -136,7 +136,7 @@ public class HotelServiceClient {
     }
 
     // Компенсация неудачной Saga
-    // timesBooked уменьшается
+    // При компенсации активной резервации timesBooked также уменьшается ровно один раз
     public HotelReservationResponse compensateRoom(
             Long roomId,
             UUID reservationId

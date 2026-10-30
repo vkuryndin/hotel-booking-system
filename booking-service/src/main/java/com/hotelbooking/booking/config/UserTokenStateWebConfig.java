@@ -1,6 +1,7 @@
 
 package com.hotelbooking.booking.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.repository.AppUserRepository;
 import org.slf4j.MDC;
@@ -20,11 +21,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Configuration
 public class UserTokenStateWebConfig
         implements WebMvcConfigurer, HandlerInterceptor {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final String GATEWAY_HEADER =
             "X-Gateway-Internal-Secret";
@@ -138,22 +143,17 @@ public class UserTokenStateWebConfig
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
-        String path = request.getRequestURI()
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"");
-
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", status);
+        body.put("code", code);
+        body.put("message", message);
+        body.put("path", request.getRequestURI());
         String traceId = MDC.get("traceId");
-        // TraceIdFilter guarantees a valid UUID for real HTTP requests.
-        String traceField = traceId == null || traceId.isBlank()
-                ? "" : ",\"traceId\":\"" + traceId + "\"";
-
-        response.getWriter().write(
-                "{\"timestamp\":\"" + Instant.now() + "\","
-                        + "\"status\":" + status + ","
-                        + "\"code\":\"" + code + "\","
-                        + "\"message\":\"" + message + "\","
-                        + "\"path\":\"" + path + "\"" + traceField + "}"
-        );
+        if (traceId != null && !traceId.isBlank()) {
+            body.put("traceId", traceId);
+        }
+        response.getWriter().write(JSON.writeValueAsString(body));
         return false;
     }
 }

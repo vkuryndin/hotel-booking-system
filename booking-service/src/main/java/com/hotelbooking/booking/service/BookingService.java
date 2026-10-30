@@ -76,7 +76,7 @@ public class BookingService {
         this.validator = validator;
     }
 
-    public void validateDates(BookingRequest request) {
+    private void validateDates(BookingRequest request) {
 
         if (request.checkIn() == null || request.checkOut() == null) {
             throw new IllegalArgumentException(
@@ -96,7 +96,7 @@ public class BookingService {
         }
     }
 
-    public HotelRoomResponse validateRoom(Long roomId) {
+    private HotelRoomResponse validateRoom(Long roomId) {
 
         HotelRoomResponse room = hotelServiceClient.getRoom(roomId);
 
