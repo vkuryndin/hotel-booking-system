@@ -10,6 +10,7 @@ import com.hotelbooking.hotel.repository.RoomReservationNightRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.time.LocalDate;
 
@@ -33,7 +34,7 @@ public class HotelStatisticsService {
         this.nightRepository = nightRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public HotelStatisticsResponse getStatistics(Long hotelId) {
 
         if (!hotelRepository.existsById(hotelId)) {
