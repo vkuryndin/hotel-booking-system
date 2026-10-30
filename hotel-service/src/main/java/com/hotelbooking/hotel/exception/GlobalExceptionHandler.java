@@ -66,6 +66,21 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler({
+            org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class
+    })
+    public ResponseEntity<ErrorResponse> handleConcurrentModification(
+            Exception ex, HttpServletRequest request) {
+        return buildError(
+                HttpStatus.CONFLICT,
+                "CONCURRENT_MODIFICATION",
+                "Hotel was changed by another request; reload and retry",
+                request,
+                Map.of()
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(
             Exception ex,

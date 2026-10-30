@@ -30,6 +30,10 @@ public class Hotel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(nullable = false, length = 150)
     private String name;
 
@@ -80,6 +84,10 @@ public class Hotel {
     private void updateNormalizedFields() {
         normalizedName = name.trim().toLowerCase(Locale.ROOT);
         normalizedAddress = address.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public Long getVersion() {
+        return version;
     }
 
     public Long getId() {
