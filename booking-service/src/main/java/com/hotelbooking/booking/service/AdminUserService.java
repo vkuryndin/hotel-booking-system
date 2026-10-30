@@ -101,7 +101,7 @@ public class AdminUserService {
         List<AppUser> lockedAdmins =
                 userRepository.lockUsersByRole(Role.ADMIN);
 
-        AppUser user = userRepository.findById(id)
+        AppUser user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "User not found: " + id

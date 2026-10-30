@@ -86,7 +86,7 @@ class AdminProtectionTest {
 
     @Test void lastAdminCannotBeDeletedByAnotherAdmin() {
         AppUser target = user(Role.ADMIN, "alice");
-        when(users.findById(1L)).thenReturn(Optional.of(target));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(target));
         when(users.lockUsersByRole(Role.ADMIN)).thenReturn(List.of(target));
         conflict(() -> admin.deleteUser(1L, 2L));
         verify(users, never()).delete(any());
@@ -94,7 +94,7 @@ class AdminProtectionTest {
 
     @Test void otherAdminCanBeDeletedIfAtLeastOneAdminRemains() {
         AppUser target = user(Role.ADMIN, "alice");
-        when(users.findById(1L)).thenReturn(Optional.of(target));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(target));
         when(users.lockUsersByRole(Role.ADMIN)).thenReturn(List.of(target, user(Role.ADMIN, "bob")));
         admin.deleteUser(1L, 2L);
         verify(users).delete(target);
@@ -103,7 +103,7 @@ class AdminProtectionTest {
 
     @Test void bookingHistoryStillPreventsUserDeletion() {
         AppUser target = user(Role.USER, "guest");
-        when(users.findById(1L)).thenReturn(Optional.of(target));
+        when(users.findByIdForUpdate(1L)).thenReturn(Optional.of(target));
         when(bookings.existsByUserId(1L)).thenReturn(true);
         conflict(() -> admin.deleteUser(1L, 2L));
         verify(users, never()).delete(any());

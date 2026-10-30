@@ -7,6 +7,9 @@ import com.hotelbooking.booking.exception.BookingNotFoundException;
 import com.hotelbooking.booking.exception.InvalidBookingStatusException;
 import com.hotelbooking.booking.mapper.BookingMapper;
 import com.hotelbooking.booking.repository.BookingRepository;
+import com.hotelbooking.booking.repository.AppUserRepository;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,15 +28,18 @@ import com.hotelbooking.booking.exception.RequestInProgressException;
 public class BookingSagaStateService {
 
     private final BookingRepository bookingRepository;
+    private final AppUserRepository userRepository;
     private final BookingMapper bookingMapper;
     public static final int MAX_RECOVERY_ATTEMPTS = 5;
 
     public BookingSagaStateService(
             BookingRepository bookingRepository,
-            BookingMapper bookingMapper
+            BookingMapper bookingMapper,
+            AppUserRepository userRepository
     ) {
         this.bookingRepository = bookingRepository;
         this.bookingMapper = bookingMapper;
+        this.userRepository = userRepository;
     }
 
     public record SagaBooking(
@@ -51,6 +57,9 @@ public class BookingSagaStateService {
             Long resolvedRoomId,
             UUID idempotencyKey
     ) {
+        // Synchronize with AdminUserService.deleteUser before inserting a booking.
+        userRepository.findByIdForUpdate(userId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
         Booking booking = new Booking(
                 userId,
                 resolvedRoomId,

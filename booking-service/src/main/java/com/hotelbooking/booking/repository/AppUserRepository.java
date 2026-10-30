@@ -13,6 +13,10 @@ import java.util.List;
 
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM AppUser u WHERE u.id = :id")
+    Optional<AppUser> findByIdForUpdate(@Param("id") Long id);
+
     Optional<AppUser> findByEmail(String email);
 
     boolean existsByEmail(String email);

@@ -10,6 +10,12 @@ import com.hotelbooking.booking.exception.RequestInProgressException;
 import com.hotelbooking.booking.mapper.BookingMapper;
 import com.hotelbooking.booking.repository.BookingRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import com.hotelbooking.booking.repository.AppUserRepository;
+import com.hotelbooking.booking.entity.AppUser;
+import java.util.Optional;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
@@ -32,6 +38,12 @@ import static org.junit.jupiter.api.Assertions.*;
 @Import(BookingSagaStateService.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BookingSagaStateJpaTest {
+    // These Saga tests use synthetic user IDs; R4 ownership locking is tested separately.
+    @MockitoBean AppUserRepository users;
+    @BeforeEach void stubUserLookup() {
+        when(users.findByIdForUpdate(anyLong())).thenReturn(Optional.of(mock(AppUser.class)));
+    }
+
     @Autowired BookingSagaStateService state;
     @Autowired BookingRepository bookings;
     @Autowired JdbcTemplate jdbc;
