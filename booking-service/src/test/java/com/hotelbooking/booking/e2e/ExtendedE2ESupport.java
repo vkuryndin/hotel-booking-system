@@ -22,6 +22,7 @@ abstract class ExtendedE2ESupport {
         String body() { return new String(bytes, java.nio.charset.StandardCharsets.UTF_8); }
     }
     record Account(String email, String password, String token) {}
+    private static volatile Account cachedAdmin;
 
     Response send(String method, String route, String jwt, byte[] bytes, String mime) {
         try {
@@ -48,8 +49,10 @@ abstract class ExtendedE2ESupport {
     Account register(String prefix) {
         String email = prefix + "." + runId + "." + UUID.randomUUID().toString().substring(0, 7) + "@example.test";
         String username = ("ext" + UUID.randomUUID().toString().replace("-", "")).substring(0, 20);
-        Response reg = json("POST","/api/users/register",null,Map.of("email",email,"password",PASSWORD,
-                "username",username,"firstName","E2E","lastName","Test"));
+        // Test fixture creation uses the existing ADMIN API, not the public
+        // registration endpoint (5 requests/hour/IP in production).
+        Response reg = json("POST","/api/users",admin().token(),Map.of("email",email,"password",PASSWORD,
+                "role","USER", "username",username,"firstName","E2E","lastName","Test"));
         expect(201,reg);
         return new Account(email,PASSWORD, login(email,PASSWORD));
     }
@@ -82,18 +85,24 @@ abstract class ExtendedE2ESupport {
     static final byte[] PNG = Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGPUylvAAANMDEgANwcAPX4BQJVh6wIAAAAASUVORK5CYII=");
     /** Read the existing demo admin fixture from requests.http; no credentials copied into test sources. */
     Account admin() {
-        try {
-            Path requests = Files.isRegularFile(Path.of("requests.http")) ? Path.of("requests.http") : Path.of("..", "requests.http");
-            String txt = Files.readString(requests);
-            java.util.regex.Matcher section = java.util.regex.Pattern.compile(
-                    "(?s)### Login as ADMIN\\s*POST[^\\r\\n]*\\R[^\\r\\n]*\\R\\s*(\\{.*?\\})").matcher(txt);
-            if (!section.find()) throw new AssertionError("Admin login block not found in requests.http");
-            JsonNode creds = om.readTree(section.group(1));
-            String email = creds.path("email").asText();
-            String password = creds.path("password").asText();
-            if (email.isBlank() || password.isBlank()) throw new AssertionError("Empty demo admin credentials");
-            return new Account(email, password, login(email, password));
-        } catch (IOException ex) { throw new AssertionError("Cannot load requests.http demo admin account", ex); }
+        Account ready = cachedAdmin;
+        if (ready != null) return ready;
+        synchronized (ExtendedE2ESupport.class) {
+            if (cachedAdmin != null) return cachedAdmin;
+            try {
+                Path requests = Files.isRegularFile(Path.of("requests.http")) ? Path.of("requests.http") : Path.of("..", "requests.http");
+                String txt = Files.readString(requests);
+                java.util.regex.Matcher section = java.util.regex.Pattern.compile(
+                        "(?s)### Login as ADMIN\\s*POST[^\\r\\n]*\\R[^\\r\\n]*\\R\\s*(\\{.*?\\})").matcher(txt);
+                if (!section.find()) throw new AssertionError("Admin login block not found in requests.http");
+                JsonNode creds = om.readTree(section.group(1));
+                String email = creds.path("email").asText();
+                String password = creds.path("password").asText();
+                if (email.isBlank() || password.isBlank()) throw new AssertionError("Empty demo admin credentials");
+                cachedAdmin = new Account(email, password, login(email, password));
+                return cachedAdmin;
+            } catch (IOException ex) { throw new AssertionError("Cannot load requests.http demo admin account", ex); }
+        }
     }
     /** Auto-provision and cache exactly 200 USER accounts; no external TSV or manual preparation. */
     synchronized List<Account> suppliedUsers() throws IOException {

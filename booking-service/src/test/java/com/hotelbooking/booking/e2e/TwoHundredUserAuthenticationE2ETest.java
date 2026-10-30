@@ -9,6 +9,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Isolate from security-rate-limit tests; see README for fixture and rate-limit requirements. */
 @EnabledIfSystemProperty(named="hotel.e2e",matches="true")
 @Tag("e2e-200-users")
+// 200 POST /login requests from a single client IP inevitably consume the shared
+// production login quota (20/min) and break unrelated tests. Must be explicitly
+// opted in on a dedicated run, not under the user's normal E2E All configuration.
+@org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="hotel.e2e.exclusive-rate-limit", matches="true")
 class TwoHundredUserAuthenticationE2ETest extends ExtendedE2ESupport {
     @Test void twoHundredDistinctUsersLoginAtOnce() throws Exception {
         List<Account> users=suppliedUsers();

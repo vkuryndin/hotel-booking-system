@@ -18,7 +18,7 @@ class AuthenticationSecurityExtendedE2ETest extends ExtendedE2ESupport {
         expect(401,json("POST","/api/users/login",null,Map.of("email",a.email(),"password","DefinitelyWrong123!")));
         assertFalse(login(a.email(),a.password()).isBlank());
     }
-    @Test @Order(99) void distributedAttemptsAgainstOneAccountAreBounded() throws Exception {
+    @Test @Order(99) @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="hotel.e2e.exclusive-rate-limit", matches="true") void distributedAttemptsAgainstOneAccountAreBounded() throws Exception {
         Account a=testUser();
         List<Callable<Response>> requests=new ArrayList<>();
         for(int i=0;i<20;i++) requests.add(() -> json("POST","/api/users/login",null,

@@ -65,6 +65,8 @@ class HotelBookingLoadE2ETest {
     void setup() throws Exception {
         primary = registerAndLogin("owner");
         users.add(primary);
+        // One additional identity for cross-user authorization checks; do not flood /register.
+        users.add(registerAndLogin("secondary"));
         String adminEmail = config("E2E_ADMIN_EMAIL", "ADMIN_EMAIL");
         String adminPassword = config("E2E_ADMIN_PASSWORD", "ADMIN_PASSWORD");
         if (adminEmail != null && adminPassword != null) {
@@ -115,17 +117,13 @@ class HotelBookingLoadE2ETest {
     }
 
     @Test @Order(1)
-    void parallelRegistrationAndLogin100() throws Exception {
-        List<Measured<Identity>> answers = parallel("01-register-login", 100, 25, i -> {
-            try { return registerAndLogin("load-" + i); }
-            catch (Exception e) { throw new RuntimeException(e); }
-        });
-        for (Measured<Identity> a : answers) {
-            assertNotNull(a.value().token());
-            assertFalse(a.value().token().isBlank());
-            users.add(a.value());
-        }
-        assertEquals(100, answers.stream().map(x -> x.value().email()).distinct().count());
+    void parallelAuthenticatedRequests100() throws Exception {
+        // Both existing identities are reused; a public registration burst would exhaust
+        // the production 5/hour/IP limit and invalidate unrelated E2E classes.
+        List<Measured<Result>> answers = parallel("01-authenticated-reads", 100, 25,
+                i -> getCompact("/api/hotels?page=0&size=20", user(i).token()));
+        allStatus(answers, 200);
+        assertEquals(100, answers.size());
     }
 
     @Test @Order(2)
