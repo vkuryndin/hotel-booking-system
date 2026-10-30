@@ -4826,3 +4826,180 @@ Authorization: Bearer {{adminToken}}
         client.assert(Number(response.body.totalTimesBooked) === 0);
     });
 %}
+
+### STAGE 18 — deletion of hotel with photographs
+### Run existing ADMIN login first (must set client.global adminToken).
+### Put stage18-photo.jpg and stage18-photo.png next to this .http file.
+### On repeat in the same H2, change the hotel names below.
+
+### S18-01 Create a hotel without rooms (201)
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "S18 Photos Hotel 20261029",
+  "address": "S18 Photos Street 20261029"
+}
+
+> {%
+    client.test("S18-01 created", () => {
+        client.assert(response.status === 201);
+        client.global.set("s18HotelId", response.body.id);
+    });
+%}
+
+### S18-02 Upload first photo (201)
+POST {{baseUrl}}/api/hotels/{{s18HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=Stage18Boundary
+
+--Stage18Boundary
+Content-Disposition: form-data; name="file"; filename="stage18-photo.jpg"
+Content-Type: image/jpeg
+
+< ./stage18-photo.jpg
+--Stage18Boundary--
+
+> {%
+    client.test("S18-02 photo #1", () => {
+        client.assert(response.status === 201);
+        client.global.set("s18PhotoId", response.body.id);
+    });
+%}
+
+### S18-03 Upload second photo (201)
+POST {{baseUrl}}/api/hotels/{{s18HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=Stage18Boundary
+
+--Stage18Boundary
+Content-Disposition: form-data; name="file"; filename="stage18-photo.png"
+Content-Type: image/png
+
+< ./stage18-photo.png
+--Stage18Boundary--
+
+> {%
+    client.test("S18-03 photo #2", () => {
+        client.assert(response.status === 201);
+    });
+%}
+
+### S18-04 Two photos before deleting (200)
+GET {{baseUrl}}/api/hotels/{{s18HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S18-04 two photos", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.length === 2);
+    });
+%}
+
+### S18-05 Delete hotel with photos, without rooms (204)
+DELETE {{baseUrl}}/api/hotels/{{s18HotelId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S18-05 hotel deleted", () => {
+        client.assert(response.status === 204);
+    });
+%}
+
+### S18-06 Hotel no longer exists (404)
+GET {{baseUrl}}/api/hotels/{{s18HotelId}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S18-06 hotel absent", () => {
+        client.assert(response.status === 404);
+    });
+%}
+
+### S18-07 Photo list no longer exists (404)
+GET {{baseUrl}}/api/hotels/{{s18HotelId}}/photos
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S18-07 photo list absent", () => {
+        client.assert(response.status === 404);
+    });
+%}
+
+### S18-08 Create second hotel (201)
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "S18 Hotel With Room 20261029",
+  "address": "S18 Second Street 20261029"
+}
+
+> {%
+    client.test("S18-08 hotel created", () => {
+        client.assert(response.status === 201);
+        client.global.set("s18Hotel2Id", response.body.id);
+    });
+%}
+
+### S18-09 Upload photo to second hotel (201)
+POST {{baseUrl}}/api/hotels/{{s18Hotel2Id}}/photos
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=Stage18Boundary
+
+--Stage18Boundary
+Content-Disposition: form-data; name="file"; filename="stage18-photo.jpg"
+Content-Type: image/jpeg
+
+< ./stage18-photo.jpg
+--Stage18Boundary--
+
+> {%
+    client.test("S18-09 photo uploaded", () => {
+        client.assert(response.status === 201);
+    });
+%}
+
+### S18-10 Create room (201)
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{s18Hotel2Id}},
+  "number": "101",
+  "category": "STANDARD",
+  "capacity": 2,
+  "pricePerNight": 100,
+  "amenities": []
+}
+
+> {%
+    client.test("S18-10 room created", () => {
+        client.assert(response.status === 201);
+    });
+%}
+
+### S18-11 Delete hotel with room must be blocked (409)
+DELETE {{baseUrl}}/api/hotels/{{s18Hotel2Id}}
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S18-11 blocked when room exists", () => {
+        client.assert(response.status === 409);
+        client.assert(response.body.code === "HOTEL_HAS_ROOMS");
+    });
+%}
+
+### S18-12 Hotel still exists with photo (200 + 1 photo)
+GET {{baseUrl}}/api/hotels/{{s18Hotel2Id}}/photos
+Authorization: Bearer {{adminToken}}
+
+> {%
+    client.test("S18-12 photo untouched", () => {
+        client.assert(response.status === 200);
+        client.assert(response.body.length === 1);
+    });
+%}

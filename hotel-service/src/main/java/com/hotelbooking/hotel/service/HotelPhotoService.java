@@ -15,6 +15,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +24,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.FileVisitResult;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -271,6 +276,72 @@ public class HotelPhotoService {
         // №17: физический файл удалится только после
         // успешного COMMIT транзакции.
         registerDeleteAfterCommit(file);
+    }
+
+    /**
+     * Вызывается только из HotelService.deleteHotel() внутри общей транзакции.
+     * Удаляем строки из БД; файлы останутся до COMMIT.
+     * Блокировка отеля уже удерживается вызывающим методом.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void removeAllForHotelDeletion(Long hotelId) {
+        List<HotelPhoto> photos = photoRepository
+                .findByHotel_IdOrderBySortOrderAscIdAsc(hotelId);
+
+        photoRepository.deleteAll(photos);
+        photoRepository.flush();
+
+        // Чистим весь каталог данного отеля, включая файлы,
+        // оставшиеся от предыдущих неуспешных операций.
+        registerHotelDirectoryDeletionAfterCommit(hotelDirectory(hotelId));
+    }
+
+    private void registerHotelDirectoryDeletionAfterCommit(Path directory) {
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
+                                return;
+                            }
+
+                            // Без FOLLOW_LINKS: не выходим за пределы
+                            // каталога через символические ссылки.
+                            Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+                                @Override
+                                public FileVisitResult visitFile(
+                                        Path file,
+                                        BasicFileAttributes attrs
+                                ) throws IOException {
+                                    Files.delete(file);
+                                    return FileVisitResult.CONTINUE;
+                                }
+
+                                @Override
+                                public FileVisitResult postVisitDirectory(
+                                        Path dir,
+                                        IOException error
+                                ) throws IOException {
+                                    if (error != null) {
+                                        throw error;
+                                    }
+                                    Files.delete(dir);
+                                    return FileVisitResult.CONTINUE;
+                                }
+                            });
+                        } catch (IOException ex) {
+                            // COMMIT БД уже произошёл; фиксируем сбой,
+                            // чтобы можно было очистить остатки позже.
+                            log.error(
+                                    "Cannot delete hotel photo directory after commit: {}",
+                                    directory,
+                                    ex
+                            );
+                        }
+                    }
+                }
+        );
     }
 
     private Hotel findHotel(Long hotelId) {

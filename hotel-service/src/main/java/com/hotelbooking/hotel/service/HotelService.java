@@ -42,15 +42,18 @@ public class HotelService {
     private final HotelRepository hotelRepository;
     private final HotelMapper hotelMapper;
     private final RoomRepository roomRepository;
+    private final HotelPhotoService hotelPhotoService;
 
     public HotelService(
             HotelRepository hotelRepository,
             RoomRepository roomRepository,
-            HotelMapper hotelMapper
+            HotelMapper hotelMapper,
+            HotelPhotoService hotelPhotoService
     ) {
         this.hotelRepository = hotelRepository;
         this.roomRepository = roomRepository;
         this.hotelMapper = hotelMapper;
+        this.hotelPhotoService = hotelPhotoService;
     }
 
     @Transactional
@@ -216,9 +219,12 @@ public class HotelService {
 
     @Transactional
     public void deleteHotel(Long id) {
-        Hotel hotel = hotelRepository.findById(id)
+        // Та же блокировка, что используется в HotelPhotoService
+        // при upload/delete/setPrimary/setOrder.
+        Hotel hotel = hotelRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new HotelNotFoundException(id));
 
+        // Прежнее бизнес-правило: отель с номерами не удаляем.
         if (roomRepository.existsByHotelId(id)) {
             throw new ResourceInUseException(
                     "HOTEL_HAS_ROOMS",
@@ -226,18 +232,16 @@ public class HotelService {
             );
         }
 
-        try {
-            hotelRepository.delete(hotel);
-            hotelRepository.flush();
-        } catch (DataIntegrityViolationException ex) {
-            throw new ResourceInUseException(
-                    "HOTEL_HAS_ROOMS",
-                    "Cannot delete hotel with existing rooms: " + id
-            );
-        }
+        // Удаляем метаданные фото В ТОЙ ЖЕ транзакции.
+        // Фото с диска удаляются только после общего COMMIT.
+        hotelPhotoService.removeAllForHotelDeletion(id);
+
+        hotelRepository.delete(hotel);
+        hotelRepository.flush();
 
         log.info("Hotel deleted: id={}", id);
     }
+
     private boolean isHotelUniquenessViolation(
             DataIntegrityViolationException ex
     ) {
