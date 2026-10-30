@@ -17,6 +17,8 @@ import java.util.UUID;
 
 import java.net.URI;
 import java.util.List;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.CurrentSecurityContext;
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -56,33 +58,46 @@ public class BookingController {
     @GetMapping("/{id}")
     public BookingResponse getBookingById(
             @PathVariable Long id,
-            @AuthenticationPrincipal Jwt jwt
+            @AuthenticationPrincipal Jwt jwt,
+            @CurrentSecurityContext(expression = "authentication")
+            Authentication authentication
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-        boolean isAdmin = "ADMIN".equals(jwt.getClaimAsString("role"));
 
-        return bookingService.getBookingById(id, userId, isAdmin);
+        return bookingService.getBookingById(
+                id, userId, isAdmin(authentication)
+        );
     }
-
     @PatchMapping("/{id}/cancel")
     public BookingResponse cancelBooking(
             @PathVariable Long id,
-            @AuthenticationPrincipal Jwt jwt
+            @AuthenticationPrincipal Jwt jwt,
+            @CurrentSecurityContext(expression = "authentication")
+            Authentication authentication
     ) {
         Long userId = Long.valueOf(jwt.getSubject());
-        boolean isAdmin = "ADMIN".equals(jwt.getClaimAsString("role"));
 
-        return bookingService.cancelBooking(id, userId, isAdmin);
+        return bookingService.cancelBooking(
+                id, userId, isAdmin(authentication)
+        );
     }
 
     @GetMapping
     public Page<BookingResponse> getAllBookings(
-            @AuthenticationPrincipal Jwt jwt,
+            @CurrentSecurityContext(expression = "authentication")
+            Authentication authentication,
             @RequestParam(required = false) BookingStatus status,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        boolean isAdmin = "ADMIN".equals(jwt.getClaimAsString("role"));
-
-        return bookingService.getAllBookings(isAdmin, status, pageable);
+        return bookingService.getAllBookings(
+                isAdmin(authentication), status, pageable
+        );
+    }
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority ->
+                        "ROLE_ADMIN".equals(authority.getAuthority())
+                );
     }
 }
