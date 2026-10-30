@@ -5,6 +5,7 @@ import com.hotelbooking.hotel.entity.*;
 import com.hotelbooking.hotel.repository.HotelPhotoRepository;
 import com.hotelbooking.hotel.repository.HotelRepository;
 import com.hotelbooking.hotel.repository.RoomRepository;
+import com.hotelbooking.hotel.repository.RoomPhotoRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,18 +37,23 @@ public class DemoHotelsInitializer implements ApplicationRunner {
     private final HotelRepository hotels;
     private final RoomRepository rooms;
     private final HotelPhotoRepository photos;
+    private final RoomPhotoRepository roomPhotos;
     private final Path photoStorage;
+    private final Path roomPhotoStorage;
 
     public DemoHotelsInitializer(
             HotelRepository hotels,
             RoomRepository rooms,
             HotelPhotoRepository photos,
-            @Value("${app.photos.directory:storage/hotels}")
-            String photoDirectory
+            RoomPhotoRepository roomPhotos,
+            @Value("${app.photos.directory:storage/hotels}") String photoDirectory,
+            @Value("${app.room-photos.directory:storage/rooms}") String roomPhotoDirectory
     ) {
         this.hotels = hotels;
         this.rooms = rooms;
         this.photos = photos;
+        this.roomPhotos = roomPhotos;
+        this.roomPhotoStorage = Path.of(roomPhotoDirectory).toAbsolutePath().normalize();
         this.photoStorage = Path.of(photoDirectory)
                 .toAbsolutePath().normalize();
     }
@@ -81,76 +87,113 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                     rooms.findByHotelId(hotel.getId());
 
             for (RoomSeed roomSeed : seed.rooms()) {
+                Room room = existingRooms.stream()
+                        .filter(r -> r.getNumber().equals(roomSeed.number()))
+                        .findFirst()
+                        .orElse(null);
 
-                boolean exists = existingRooms.stream()
-                        .anyMatch(r -> r.getNumber()
-                                .equals(roomSeed.number()));
-
-                if (!exists) {
-                    Room room = new Room(hotel, roomSeed.number());
-
+                if (room == null) {
+                    room = new Room(hotel, roomSeed.number());
                     room.changeRoomDetails(
                             roomSeed.category(),
                             roomSeed.capacity(),
                             roomSeed.pricePerNight(),
                             roomSeed.amenities()
                     );
-
-                    rooms.save(room);
+                    room = rooms.saveAndFlush(room);
                 }
+
+                seedRoomPhotos(room, seed.photoPrefix());
             }
 
-            List<HotelPhoto> existingPhotos =
-                    photos.findByHotel_IdOrderBySortOrderAscIdAsc(hotel.getId());
-
-            Path directory = photoStorage
-                    .resolve(hotel.getId().toString())
-                    .normalize();
-
-            Files.createDirectories(directory);
-
-            int sortOrder = existingPhotos.size();
-            boolean makePrimary = existingPhotos.isEmpty();
-
-            for (PhotoSeed photoSeed : seed.photos()) {
-
-                Path file = directory
-                        .resolve(photoSeed.fileName())
-                        .normalize();
-
-                if (!file.startsWith(directory)) {
-                    throw new IllegalStateException("Invalid demo photo path");
-                }
-
-                if (Files.notExists(file)) {
-                    ClassPathResource resource = new ClassPathResource(
-                            "demo/hotels/" + photoSeed.resourceName()
-                    );
-
-                    try (var input = resource.getInputStream()) {
-                        Files.copy(input, file);
-                    }
-                }
-
-                boolean exists = existingPhotos.stream()
-                        .anyMatch(p -> p.getFileName()
-                                .equals(photoSeed.fileName()));
-
-                if (!exists) {
-                    photos.save(new HotelPhoto(
-                            hotel,
-                            photoSeed.fileName(),
-                            photoContentType(photoSeed.fileName()),
-                            makePrimary,
-                            sortOrder++
-                    ));
-
-                    makePrimary = false;
-                }
-            }
+            seedHotelPhotos(hotel, seed.photos());
         }
 
-        log.info("Demo initialized: 3 hotels and 9 rooms");
+        log.info("Demo initialized: 3 hotels and 9 rooms; available photos synchronized");
+    }
+
+    /** Existing demo files are imported once. Missing optional files do not block startup. */
+    private void seedHotelPhotos(Hotel hotel, List<PhotoSeed> seeds) throws Exception {
+        List<HotelPhoto> existing =
+                photos.findByHotel_IdOrderBySortOrderAscIdAsc(hotel.getId());
+        Path directory = photoStorage.resolve(hotel.getId().toString()).normalize();
+        if (!directory.startsWith(photoStorage)) {
+            throw new IllegalStateException("Invalid hotel photo directory");
+        }
+        int order = existing.stream().mapToInt(HotelPhoto::getSortOrder)
+                .max().orElse(-1) + 1;
+        boolean primary = existing.isEmpty();
+        for (PhotoSeed photo : seeds) {
+            if (existing.stream().anyMatch(p -> p.getFileName().equals(photo.fileName()))) {
+                continue;
+            }
+            ClassPathResource resource = new ClassPathResource("demo/hotels/" + photo.resourceName());
+            if (!resource.exists()) {
+                log.warn("Optional demo hotel photo not found (demo/hotels/): {}", photo.resourceName());
+                continue;
+            }
+            Path target = directory.resolve(photo.fileName()).normalize();
+            if (!target.startsWith(directory)) {
+                throw new IllegalStateException("Invalid hotel photo path");
+            }
+            Files.createDirectories(directory);
+            if (Files.notExists(target)) {
+                try (var input = resource.getInputStream()) {
+                    Files.copy(input, target);
+                }
+            }
+            photos.save(new HotelPhoto(hotel, photo.fileName(),
+                    photoContentType(photo.fileName()), primary, order++));
+            primary = false;
+        }
+    }
+
+    /** Up to five demo room photos from HOTEL/ROOM/number/photo_1..5; stored with legacy unique names. */
+    private void seedRoomPhotos(Room room, String prefix) throws Exception {
+        List<RoomPhoto> existing = roomPhotos
+                .findByRoom_IdOrderBySortOrderAscIdAsc(room.getId());
+        Path directory = roomPhotoStorage.resolve(room.getId().toString()).normalize();
+        if (!directory.startsWith(roomPhotoStorage)) {
+            throw new IllegalStateException("Invalid room photo directory");
+        }
+        int order = existing.stream().mapToInt(RoomPhoto::getSortOrder)
+                .max().orElse(-1) + 1;
+        boolean primary = existing.isEmpty();
+        for (int i = 1; i <= 5; i++) {
+            String stem = prefix + "-room-" + room.getNumber() + (i == 1 ? "" : "-" + i);
+            // Extension is determined by the actual classpath resource.
+            String fileName = null;
+            ClassPathResource resource = null;
+            for (String extension : List.of(".jpg", ".jpeg", ".png")) {
+                ClassPathResource candidate = new ClassPathResource("demo/hotels/" + prefix + "/ROOM/" + room.getNumber() + "/photo_" + i + extension);
+                if (candidate.exists()) {
+                    fileName = stem + extension;
+                    resource = candidate;
+                    break;
+                }
+            }
+            if (resource == null) {
+                log.debug("Optional demo room photo missing: {}", stem);
+                continue;
+            }
+            final String current = fileName;
+            if (existing.stream().anyMatch(p -> p.getFileName().equals(current))) {
+                continue;
+            }
+            Path target = directory.resolve(fileName).normalize();
+            if (!target.startsWith(directory)) {
+                throw new IllegalStateException("Invalid room photo path");
+            }
+            Files.createDirectories(directory);
+            if (Files.notExists(target)) {
+                try (var input = resource.getInputStream()) {
+                    Files.copy(input, target);
+                }
+            }
+            roomPhotos.save(new RoomPhoto(room, fileName,
+                    photoContentType(fileName), primary, order++));
+            primary = false;
+        }
     }
 
     static String photoContentType(String fileName) {
@@ -178,8 +221,11 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                                 HotelAmenity.GYM
                         ),
                         List.of(
-                                new PhotoSeed("maison-lumiere.jpg", "demo-maison-lumiere.jpg"),
-                                new PhotoSeed("maison-lumiere-2.png", "demo-maison-lumiere-2.png")
+                                new PhotoSeed("maison-lumiere/maison-lumiere.jpg", "maison-lumiere.jpg"),
+                                new PhotoSeed("maison-lumiere/maison-lumiere-2.png", "maison-lumiere-2.png"),
+                                new PhotoSeed("maison-lumiere/maison-lumiere-3.jpg", "maison-lumiere-3.jpg"),
+                                new PhotoSeed("maison-lumiere/maison-lumiere-4.jpg", "maison-lumiere-4.jpg"),
+                                new PhotoSeed("maison-lumiere/maison-lumiere-5.jpg", "maison-lumiere-5.jpg")
                         ),
                         List.of(
                                 new RoomSeed("101", RoomCategory.STANDARD,
@@ -198,7 +244,8 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                                                 RoomAmenity.TV,
                                                 RoomAmenity.MINIBAR,
                                                 RoomAmenity.BALCONY))
-                        )
+                        ),
+                        "maison-lumiere"
                 ),
                 new HotelSeed(
                         "Coral Bay Resort",
@@ -214,8 +261,11 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                                 HotelAmenity.PARKING
                         ),
                         List.of(
-                                new PhotoSeed("coral-bay.jpg", "demo-coral-bay.jpg"),
-                                new PhotoSeed("coral-bay-2.png", "demo-coral-bay-2.png")
+                                new PhotoSeed("coral-bay/coral-bay.jpg", "coral-bay.jpg"),
+                                new PhotoSeed("coral-bay/coral-bay-2.png", "coral-bay-2.png"),
+                                new PhotoSeed("coral-bay/coral-bay-3.jpg", "coral-bay-3.jpg"),
+                                new PhotoSeed("coral-bay/coral-bay-4.jpg", "coral-bay-4.jpg"),
+                                new PhotoSeed("coral-bay/coral-bay-5.jpg", "coral-bay-5.jpg")
                         ),
                         List.of(
                                 new RoomSeed("101", RoomCategory.STANDARD,
@@ -235,7 +285,8 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                                                 RoomAmenity.TV,
                                                 RoomAmenity.MINIBAR,
                                                 RoomAmenity.BALCONY))
-                        )
+                        ),
+                        "coral-bay"
                 ),
                 new HotelSeed(
                         "Alpine Summit Lodge",
@@ -250,8 +301,11 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                                 HotelAmenity.PARKING
                         ),
                         List.of(
-                                new PhotoSeed("alpine-summit.jpg", "demo-alpine-summit.jpg"),
-                                new PhotoSeed("alpine-summit-2.png", "demo-alpine-summit-2.png")
+                                new PhotoSeed("alpine-summit/alpine-summit.jpg", "alpine-summit.jpg"),
+                                new PhotoSeed("alpine-summit/alpine-summit-2.png", "alpine-summit-2.png"),
+                                new PhotoSeed("alpine-summit/alpine-summit-3.jpg", "alpine-summit-3.jpg"),
+                                new PhotoSeed("alpine-summit/alpine-summit-4.jpg", "alpine-summit-4.jpg"),
+                                new PhotoSeed("alpine-summit/alpine-summit-5.jpg", "alpine-summit-5.jpg")
                         ),
                         List.of(
                                 new RoomSeed("101", RoomCategory.STANDARD,
@@ -269,7 +323,8 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                                                 RoomAmenity.TV,
                                                 RoomAmenity.MINIBAR,
                                                 RoomAmenity.BALCONY))
-                        )
+                        ),
+                        "alpine-summit"
                 )
         );
     }
@@ -281,7 +336,8 @@ public class DemoHotelsInitializer implements ApplicationRunner {
             BigDecimal rating,
             Set<HotelAmenity> amenities,
             List<PhotoSeed> photos,
-            List<RoomSeed> rooms
+            List<RoomSeed> rooms,
+            String photoPrefix
     ) {}
 
     private record PhotoSeed(
