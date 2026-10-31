@@ -15,11 +15,11 @@ chmod +x ./gradlew
 ./gradlew clean test
 ```
 
-В исходниках есть тесты каждого модуля (`src/test/java`), включая security, booking и hotel domain. После локального рефакторинга фотосервисов/поиска пользователь подтвердил успешный unit-прогон; прогон нельзя автоматически переносить на будущие изменения.
+В исходниках есть тесты каждого модуля (`src/test/java`), включая security, booking и hotel domain. 
 
 ## E2E
 
-E2E классы содержатся в модуле Booking Service, среди них `HotelBookingSmokeE2ETest`, `HotelBookingSagaFaultE2ETest`, `HotelBookingLoadE2ETest`, `AuthenticationSecurityExtendedE2ETest`, `ResilienceBoundaryE2ETest` и другие. Они предполагают **запущенные отдельно** Eureka, Gateway, Hotel и Booking, корректные JWT/service secrets и, для некоторых fault-сценариев, специальную локальную конфигурацию. Используйте подготовленную в IntelliJ конфигурацию `E2E All`, если она присутствует в рабочем репозитории. Не смешивайте её с `clean test`.
+E2E классы содержатся в модуле Booking Service, среди них `HotelBookingSmokeE2ETest`, `HotelBookingSagaFaultE2ETest`, `HotelBookingLoadE2ETest`, `AuthenticationSecurityExtendedE2ETest`, `ResilienceBoundaryE2ETest` и другие. Они предполагают **запущенные отдельно** Eureka, Gateway, Hotel и Booking, корректные JWT/service secrets и, для некоторых fault-сценариев, специальную локальную конфигурацию. Используйте подготовленную в IntelliJ конфигурацию `E2E All`, из конфигураций запуска проекта. Не смешивайте её с `clean test`.
 
 Проверочный цикл:
 
@@ -29,7 +29,7 @@ E2E классы содержатся в модуле Booking Service, сред�
 4. Запустить E2E All.
 5. Проверить отсутствие неразрешённых `503`, неожиданных `409`, зависших Saga, расхождения `timesBooked` и зарезервированных слотов.
 
-По ранее подтверждённым результатам полный E2E набор проходил после чистого рестарта (до последнего небольшого рефакторинга). После текущего рефакторинга новый E2E прогон ещё не зафиксирован.
+
 
 ## Ручная демонстрация для ментора
 
@@ -47,4 +47,8 @@ E2E классы содержатся в модуле Booking Service, сред�
 | Фильтры и пагинация | Согласованные страницы результатов |
 | Photo upload | Метаданные и файл доступны только по предусмотренному контракту |
 
-Для ручных запросов имеются `requests.http`, `idempotency-tests.http` и другие `.http` примеры. Время и параметры `checkIn/checkOut` нужно обновлять на будущие даты. Важно не обещать успешные тесты без фактического запуска на целевой машине.
+Для ручных запросов имеются `requests.http`, `idempotency-tests.http` и другие `.http` примеры. Время и параметры `checkIn/checkOut` нужно обновлять на будущие даты. 
+
+## Проверка Swagger
+
+При запущенных Booking Service и Hotel Service откройте `/swagger-ui.html` на портах `8081` и `8082` соответственно. Проверьте `/v3/api-docs`, авторизацию через кнопку **Authorize** и выполнение защищённого запроса с JWT. В Hotel Swagger внутренние методы `confirm-availability` и `release` не отображаются.

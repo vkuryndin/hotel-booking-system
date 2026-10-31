@@ -1,11 +1,17 @@
 # REST API — карта контроллеров
 
-Источник: аннотации маршрутизации Java-контроллеров актуального backend. Базовый внешний адрес — `http://localhost:8080`. Маршруты, роли, request/response DTO и ограничения следует проверять в соответствующих контроллерах; таблица фиксирует реальные пути, **а не гарантирует доступность каждого метода всем ролям**.
+Основной адрес для клиентских запросов — `http://localhost:8080` (API Gateway). Методы ниже соответствуют REST-контроллерам Booking Service и Hotel Service.
 
 Для защищённых операций используйте заголовок `Authorization: Bearer <JWT>`. Для создания бронирования дополнительно обязателен `Idempotency-Key` (UUID). Административные методы защищены ролью `ADMIN`, внутренние Saga-методы — служебной авторизацией и блокируются внешним Gateway.
 
 | Сервис | Метод | Путь | Контроллер |
 |---|---|---|---|
+| `booking-service` | `POST` | `/api/users` | `AdminUserController` |
+| `booking-service` | `GET` | `/api/users` | `AdminUserReadController` |
+| `booking-service` | `GET` | `/api/users/me` | `UserProfileController` |
+| `booking-service` | `PATCH` | `/api/users/me` | `UserProfileController` |
+| `booking-service` | `POST` | `/api/bookings` | `BookingController` |
+| `booking-service` | `GET` | `/api/bookings` | `BookingController` |
 | `booking-service` | `DELETE` | `/api/users/{id}` | `AdminUserController` |
 | `booking-service` | `GET` | `/api/users/{id}` | `AdminUserReadController` |
 | `booking-service` | `PATCH` | `/api/users/{id}` | `AdminUserUpdateController` |
@@ -19,6 +25,12 @@
 | `booking-service` | `POST` | `/api/users/register` | `RegistrationController` |
 | `booking-service` | `POST` | `/api/users/me/change-password` | `UserPasswordController` |
 | `booking-service` | `GET` | `/api/users/token-status` | `UserPasswordController` |
+| `hotel-service` | `POST` | `/api/hotels` | `HotelController` |
+| `hotel-service` | `GET` | `/api/hotels` | `HotelController` |
+| `hotel-service` | `POST` | `/api/rooms` | `RoomController` |
+| `hotel-service` | `GET` | `/api/rooms` | `RoomController` |
+| `hotel-service` | `GET` | `/api/hotels/{hotelId}/photos` | `HotelPhotoController` |
+| `hotel-service` | `GET` | `/api/rooms/{roomId}/photos` | `RoomPhotoController` |
 | `hotel-service` | `GET` | `/api/hotels/{id}` | `HotelController` |
 | `hotel-service` | `PUT` | `/api/hotels/{id}` | `HotelController` |
 | `hotel-service` | `GET` | `/api/hotels/{id}/room-selection-strategy` | `HotelController` |
@@ -61,4 +73,11 @@
 
 ## Swagger/OpenAPI
 
-В обоих сервисах присутствует зависимость `org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1`. Поскольку настройка Swagger находится на паузе, не считаем работу `/swagger-ui.html` гарантированной; после завершения задачи следует отдельно проверить `/v3/api-docs`, UI, политики JWT и сокрытие внутренних методов.
+Booking Service и Hotel Service используют `springdoc-openapi-starter-webmvc-ui:3.1.1` и собственные `OpenApiConfig` с описанием API и схемой `bearerAuth` (HTTP Bearer JWT). Контроллеры распределены по группам через `@Tag`; регистрация и вход отмечены как операции без JWT. Служебный `RoomReservationController` исключён из спецификации через `@Hidden`.
+
+| Сервис | Swagger UI | JSON-спецификация |
+|---|---|---|
+| Booking | `http://localhost:8081/swagger-ui.html` | `http://localhost:8081/v3/api-docs` |
+| Hotel | `http://localhost:8082/swagger-ui.html` | `http://localhost:8082/v3/api-docs` |
+
+Для выполнения защищённого запроса в Swagger UI нажмите **Authorize**, вставьте пользовательский JWT и используйте **Try it out → Execute**. UI доступен без токена; доступ к операциям регулируется Spring Security.
