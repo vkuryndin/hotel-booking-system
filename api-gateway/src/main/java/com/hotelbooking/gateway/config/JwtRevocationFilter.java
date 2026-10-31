@@ -8,7 +8,10 @@ import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.http.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -94,7 +97,9 @@ public class JwtRevocationFilter implements GlobalFilter, Ordered {
 
   /** Coalesce concurrent checks for the same token; never cache decisions after completion. */
   private Mono<Integer> checkToken(String token, ServerWebExchange exchange) {
-    if (inFlight.size() > 2048) return fetchTokenStatus(token, exchange);
+    if (inFlight.size() > 2048) {
+      return fetchTokenStatus(token, exchange);
+    }
     return inFlight.computeIfAbsent(
         token,
         key -> {
@@ -118,7 +123,9 @@ public class JwtRevocationFilter implements GlobalFilter, Ordered {
               headers.setBearerAuth(token);
               headers.set(GatewaySecretFilter.HEADER, secret);
               String traceId = exchange.getRequest().getHeaders().getFirst(TraceWebFilter.HEADER);
-              if (traceId != null) headers.set(TraceWebFilter.HEADER, traceId);
+              if (traceId != null) {
+                headers.set(TraceWebFilter.HEADER, traceId);
+              }
             })
         .exchangeToMono(response -> Mono.just(response.statusCode().value()))
         .timeout(Duration.ofSeconds(3))
