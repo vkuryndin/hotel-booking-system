@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Hotel Booking">
+  <rect width="64" height="64" rx="15" fill="#2563eb"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 48V22a4 4 0 0 1 4-4h30a4 4 0 0 1 4 4v26" stroke-width="4"/>
+    <rect x="19" y="25" width="11" height="8" rx="2" stroke-width="3"/>
+    <rect x="34" y="25" width="11" height="8" rx="2" stroke-width="3"/>
+    <path d="M13 37h38v11H13z" stroke-width="3.7"/>
+  </g>
+</svg>
