@@ -62,7 +62,7 @@ flowchart TB
 
 ## Настройка секретов
 
-Для Booking Service обязательны переменные окружения:
+Для Booking Service обязательны переменные окружения и параметры, перечисленные ниже (учётные данные демопользователей и администратора — необязательные):
 
 | Имя | Назначение |
 |---|---|
@@ -73,7 +73,8 @@ flowchart TB
 | `GATEWAY_INTERNAL_SECRET` | Секрет доверенного взаимодействия Gateway/сервисов; согласовать значение между компонентами, которые его используют |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Необязательная инициализация администратора |
 | `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` | Необязательные пароли демопользователей |
-| `HOTEL_PHOTOS_DIR` | Необязательный каталог фото, по умолчанию `storage/hotels` |
+
+**Каталоги фотографий (Hotel Service).** Переменная `HOTEL_PHOTOS_DIR` задаёт путь к фотографиям отелей; по умолчанию используется `storage/hotels` (`app.photos.directory` в `hotel-service/src/main/resources/application.yml`). Фотографии номеров используют отдельное свойство `app.room-photos.directory`, по умолчанию `storage/rooms`; его считывают `RoomPhotoService` и `DemoHotelsInitializer`. При необходимости другой каталог для номеров задаётся в VM options **Hotel Service**: `-Dapp.room-photos.directory=<абсолютный-путь>`. Оба относительных пути отсчитываются от рабочей директории процесса Hotel Service, а не Booking Service.
 
 Создать keystore можно утилитой JDK `keytool` (пример для тестовой среды):
 
@@ -82,8 +83,24 @@ keytool -genkeypair -alias jwt-signing -keyalg RSA -keysize 3072 -sigalg SHA256w
 keytool -genkeypair -alias service-jwt-signing -keyalg RSA -keysize 3072 -sigalg SHA256withRSA -storetype PKCS12 -keystore service-jwt.p12 -validity 365 -dname "CN=hotel-booking-service"
 ```
 
-`keytool` предложит пароль; затем укажите пути и пароли в переменных окружения **каждой соответствующей Run Configuration**, а `GATEWAY_INTERNAL_SECRET` — в конфигурациях Gateway и Booking/Hotel там, где он читается. Перед запуском сервисов настройте необходимые переменные окружения в Run Configurations IntelliJ IDEA. При запуске из терминала переменные должны быть заданы в окружении процесса, из которого запускается соответствующий сервис. 
-API Gateway проверяет JWT и добавляет служебный заголовок X-Gateway-Internal-Secret, который используется backend-сервисами для защиты от прямого обращения. Gateway также передаёт проверенный IP клиента через X-Verified-Client-IP. Значения служебных секретов задаются через переменные окружения и не должны передаваться пользователями вручную
+`keytool` предложит пароль для каждого хранилища. Алиасы `jwt-signing` и `service-jwt-signing` должны совпадать с `app.jwt.keystore.alias` и `app.jwt.service-keystore.alias` в Booking Service. После создания новых ключей **обязательно экспортируйте их публичные X.509-сертификаты**, поскольку API Gateway и Hotel Service проверяют подписанные токены по файлам `.crt`, а не по приватным keystore:
+
+```powershell
+# Выполняется из корня проекта, там же, где созданы user-jwt.p12 и service-jwt.p12
+keytool -exportcert -rfc -storetype PKCS12 -alias jwt-signing -keystore user-jwt.p12 -file jwt-signing.crt
+keytool -exportcert -rfc -storetype PKCS12 -alias service-jwt-signing -keystore service-jwt.p12 -file service-jwt-signing.crt
+
+# Пользовательский JWT проверяют Gateway и Hotel Service
+Copy-Item .\jwt-signing.crt .\api-gateway\src\main\resources\jwt-signing.crt -Force
+Copy-Item .\jwt-signing.crt .\hotel-service\src\main\resources\jwt-signing.crt -Force
+
+# Служебный JWT проверяет Hotel Service
+Copy-Item .\service-jwt-signing.crt .\hotel-service\src\main\resources\service-jwt-signing.crt -Force
+```
+
+Укажите `JWT_KEYSTORE_PATH` и `SERVICE_JWT_KEYSTORE_PATH` (пути к соответствующим `.p12`) и их пароли **в окружении Booking Service**. Для путей безопаснее использовать абсолютные значения. `GATEWAY_INTERNAL_SECRET` задайте одинаковым в Gateway, Booking Service и Hotel Service. При запуске из IntelliJ IDEA используйте **Environment variables** соответствующих Run Configurations, при запуске через терминал — окружение запускаемых процессов. После замены сертификатов перезапустите Gateway и Hotel Service, а Booking Service запустите с соответствующими новыми keystore; ранее подписанные старыми ключами JWT перестанут проходить проверку.
+
+API Gateway проверяет JWT и добавляет служебный заголовок `X-Gateway-Internal-Secret`, который используется backend-сервисами для защиты от прямого обращения. Gateway также передаёт проверенный IP клиента через `X-Verified-Client-IP`. Секретные значения не должны передаваться пользователями вручную.
 
 ## Конфигурации запуска в IntelliJ IDEA
 
@@ -102,10 +119,10 @@ API Gateway проверяет JWT и добавляет служебный за
 |---|---|
 | Discovery Server | Не требуются |
 | API Gateway | `GATEWAY_INTERNAL_SECRET` |
-| Hotel Service | `GATEWAY_INTERNAL_SECRET`, `APP_DEMO_ENABLED=true`, `HOTEL_PHOTOS_DIR=$PROJECT_DIR$/storage/hotels` |
+| Hotel Service | `GATEWAY_INTERNAL_SECRET`, `APP_DEMO_ENABLED=true`, `HOTEL_PHOTOS_DIR=$PROJECT_DIR$/storage/hotels`; для фото номеров при необходимости добавьте в **VM options** `-Dapp.room-photos.directory=<абсолютный-путь>` |
 | Booking Service | `GATEWAY_INTERNAL_SECRET`, `JWT_KEYSTORE_PATH`, `JWT_KEYSTORE_PASSWORD`, `SERVICE_JWT_KEYSTORE_PATH`, `SERVICE_JWT_KEYSTORE_PASSWORD`, `APP_DEMO_ENABLED=true`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` |
 
-`GATEWAY_INTERNAL_SECRET` должен иметь **одно и то же значение** в Gateway, Hotel и Booking. Пути `JWT_KEYSTORE_PATH` и `SERVICE_JWT_KEYSTORE_PATH` должны указывать на PKCS#12-файлы, соответствующие сертификатам проверки JWT в Gateway и Hotel Service. Пароли и сами секреты в README не приводятся. После настройки запускайте сервисы в порядке Eureka → Gateway → Hotel → Booking.
+`GATEWAY_INTERNAL_SECRET` должен иметь **одно и то же значение** в Gateway, Hotel и Booking. `JWT_KEYSTORE_PATH` и `SERVICE_JWT_KEYSTORE_PATH` указывают на PKCS#12-файлы Booking Service; публичные сертификаты из этих хранилищ должны быть экспортированы и размещены в Gateway/Hotel Service, как показано выше. Пароли и сами секреты в README не приводятся. После настройки запускайте сервисы в порядке Eureka → Gateway → Hotel → Booking.
 
 **E2E All:** отдельная конфигурация **JUnit** для модуля `hotel-booking-system.booking-service.test`, с **JDK 17**, выбором **All in package** → `com.hotelbooking.booking.e2e`, **VM options** `-ea -Dhotel.e2e=true` и **Working directory** `$MODULE_WORKING_DIR$`. Четыре сервиса должны быть запущены. Подробности, в том числе сценарии Saga Fault и файл локальных ADMIN-параметров, приведены в [документации тестирования](docs/testing.md).
 

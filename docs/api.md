@@ -1,6 +1,6 @@
 # REST API — карта контроллеров
 
-Основной адрес для клиентских запросов — `http://localhost:8080` (API Gateway). Методы ниже соответствуют REST-контроллерам Booking Service и Hotel Service.
+Основной адрес для клиентских запросов — `http://localhost:8080` (API Gateway). Методы ниже соответствуют REST-контроллерам Booking Service и Hotel Service. Таблица включает также служебные маршруты, которые **не являются публичным клиентским API** и недоступны через Gateway.
 
 Для защищённых операций используйте заголовок `Authorization: Bearer <JWT>`. Для создания бронирования дополнительно обязателен `Idempotency-Key` (UUID). Административные методы защищены ролью `ADMIN`, внутренние Saga-методы — служебной авторизацией и блокируются внешним Gateway.
 
@@ -24,7 +24,7 @@
 | `booking-service` | `POST` | `/api/users/login` | `LoginController` |
 | `booking-service` | `POST` | `/api/users/register` | `RegistrationController` |
 | `booking-service` | `POST` | `/api/users/me/change-password` | `UserPasswordController` |
-| `booking-service` | `GET` | `/api/users/token-status` | `UserPasswordController` |
+| `booking-service` | `GET` | `/api/users/token-status` | `UserPasswordController` (**внутренний; через Gateway запрещён**) |
 | `hotel-service` | `POST` | `/api/hotels` | `HotelController` |
 | `hotel-service` | `GET` | `/api/hotels` | `HotelController` |
 | `hotel-service` | `POST` | `/api/rooms` | `RoomController` |
@@ -65,6 +65,7 @@
 - `POST /api/bookings`: тело `BookingRequest(roomId, hotelId, autoSelect, checkIn, checkOut, guestCount, strategy)`; даты в `yyyy-MM-dd`. При автоотборе `roomId` игнорируется.
 - `GET /api/bookings/my` и `GET /api/bookings` возвращают страницы (`Page`) с настройками пагинации; второй метод только для ADMIN.
 - `PATCH /api/bookings/{id}/cancel` отменяет бронирование; `DELETE` для данной операции **не используется**.
+- `GET /api/users/token-status` — **внутренняя проверка действительности пользовательского JWT**, вызываемая Gateway напрямую в Booking Service с JWT и `X-Gateway-Internal-Secret`. В `GatewaySecurityConfig` внешние запросы к этому пути явно запрещены (`denyAll`), даже если операция видна в Swagger Booking Service. Клиентам вызывать её не нужно.
 - `POST /api/rooms/{id}/confirm-availability` и `/release` — **внутренние операции** Booking→Hotel, не выполнять через Gateway как пользователь.
 
 ## HTTP-ошибки
