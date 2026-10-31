@@ -28,15 +28,20 @@ REST API системы бронирования отелей на Java 17, Spri
 
 ```mermaid
 flowchart TB
-    Client[HTTP клиент / React / requests.http] --> GW[API Gateway :8080]
-    GW -->|lb://booking-service| BS[Booking Service :8081]
-    GW -->|lb://hotel-service| HS[Hotel Service :8082]
-    BS -->|внутренний HTTP + service JWT| HS
-    BS --- BDB[(H2 bookingdb)]
-    HS --- HDB[(H2 hoteldb)]
-    E[Eureka Server :8761] <-.регистрация и discovery.-> GW
-    E <-.-> BS
-    E <-.-> HS
+    Client["Клиент / React / requests.http"] --> GW["API Gateway :8080"]
+
+    GW -->|"Маршрутизация"| BS["Booking Service :8081"]
+    GW -->|"Маршрутизация"| HS["Hotel Service :8082"]
+    GW -.->|"Проверка статуса JWT"| BS
+    BS -->|"Внутренний REST API + service JWT"| HS
+
+    BS --- BDB[("H2 bookingdb")]
+    HS --- HDB[("H2 hoteldb")]
+
+    E["Eureka Server :8761"]
+    E <-.->|"Регистрация и Service Discovery"| GW
+    E <-.->|"Регистрация и Service Discovery"| BS
+    E <-.->|"Регистрация и Service Discovery"| HS
 ```
 
 | Модуль | Ответственность | Порт |
@@ -79,6 +84,30 @@ keytool -genkeypair -alias service-jwt-signing -keyalg RSA -keysize 3072 -sigalg
 
 `keytool` предложит пароль; затем укажите пути и пароли в переменных окружения **каждой соответствующей Run Configuration**, а `GATEWAY_INTERNAL_SECRET` — в конфигурациях Gateway и Booking/Hotel там, где он читается. Перед запуском сервисов настройте необходимые переменные окружения в Run Configurations IntelliJ IDEA. При запуске из терминала переменные должны быть заданы в окружении процесса, из которого запускается соответствующий сервис. 
 API Gateway проверяет JWT и добавляет служебный заголовок X-Gateway-Internal-Secret, который используется backend-сервисами для защиты от прямого обращения. Gateway также передаёт проверенный IP клиента через X-Verified-Client-IP. Значения служебных секретов задаются через переменные окружения и не должны передаваться пользователями вручную
+
+## Конфигурации запуска в IntelliJ IDEA
+
+В меню **Run → Edit Configurations** создайте четыре конфигурации типа **Spring Boot** (кнопка **+**). Выберите **JDK 17**, модуль и главный класс из таблицы. Для Booking и Hotel укажите `-Dspring.profiles.active=dev` в поле **VM options** (если поле скрыто — **Modify options → Add VM options**).
+
+| Конфигурация | Module (Use classpath of module) | Main class | VM options |
+|---|---|---|---|
+| `DiscoveryServerApplication` | `hotel-booking-system.discovery-server.main` | `com.hotelbooking.discovery.DiscoveryServerApplication` | — |
+| `GatewayApplication` | `hotel-booking-system.api-gateway.main` | `com.hotelbooking.gateway.GatewayApplication` | — |
+| `HotelServiceApplication` | `hotel-booking-system.hotel-service.main` | `com.hotelbooking.hotel.HotelServiceApplication` | `-Dspring.profiles.active=dev` |
+| `BookingServiceApplication` | `hotel-booking-system.booking-service.main` | `com.hotelbooking.booking.BookingServiceApplication` | `-Dspring.profiles.active=dev` |
+
+В поле **Environment variables** настройте:
+
+| Конфигурация | Переменные окружения |
+|---|---|
+| Discovery Server | Не требуются |
+| API Gateway | `GATEWAY_INTERNAL_SECRET` |
+| Hotel Service | `GATEWAY_INTERNAL_SECRET`, `APP_DEMO_ENABLED=true`, `HOTEL_PHOTOS_DIR=$PROJECT_DIR$/storage/hotels` |
+| Booking Service | `GATEWAY_INTERNAL_SECRET`, `JWT_KEYSTORE_PATH`, `JWT_KEYSTORE_PASSWORD`, `SERVICE_JWT_KEYSTORE_PATH`, `SERVICE_JWT_KEYSTORE_PASSWORD`, `APP_DEMO_ENABLED=true`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` |
+
+`GATEWAY_INTERNAL_SECRET` должен иметь **одно и то же значение** в Gateway, Hotel и Booking. Пути `JWT_KEYSTORE_PATH` и `SERVICE_JWT_KEYSTORE_PATH` должны указывать на PKCS#12-файлы, соответствующие сертификатам проверки JWT в Gateway и Hotel Service. Пароли и сами секреты в README не приводятся. После настройки запускайте сервисы в порядке Eureka → Gateway → Hotel → Booking.
+
+**E2E All:** отдельная конфигурация **JUnit** для модуля `hotel-booking-system.booking-service.test`, с **JDK 17**, выбором **All in package** → `com.hotelbooking.booking.e2e`, **VM options** `-ea -Dhotel.e2e=true` и **Working directory** `$MODULE_WORKING_DIR$`. Четыре сервиса должны быть запущены. Подробности, в том числе сценарии Saga Fault и файл локальных ADMIN-параметров, приведены в [документации тестирования](docs/testing.md).
 
 ## Сборка и запуск
 
@@ -154,19 +183,37 @@ chmod +x ./gradlew
 ```mermaid
 sequenceDiagram
     actor U as Пользователь
+    participant G as API Gateway
+    participant E as Eureka Server
     participant B as Booking Service
     participant H as Hotel Service
-    U->>B: POST /api/bookings + Idempotency-Key
+
+    Note over G,H: Регистрация сервисов и обновление реестра Eureka выполняются независимо от бронирования
+    G->>E: Получение реестра сервисов
+    E-->>G: Адреса Booking и Hotel Service
+    B->>E: Получение реестра сервисов
+    E-->>B: Адрес Hotel Service
+
+    U->>G: POST /api/bookings + JWT + Idempotency-Key
+    G->>B: GET /api/users/token-status (проверка JWT)
+    B-->>G: 204 (токен действителен)
+    G->>B: POST /api/bookings (маршрутизация)
     B->>B: PENDING (локальная транзакция)
-    B->>H: confirm-availability (service JWT)
+    B->>H: POST /api/rooms/{id}/confirm-availability (service JWT)
+
     alt Резервация успешна
-      H-->>B: подтверждение
-      B->>B: CONFIRMED
-      B-->>U: 201
-    else Сбой/отказ
-      B->>H: release / компенсация по необходимости
-      B->>B: CANCELLED или состояние для recovery
-      B-->>U: ошибка/результат обработки
+        H-->>B: Подтверждение
+        B->>B: CONFIRMED
+        B-->>G: 201 Created
+        G-->>U: 201 Created
+    else Сбой или отказ
+        opt Если резервация создана
+            B->>H: POST /api/rooms/{id}/release (компенсация)
+            H-->>B: Результат освобождения
+        end
+        B->>B: CANCELLED или состояние для Recovery
+        B-->>G: Результат обработки ошибки
+        G-->>U: HTTP-ответ
     end
 ```
 
@@ -174,10 +221,26 @@ sequenceDiagram
 
 ## Тестирование
 
-1. `clean test`: unit/integration Spring-тесты из модулей.
-2. E2E запускаются отдельно при работающих четырёх сервисах и настроенном тестовом окружении.
-3. Перед повторным E2E-прогоном рекомендуется **перезапустить сервисы**, так как H2 in-memory хранит данные только пока жив процесс.
-4. Отдельно проверить регистрацию, 401/403, конфликт 409, параллельные бронирования, сбои Hotel Service, retry/compensation/recovery, счетчик `timesBooked`.
+Проект включает модульные (Unit), интеграционные (Integration) и сквозные (E2E) тесты.
+
+**Модульные и интеграционные тесты** запускаются из корня проекта командой:
+
+```powershell
+.\gradlew.bat clean test
+```
+
+**E2E-тестирование** выполняется через конфигурацию `E2E All` в IntelliJ IDEA при работающих Eureka Server, API Gateway, Hotel Service и Booking Service. Для изоляции повторных прогонов используется перезапуск сервисов со сбросом данных H2 in-memory.
+
+Автоматизированные тесты охватывают:
+
+- Регистрацию, аутентификацию и разграничение прав доступа (401/403).
+- Проверку конфликтов бронирования (409), параллельных запросов и идемпотентности.
+- Работу алгоритмов подбора номеров.
+- Сбои Hotel Service, Retry, Timeout и Circuit Breaker.
+- Подтверждение, компенсацию и восстановление Saga (Recovery).
+- Корректность учёта бронирований в `timesBooked`.
+
+Все Unit- и E2E-тесты успешно прошли на актуальной версии проекта.
 
 Подробности: [тестирование](docs/testing.md). 
 
@@ -187,12 +250,11 @@ sequenceDiagram
 - [REST API](docs/api.md)
 - [Модель данных](docs/database.md)
 - [Тестирование и демонстрация](docs/testing.md)
-- [Реестр ADR](docs/adr/README.md) — 6 архитектурных решений
+- [Реестр ADR](docs/adr/README.md) — 7 архитектурных решений
 
 ## Ограничения и статус
 
 - `H2 in-memory` и `ddl-auto: create-drop`: после рестарта содержимое БД теряется; это требование учебной версии.
-- Фотографии хранятся в локальной файловой системе.
+- Фотографии хранятся в локальной файловой системе. См. [ADR-007](docs/adr/007-photo-storage.md).
 - Локальные in-memory механизмы ограничения частоты запросов не являются распределённым лимитером на несколько экземпляров.
-- Прямой доступ к портам бизнес-сервисов допустим для локальной отладки, но для production требуется сетевая изоляция и политика доступа.
 
