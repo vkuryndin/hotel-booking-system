@@ -12,17 +12,20 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class AuthenticationSecurityExtendedE2ETest extends ExtendedE2ESupport {
     private Account cached;
-    Account testUser() { if (cached==null) cached=register("securitysuite"); return cached; }
+    Account testUser() { if (cached==null) cached=registerDistinct("securitysuite"); return cached; }
     @Test @Order(1) void wrongPasswordRejectedAndValidPasswordWorks() {
         Account a=testUser();
         expect(401,json("POST","/api/users/login",null,Map.of("email",a.email(),"password","DefinitelyWrong123!")));
         assertFalse(login(a.email(),a.password()).isBlank());
     }
-    @Test @Order(99) @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="hotel.e2e.exclusive-rate-limit", matches="true") void distributedAttemptsAgainstOneAccountAreBounded() throws Exception {
+    @Test @Order(99) void distributedAttemptsAgainstOneAccountAreBounded() throws Exception {
         Account a=testUser();
         List<Callable<Response>> requests=new ArrayList<>();
-        for(int i=0;i<20;i++) requests.add(() -> json("POST","/api/users/login",null,
-                Map.of("email",a.email(),"password","WrongPassword123!")));
+        for(int i=0;i<20;i++) {
+            int index=i;
+            requests.add(() -> jsonFromLoopback("/api/users/login",
+                Map.of("email",a.email(),"password","WrongPassword123!"),index+500));
+        }
         List<Response> all=concurrent(20,requests);
         long limited=all.stream().filter(r -> r.status()==429).count();
         assertTrue(limited>0,"Account brute-force protection did not return 429: "+all.stream().map(Response::status).toList());

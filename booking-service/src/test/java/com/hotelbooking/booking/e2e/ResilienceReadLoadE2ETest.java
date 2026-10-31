@@ -25,9 +25,21 @@ class ResilienceReadLoadE2ETest extends ExtendedE2ESupport {
         for(Response r:concurrent(24,jobs))expect(200,r);
     }
     @Test void alternatingUserTokensKeepDataPrivate() {
-        Account one=user();Account two=register("readother");
+        Account one=user();Account two=registerDistinct("readother");
         Response a=get("/api/users/me",one.token());Response b=get("/api/users/me",two.token());
-        expect(200,a);expect(200,b);assertNotEquals(node(a).path("id").asText(),node(b).path("id").asText());
+        expect(200,a);expect(200,b);
+        System.out.println("[E2E PROFILE] User 1 email: " + one.email());
+        System.out.println("[E2E PROFILE] User 2 email: " + two.email());
+        System.out.println("[E2E PROFILE] User 1 profile: " + a.body());
+        System.out.println("[E2E PROFILE] User 2 profile: " + b.body());
+        System.out.println("[E2E PROFILE] Same JWT: " + one.token().equals(two.token()));
+        assertNotEquals(one.token(),two.token(),"Different users must receive distinct JWT");
+        assertEquals(one.email(),node(a).path("email").asText(),
+                "First token resolved to someone else's profile: "+a.body());
+        assertEquals(two.email(),node(b).path("email").asText(),
+                "Second token resolved to someone else's profile: "+b.body());
+        assertNotEquals(node(a).path("id").asText(),node(b).path("id").asText(),
+                "Distinct account profiles must have distinct IDs: "+a.body()+" / "+b.body());
     }
     @Test void repeatedAdminListIsAccessible() {
         String jwt=adminUser().token();for(int i=0;i<5;i++)expect(200,get("/api/users?page=0&size=2",jwt));

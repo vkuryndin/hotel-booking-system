@@ -79,9 +79,8 @@ abstract class SagaE2ESupport {
         String email = adminSettings.getProperty("email");
         String password = adminSettings.getProperty("password");
         if (email != null && password != null) {
-            R login = post("/api/users/login", Map.of("email", email, "password", password), null, null);
-            assertEquals(200, login.status(), "Invalid local Saga E2E ADMIN credentials: " + shortR(login));
-            admin = new User(email, js(login).path("accessToken").asText());
+            ExtendedE2ESupport.Account fixtureAdmin = new ExtendedE2ESupport() {}.admin();
+            admin = new User(fixtureAdmin.email(), fixtureAdmin.token());
             R hotel = post("/api/hotels", Map.of("name", "SAGA-E2E-" + run,
                     "address", "Isolated Saga E2E fixture " + run), admin.token(), null);
             assertEquals(201, hotel.status(), "Could not create test hotel: " + shortR(hotel));
@@ -141,21 +140,10 @@ abstract class SagaE2ESupport {
     }
 
     User register(String label) {
-        String suffix = UUID.randomUUID().toString().substring(0, 8);
-        String email = "saga-" + label + "-" + run + "-" + suffix + "@example.com";
-        Map<String, Object> registration = Map.of(
-                "email", email, "password", PASS,
-                "username", "saga" + UUID.randomUUID().toString().replace("-", "").substring(0, 12),
-                "firstName", "Saga", "lastName", "E2E");
-        assertEquals("Saga", registration.get("firstName"), "Missing firstName in Saga fixture");
-        assertEquals("E2E", registration.get("lastName"), "Missing lastName in Saga fixture");
-        R created = post("/api/users/register", registration, null, null);
-        assertEquals(201, created.status(), "Registration failed: " + shortR(created));
-        R login = post("/api/users/login", Map.of("email", email, "password", PASS), null, null);
-        assertEquals(200, login.status(), "Login failed: " + shortR(login));
-        String token = js(login).path("accessToken").asText();
-        assertFalse(token.isBlank(), "Login did not return accessToken for " + email);
-        return new User(email, token);
+        // Share a single authenticated USER fixture with the rest of the E2E suite.
+        // Public register/login per Saga class exhausted 5/hour and 20/minute quotas.
+        ExtendedE2ESupport.Account fixture = new ExtendedE2ESupport() {}.register("saga");
+        return new User(fixture.email(), fixture.token());
     }
 
     LocalDate day(int offset) { return start.plusDays(offset); }

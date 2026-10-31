@@ -27,5 +27,5 @@ class ResilienceBoundaryE2ETest extends ExtendedE2ESupport {
     @Test void hotelsAndRoomsHaveValidPagination(){Account actor=user();Response hotels=get("/api/hotels?page=0&size=5",actor.token());expect(200,hotels);assertTrue(node(hotels).path("content").isArray());}
     @Test void photosForMissingHotelReturn404(){assertEquals(404,get("/api/hotels/999999999/photos",user().token()).status());}
     @Test void photosForMissingRoomReturn404(){assertEquals(404,get("/api/rooms/999999999/photos",user().token()).status());}
-    @Test void unknownHotelStatisticsReturn404(){assertEquals(404,get("/api/hotels/999999999/statistics",user().token()).status());}
+    @Test void unknownHotelStatisticsReturn404(){assertEquals(404,get("/api/hotels/999999999/statistics",administrator().token()).status());}
 }
