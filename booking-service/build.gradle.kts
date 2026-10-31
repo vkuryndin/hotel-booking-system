@@ -4,6 +4,7 @@ plugins {
     checkstyle
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("com.diffplug.spotless")
 }
 
 java {
@@ -78,5 +79,11 @@ tasks.withType<org.gradle.api.plugins.quality.Checkstyle>().configureEach {
     reports {
         html.required = true
         xml.required = true
+    }
+}
+
+spotless {
+    java {
+        googleJavaFormat("1.28.0")
     }
 }

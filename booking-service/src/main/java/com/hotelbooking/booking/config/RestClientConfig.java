@@ -1,75 +1,70 @@
 package com.hotelbooking.booking.config;
 
+import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import org.slf4j.MDC;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import java.net.http.HttpClient;
-import java.time.Duration;
-import org.slf4j.MDC;
-import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
 @Configuration
 public class RestClientConfig {
 
-    @Bean
-    @Primary
-    public RestClient.Builder restClientBuilder() {
-        return RestClient.builder();
-    }
+  @Bean
+  @Primary
+  public RestClient.Builder restClientBuilder() {
+    return RestClient.builder();
+  }
 
-    @Bean
-    @LoadBalanced
-    public RestClient.Builder loadBalancedRestClientBuilder() {
-        return RestClient.builder();
-    }
+  @Bean
+  @LoadBalanced
+  public RestClient.Builder loadBalancedRestClientBuilder() {
+    return RestClient.builder();
+  }
 
-    @Bean
-    public RestClient hotelRestClient(
-            @LoadBalanced RestClient.Builder builder
-    ) {
-        return builder
-                .baseUrl("http://hotel-service")
-                .requestFactory(hotelRequestFactory())
+  @Bean
+  public RestClient hotelRestClient(@LoadBalanced RestClient.Builder builder) {
+    return builder
+        .baseUrl("http://hotel-service")
+        .requestFactory(hotelRequestFactory())
 
-                // Перехватываем исключение внутри HTTP-транспорта,
-                // а не по тексту сообщения.
-                .requestInterceptors(interceptors ->
-                        interceptors.add(0, (request, body, execution) -> {
-                            try {
-                                return execution.execute(request, body);
-                            } catch (IllegalStateException ex) {
-                                throw new HotelServiceUnavailableException(ex);
-                            }
-                        })
-                )
+        // Перехватываем исключение внутри HTTP-транспорта,
+        // а не по тексту сообщения.
+        .requestInterceptors(
+            interceptors ->
+                interceptors.add(
+                    0,
+                    (request, body, execution) -> {
+                      try {
+                        return execution.execute(request, body);
+                      } catch (IllegalStateException ex) {
+                        throw new HotelServiceUnavailableException(ex);
+                      }
+                    }))
+        .requestInterceptor(
+            (request, body, execution) -> {
+              String traceId = MDC.get("traceId");
 
-                .requestInterceptor((request, body, execution) -> {
-                    String traceId = MDC.get("traceId");
+              if (traceId != null) {
+                request.getHeaders().set("X-Trace-Id", traceId);
+              }
 
-                    if (traceId != null) {
-                        request.getHeaders().set(
-                                "X-Trace-Id",
-                                traceId
-                        );
-                    }
+              return execution.execute(request, body);
+            })
+        .build();
+  }
 
-                    return execution.execute(request, body);
-                })
-                .build();
-    }
-    private JdkClientHttpRequestFactory hotelRequestFactory() {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(2))
-                .build();
+  private JdkClientHttpRequestFactory hotelRequestFactory() {
+    HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 
-        JdkClientHttpRequestFactory factory =
-                new JdkClientHttpRequestFactory(client);
+    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(client);
 
-        factory.setReadTimeout(Duration.ofSeconds(5));
+    factory.setReadTimeout(Duration.ofSeconds(5));
 
-        return factory;
-    }
+    return factory;
+  }
 }
