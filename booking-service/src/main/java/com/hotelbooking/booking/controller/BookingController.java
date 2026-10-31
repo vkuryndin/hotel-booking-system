@@ -11,7 +11,7 @@ import com.hotelbooking.booking.dto.request.BookingRequest;
 import com.hotelbooking.booking.dto.response.BookingResponse;
 import com.hotelbooking.booking.entity.BookingStatus;
 import com.hotelbooking.booking.service.BookingService;
-import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,7 +25,7 @@ import org.springframework.data.web.PageableDefault;
 import java.util.UUID;
 
 import java.net.URI;
-import java.util.List;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.CurrentSecurityContext;
 
