@@ -7,7 +7,11 @@ import com.hotelbooking.booking.service.LoginService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 
+@SecurityRequirements // Public endpoint: no JWT required.
+@Tag(name = "Аутентификация")
 @RestController
 @RequestMapping("/api/users")
 public class LoginController {

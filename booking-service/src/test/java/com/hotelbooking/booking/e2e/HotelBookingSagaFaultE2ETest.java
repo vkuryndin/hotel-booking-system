@@ -223,10 +223,18 @@ class HotelBookingSagaFaultE2ETest extends SagaE2ESupport {
             R deniedRetry=send(GATEWAY,"POST","/api/bookings/"+id+"/recovery/retry",
                     owner.token(),null,null,null);
             assertEquals(403,deniedRetry.status(),"USER must not requeue exhausted Saga");
+
+            // Requeue while Hotel Service is still OUT_OF_SERVICE. Otherwise the
+            // recovery state can change during Eureka restoration and the 17-second
+            // circuit-breaker settling interval, making this a timing-dependent test.
+            // Requeue only schedules recovery; it does not call Hotel Service.
+            R retried=send(GATEWAY,"POST","/api/bookings/"+id+"/recovery/retry",
+                    admin.token(),null,null,null);
+            assertEquals(202,retried.status(),"ADMIN retry failed for booking " + id
+                    + ": " + shortR(retried)
+                    + "; exhausted-list-before-retry=" + shortR(get(
+                            "/api/bookings/recovery/exhausted",admin.token())));
         } finally { if(changedEureka) up(); }
-        R retried=send(GATEWAY,"POST","/api/bookings/"+id+"/recovery/retry",
-                admin.token(),null,null,null);
-        assertEquals(202,retried.status(),"ADMIN retry failed: " + shortR(retried));
         await("manual requeue finishes cancellation",Duration.ofMinutes(5),()-> {
             R state=booking(id,owner);
             return state.status()==200 && "CANCELLED".equals(js(state).path("status").asText());

@@ -9,7 +9,9 @@ import com.hotelbooking.hotel.service.RoomReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Hidden;
 
+@Hidden // Internal SERVICE-only Saga endpoints; not part of the public API specification.
 @RestController
 @RequestMapping("/api/rooms")
 public class RoomReservationController {

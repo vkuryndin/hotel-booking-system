@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.net.URI;
 import org.springframework.data.domain.Page;
@@ -17,6 +18,7 @@ import org.springframework.data.web.PageableDefault;
 import com.hotelbooking.hotel.entity.HotelAmenity;
 import java.math.BigDecimal;
 import com.hotelbooking.hotel.strategy.RoomSelectionMode;
+@Tag(name = "Отели")
 @RestController
 @RequestMapping("/api/hotels")
 public class HotelController {

@@ -7,9 +7,13 @@ import com.hotelbooking.booking.service.RegistrationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 
 import java.net.URI;
 
+@SecurityRequirements // Public endpoint: no JWT required.
+@Tag(name = "Регистрация")
 @RestController
 @RequestMapping("/api/users")
 public class RegistrationController {

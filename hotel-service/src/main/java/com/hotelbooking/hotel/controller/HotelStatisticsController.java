@@ -5,7 +5,9 @@ import com.hotelbooking.hotel.service.HotelStatisticsService;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Статистика отелей")
 @RestController
 @RequestMapping("/api/hotels")
 public class HotelStatisticsController {

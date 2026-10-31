@@ -7,10 +7,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+@Tag(name = "Фотографии номеров")
 @RestController
 @RequestMapping("/api/rooms/{roomId}/photos")
 public class RoomPhotoController {

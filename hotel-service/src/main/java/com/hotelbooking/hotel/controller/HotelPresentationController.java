@@ -7,7 +7,9 @@ import com.hotelbooking.hotel.service.HotelPresentationService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Оформление отелей")
 @RestController
 @RequestMapping("/api/hotels")
 public class HotelPresentationController {
