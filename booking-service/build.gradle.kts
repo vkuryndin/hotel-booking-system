@@ -1,6 +1,7 @@
 plugins {
     java
     jacoco
+    checkstyle
     id("org.springframework.boot")
     id("io.spring.dependency-management")
 }
@@ -61,6 +62,19 @@ tasks.test {
 }
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+
+checkstyle {
+    toolVersion = "12.3.1"
+    configProperties["org.checkstyle.google.severity"] = "warning"
+    maxWarnings = Int.MAX_VALUE
+}
+
+tasks.withType<org.gradle.api.plugins.quality.Checkstyle>().configureEach {
     reports {
         html.required = true
         xml.required = true

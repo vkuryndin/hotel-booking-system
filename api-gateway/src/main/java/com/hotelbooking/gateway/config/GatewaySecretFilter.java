@@ -1,4 +1,3 @@
-
 package com.hotelbooking.gateway.config;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -12,45 +11,39 @@ import reactor.core.publisher.Mono;
 @Component
 public class GatewaySecretFilter implements GlobalFilter, Ordered {
 
-    public static final String HEADER =
-            "X-Gateway-Internal-Secret";
+  public static final String HEADER = "X-Gateway-Internal-Secret";
 
-    private final String secret;
+  private final String secret;
 
-    public GatewaySecretFilter(
-            @Value("${GATEWAY_INTERNAL_SECRET}") String secret
-    ) {
-        if (secret.isBlank()) {
-            throw new IllegalArgumentException(
-                    "GATEWAY_INTERNAL_SECRET must be set");
-        }
-        this.secret = secret;
+  public GatewaySecretFilter(@Value("${GATEWAY_INTERNAL_SECRET}") String secret) {
+    if (secret.isBlank()) {
+      throw new IllegalArgumentException("GATEWAY_INTERNAL_SECRET must be set");
     }
+    this.secret = secret;
+  }
 
-    @Override
-    public int getOrder() {
-        return -20;
-    }
+  @Override
+  public int getOrder() {
+    return -20;
+  }
 
-    @Override
-    public Mono<Void> filter(
-            ServerWebExchange exchange,
-            GatewayFilterChain chain
-    ) {
-        var request = exchange.getRequest()
-                .mutate()
-                .headers(headers -> {
-                    headers.remove("X-Verified-Client-IP");
-                    headers.set(HEADER, secret);
-                    java.net.InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
-                    if (remote != null && remote.getAddress() != null) {
-                        headers.set("X-Verified-Client-IP", remote.getAddress().getHostAddress());
-                    }
+  @Override
+  public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    var request =
+        exchange
+            .getRequest()
+            .mutate()
+            .headers(
+                headers -> {
+                  headers.remove("X-Verified-Client-IP");
+                  headers.set(HEADER, secret);
+                  java.net.InetSocketAddress remote = exchange.getRequest().getRemoteAddress();
+                  if (remote != null && remote.getAddress() != null) {
+                    headers.set("X-Verified-Client-IP", remote.getAddress().getHostAddress());
+                  }
                 })
-                .build();
+            .build();
 
-        return chain.filter(
-                exchange.mutate().request(request).build()
-        );
-    }
+    return chain.filter(exchange.mutate().request(request).build());
+  }
 }

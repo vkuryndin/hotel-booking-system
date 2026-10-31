@@ -1,6 +1,7 @@
 plugins {
     java
     jacoco
+    checkstyle
     id("org.springframework.boot")
     id("io.spring.dependency-management")
 }

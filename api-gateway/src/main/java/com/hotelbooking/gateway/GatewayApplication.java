@@ -9,13 +9,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 @SpringBootApplication
 public class GatewayApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(GatewayApplication.class, args);
-    }
+  public static void main(String[] args) {
+    SpringApplication.run(GatewayApplication.class, args);
+  }
 
-    @Bean
-    @LoadBalanced
-    public WebClient.Builder loadBalancedWebClientBuilder() {
-        return WebClient.builder();
-    }
+  @Bean
+  @LoadBalanced
+  public WebClient.Builder loadBalancedWebClientBuilder() {
+    return WebClient.builder();
+  }
 }
