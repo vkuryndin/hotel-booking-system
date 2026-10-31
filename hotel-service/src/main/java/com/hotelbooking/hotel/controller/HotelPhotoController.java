@@ -1,5 +1,12 @@
 package com.hotelbooking.hotel.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import com.hotelbooking.hotel.dto.response.HotelPhotoResponse;
 import com.hotelbooking.hotel.service.HotelPhotoService;
 
@@ -12,7 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@Tag(name = "Фотографии отелей")
+@Tag(name = "Фотографии отелей", description = "Управление галереей изображений отеля.")
 @RestController
 @RequestMapping("/api/hotels/{hotelId}/photos")
 public class HotelPhotoController {
@@ -23,17 +30,33 @@ public class HotelPhotoController {
         this.service = service;
     }
 
+    @Operation(summary = "Получить фотографии отеля", description = "Возвращает метаданные фотографий указанного отеля с порядком и признаком главного изображения.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Список фотографий отеля.", useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные, параметры или формат запроса.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Отсутствует, истёк или недействителен JWT.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав или запрещён доступ к чужим данным.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Запрошенный отель, номер или фотография не найдены.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class)))
+    })
     @GetMapping
     public List<HotelPhotoResponse> list(
-            @PathVariable Long hotelId
+            @Parameter(description = "Идентификатор отеля.") @PathVariable Long hotelId
     ) {
         return service.list(hotelId);
     }
 
+    @Operation(summary = "Скачать фотографию отеля", description = "Возвращает исходный файл фотографии; Content-Type соответствует сохранённому типу изображения.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Бинарный файл JPEG, PNG или WebP.", content = @Content(mediaType = "image/*", schema = @Schema(type = "string", format = "binary"))),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные, параметры или формат запроса.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Отсутствует, истёк или недействителен JWT.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав или запрещён доступ к чужим данным.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Запрошенный отель, номер или фотография не найдены.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class)))
+    })
     @GetMapping("/{photoId}/file")
     public ResponseEntity<Resource> getFile(
-            @PathVariable Long hotelId,
-            @PathVariable Long photoId
+            @Parameter(description = "Идентификатор отеля.") @PathVariable Long hotelId,
+            @Parameter(description = "Идентификатор фотографии.") @PathVariable Long photoId
     ) {
         return ResponseEntity.ok()
                 .contentType(
@@ -44,11 +67,21 @@ public class HotelPhotoController {
                 .body(service.getFile(hotelId, photoId));
     }
 
+    @Operation(summary = "Загрузить фотографию отеля (ADMIN)", description = "Загружает JPEG, PNG или WebP через multipart/form-data, поле file. Файл — от 1 байта до 5 МБ; допускается не более 10 фотографий на отель.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Метаданные сохранённой фотографии.", useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные, параметры или формат запроса.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Отсутствует, истёк или недействителен JWT.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав или запрещён доступ к чужим данным.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Запрошенный отель, номер или фотография не найдены.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "413", description = "Загружаемое изображение превышает разрешённый размер.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "415", description = "Неподдерживаемый формат содержимого.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class)))
+    })
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<HotelPhotoResponse> upload(
-            @PathVariable Long hotelId,
-            @RequestPart("file") MultipartFile file
+            @Parameter(description = "Идентификатор отеля.") @PathVariable Long hotelId,
+            @Parameter(description = "Файл изображения (multipart/form-data).") @RequestPart("file") MultipartFile file
     ) {
         HotelPhotoResponse photo = service.upload(hotelId, file);
 
@@ -57,30 +90,54 @@ public class HotelPhotoController {
                 .body(photo);
     }
 
+    @Operation(summary = "Сделать фото главным (ADMIN)", description = "Устанавливает выбранную фотографию главной для отеля.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Обновлённые метаданные фотографии.", useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные, параметры или формат запроса.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Отсутствует, истёк или недействителен JWT.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав или запрещён доступ к чужим данным.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Запрошенный отель, номер или фотография не найдены.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class)))
+    })
     @PatchMapping("/{photoId}/primary")
     @PreAuthorize("hasRole('ADMIN')")
     public HotelPhotoResponse setPrimary(
-            @PathVariable Long hotelId,
-            @PathVariable Long photoId
+            @Parameter(description = "Идентификатор отеля.") @PathVariable Long hotelId,
+            @Parameter(description = "Идентификатор фотографии.") @PathVariable Long photoId
     ) {
         return service.setPrimary(hotelId, photoId);
     }
 
+    @Operation(summary = "Изменить порядок фото отеля (ADMIN)", description = "Меняет позицию фотографии в галерее с помощью параметра sortOrder.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Обновлённый порядок фотографии.", useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные, параметры или формат запроса.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Отсутствует, истёк или недействителен JWT.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав или запрещён доступ к чужим данным.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Запрошенный отель, номер или фотография не найдены.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class)))
+    })
     @PatchMapping("/{photoId}/order")
     @PreAuthorize("hasRole('ADMIN')")
     public HotelPhotoResponse setOrder(
-            @PathVariable Long hotelId,
-            @PathVariable Long photoId,
-            @RequestParam int sortOrder
+            @Parameter(description = "Идентификатор отеля.") @PathVariable Long hotelId,
+            @Parameter(description = "Идентификатор фотографии.") @PathVariable Long photoId,
+            @Parameter(description = "Порядковый номер фотографии в галерее.") @RequestParam int sortOrder
     ) {
         return service.setOrder(hotelId, photoId, sortOrder);
     }
 
+    @Operation(summary = "Удалить фотографию отеля (ADMIN)", description = "Удаляет метаданные и файл фотографии. Успешный ответ не содержит тела.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Фотография удалена.", useReturnTypeSchema = false),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные, параметры или формат запроса.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Отсутствует, истёк или недействителен JWT.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Недостаточно прав или запрещён доступ к чужим данным.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Запрошенный отель, номер или фотография не найдены.", content = @Content(schema = @Schema(implementation = com.hotelbooking.hotel.dto.response.ErrorResponse.class)))
+    })
     @DeleteMapping("/{photoId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(
-            @PathVariable Long hotelId,
-            @PathVariable Long photoId
+            @Parameter(description = "Идентификатор отеля.") @PathVariable Long hotelId,
+            @Parameter(description = "Идентификатор фотографии.") @PathVariable Long photoId
     ) {
         service.delete(hotelId, photoId);
 

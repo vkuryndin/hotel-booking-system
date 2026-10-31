@@ -1,5 +1,7 @@
 package com.hotelbooking.hotel.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import com.hotelbooking.hotel.entity.RoomAmenity;
 import com.hotelbooking.hotel.entity.RoomCategory;
 import jakarta.validation.constraints.DecimalMin;
@@ -9,13 +11,13 @@ import java.math.BigDecimal;
 import java.util.Set;
 
 public record RoomDetailsRequest(
-        RoomCategory category,
+        @Schema(description = "Категория номера.") RoomCategory category,
 
-        @Positive
+        @Schema(description = "Вместимость — положительное целое число.") @Positive
         Integer capacity,
 
-        @DecimalMin("0.00")
+        @Schema(description = "Цена за ночь (неотрицательное значение).") @DecimalMin("0.00")
         BigDecimal pricePerNight,
 
-        Set<RoomAmenity> amenities
+        @Schema(description = "Удобства номера из перечисления RoomAmenity.") Set<RoomAmenity> amenities
 ) {}

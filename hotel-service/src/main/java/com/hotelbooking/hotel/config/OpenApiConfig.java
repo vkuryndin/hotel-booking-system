@@ -16,11 +16,11 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI openApi() {
         return new OpenAPI()
-                .addServersItem(new Server().url("http://localhost:8080").description("API Gateway"))
+                .addServersItem(new Server().url("http://localhost:8080").description("Единая точка входа через API Gateway"))
                 .info(new Info()
-                        .title("Hotel Management Service API")
+                        .title("Сервис отелей и номеров — REST API")
                         .version("1.0")
-                        .description("Управление отелями, номерами, фотографиями, статистикой и рекомендациями."))
+                        .description("Все вызовы выполняются через API Gateway (порт 8080). Для защищённых операций нажмите Authorize и введите JWT. Административные методы требуют роли ADMIN; регистрация и вход доступны без JWT. Внутренние вызовы Saga между сервисами скрыты из публичной спецификации. Коды ошибок и ограничения перечислены для каждой операции."))
                 .components(new Components().addSecuritySchemes("bearerAuth",
                         new SecurityScheme()
                                 .type(SecurityScheme.Type.HTTP)

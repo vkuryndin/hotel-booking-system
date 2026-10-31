@@ -1,21 +1,23 @@
 package com.hotelbooking.booking.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record UpdateMyProfileRequest(
 
-        @Pattern(regexp = "[A-Za-z][A-Za-z0-9._-]{2,29}")
+        @Schema(description = "Новое имя пользователя.") @Pattern(regexp = "[A-Za-z][A-Za-z0-9._-]{2,29}")
         String username,
 
-        @Pattern(regexp = "^$|^\\+[1-9]\\d{7,14}$")
+        @Schema(description = "Новый телефон в международном формате.") @Pattern(regexp = "^$|^\\+[1-9]\\d{7,14}$")
         String phone,
 
-        @Size(max = 80)
+        @Schema(description = "Новое имя.") @Size(max = 80)
         @Pattern(regexp = ".*\\S.*")
         String firstName,
 
-        @Size(max = 80)
+        @Schema(description = "Новая фамилия.") @Size(max = 80)
         @Pattern(regexp = ".*\\S.*")
         String lastName
 ) {

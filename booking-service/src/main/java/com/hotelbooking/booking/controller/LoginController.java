@@ -1,5 +1,12 @@
 package com.hotelbooking.booking.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import com.hotelbooking.booking.dto.request.LoginRequest;
 import com.hotelbooking.booking.dto.response.LoginResponse;
 import com.hotelbooking.booking.service.LoginService;
@@ -11,7 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 
 @SecurityRequirements // Public endpoint: no JWT required.
-@Tag(name = "Аутентификация")
+@Tag(name = "Аутентификация", description = "Получение JWT по email и паролю.")
 @RestController
 @RequestMapping("/api/users")
 public class LoginController {
@@ -22,6 +29,13 @@ public class LoginController {
         this.loginService = loginService;
     }
 
+    @Operation(summary = "Войти и получить JWT", description = "Проверяет email и пароль, выдаёт JWT для последующих запросов. Авторизация не требуется.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "JWT и данные входа.", useReturnTypeSchema = true),
+        @ApiResponse(responseCode = "400", description = "Некорректные данные, параметры или формат запроса.", content = @Content(schema = @Schema(implementation = com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "401", description = "Неверный email или пароль (INVALID_CREDENTIALS).", content = @Content(schema = @Schema(implementation = com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+        @ApiResponse(responseCode = "429", description = "Превышен лимит запросов; повторите после Retry-After.", content = @Content(schema = @Schema(implementation = com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    })
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request) {

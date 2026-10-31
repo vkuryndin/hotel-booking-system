@@ -1,5 +1,7 @@
 package com.hotelbooking.booking.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.Max;
@@ -9,13 +11,13 @@ import jakarta.validation.constraints.Positive;
 import java.time.LocalDate;
 
 public record BookingRequest(
-        Long roomId,
-        Long hotelId,
-        Boolean autoSelect,
-        @NotNull @FutureOrPresent LocalDate checkIn,
-        @NotNull @Future LocalDate checkOut,
-        @Positive @Max(20) Integer guestCount,
-        RoomSelectionMode strategy
+        @Schema(description = "ID номера при ручном выборе (autoSelect=false).") Long roomId,
+        @Schema(description = "ID отеля для автоматического подбора (autoSelect=true).") Long hotelId,
+        @Schema(description = "Автоматически выбрать подходящий номер в отеле (по умолчанию false).") Boolean autoSelect,
+        @Schema(description = "Дата заезда, сегодня или позже (YYYY-MM-DD).") @NotNull @FutureOrPresent LocalDate checkIn,
+        @Schema(description = "Дата выезда позже даты заезда (YYYY-MM-DD).") @NotNull @Future LocalDate checkOut,
+        @Schema(description = "Количество гостей: от 1 до 20; по умолчанию 1.") @Positive @Max(20) Integer guestCount,
+        @Schema(description = "Стратегия автоматического подбора (если не указана — настройка отеля).") RoomSelectionMode strategy
 )
 {
     public BookingRequest {
