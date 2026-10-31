@@ -118,6 +118,37 @@ public class RoomService {
             String direction,
             Pageable pageable
     ) {
+        return searchRooms(new RoomSearchCriteria(
+                hotelId, category, minCapacity, minPrice, maxPrice,
+                available, amenity, sortBy, direction, pageable
+        ));
+    }
+
+    private record RoomSearchCriteria(
+            Long hotelId,
+            RoomCategory category,
+            Integer minCapacity,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Boolean available,
+            RoomAmenity amenity,
+            String sortBy,
+            String direction,
+            Pageable pageable
+    ) {}
+
+    private Page<RoomResponse> searchRooms(RoomSearchCriteria criteria) {
+        Long hotelId = criteria.hotelId();
+        RoomCategory category = criteria.category();
+        Integer minCapacity = criteria.minCapacity();
+        BigDecimal minPrice = criteria.minPrice();
+        BigDecimal maxPrice = criteria.maxPrice();
+        Boolean available = criteria.available();
+        RoomAmenity amenity = criteria.amenity();
+        String sortBy = criteria.sortBy();
+        String direction = criteria.direction();
+        Pageable pageable = criteria.pageable();
+
         if (pageable.getPageSize() > 100) {
             throw new IllegalArgumentException(
                     "Page size must not exceed 100"

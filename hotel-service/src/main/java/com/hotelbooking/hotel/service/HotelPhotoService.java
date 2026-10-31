@@ -100,7 +100,7 @@ public class HotelPhotoService {
         String contentType;
 
         try (InputStream input = file.getInputStream()) {
-            contentType = detectType(input.readNBytes(12));
+            contentType = PhotoFileOperations.detectType(input.readNBytes(12));
         } catch (IOException ex) {
             throw new IllegalStateException(
                     "Cannot read photo", ex
@@ -115,7 +115,7 @@ public class HotelPhotoService {
 
         // A file with a valid signature may still be truncated or corrupted.
         // Decode the complete image BEFORE writing it to storage or the database.
-        validateDecodedImage(file, contentType);
+        PhotoFileOperations.validateDecodedImage(file, contentType);
 
         String extension = switch (contentType) {
             case "image/jpeg" -> ".jpg";
@@ -131,7 +131,7 @@ public class HotelPhotoService {
         // №17: если БД откатится, удаляем созданный файл.
         // Регистрируем ДО копирования, чтобы убрать даже частично
         // записанный файл при ошибке Files.copy().
-        registerRollbackCleanup(destination);
+        PhotoFileOperations.registerRollbackCleanup(destination, log);
 
         try {
             Files.createDirectories(destination.getParent());
@@ -284,7 +284,7 @@ public class HotelPhotoService {
 
         // №17: физический файл удалится только после
         // успешного COMMIT транзакции.
-        registerDeleteAfterCommit(file);
+        PhotoFileOperations.registerDeleteAfterCommit(file, log);
     }
 
     /**
@@ -302,55 +302,7 @@ public class HotelPhotoService {
 
         // Чистим весь каталог данного отеля, включая файлы,
         // оставшиеся от предыдущих неуспешных операций.
-        registerHotelDirectoryDeletionAfterCommit(hotelDirectory(hotelId));
-    }
-
-    private void registerHotelDirectoryDeletionAfterCommit(Path directory) {
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
-                                return;
-                            }
-
-                            // Без FOLLOW_LINKS: не выходим за пределы
-                            // каталога через символические ссылки.
-                            Files.walkFileTree(directory, new SimpleFileVisitor<>() {
-                                @Override
-                                public FileVisitResult visitFile(
-                                        Path file,
-                                        BasicFileAttributes attrs
-                                ) throws IOException {
-                                    Files.delete(file);
-                                    return FileVisitResult.CONTINUE;
-                                }
-
-                                @Override
-                                public FileVisitResult postVisitDirectory(
-                                        Path dir,
-                                        IOException error
-                                ) throws IOException {
-                                    if (error != null) {
-                                        throw error;
-                                    }
-                                    Files.delete(dir);
-                                    return FileVisitResult.CONTINUE;
-                                }
-                            });
-                        } catch (IOException ex) {
-                            // COMMIT БД уже произошёл; фиксируем сбой,
-                            // чтобы можно было очистить остатки позже.
-                            log.error(
-                                    "Cannot delete hotel photo directory after commit: {}",
-                                    directory,
-                                    ex
-                            );
-                        }
-                    }
-                }
-        );
+        PhotoFileOperations.registerDirectoryDeletionAfterCommit(hotelDirectory(hotelId), log);
     }
 
     private Hotel findHotel(Long hotelId) {
@@ -391,125 +343,4 @@ public class HotelPhotoService {
                 .normalize();
     }
 
-    // №17: файл, созданный при неудачной транзакции,
-    // не должен остаться на диске.
-    private void registerRollbackCleanup(Path file) {
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-
-                    @Override
-                    public void afterCompletion(int status) {
-                        if (status != STATUS_COMMITTED) {
-                            try {
-                                Files.deleteIfExists(file);
-                            } catch (IOException ex) {
-                                log.warn(
-                                        "Cannot clean up photo after rollback: {}",
-                                        file,
-                                        ex
-                                );
-                            }
-                        }
-                    }
-                }
-        );
-    }
-
-    // №17: не удаляем файл до фиксации удаления в БД.
-    private void registerDeleteAfterCommit(Path file) {
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            Files.deleteIfExists(file);
-                        } catch (IOException ex) {
-                            // COMMIT уже произошёл: откатить БД нельзя.
-                            // Ошибку обязательно фиксируем в журнале.
-                            log.error(
-                                    "Cannot delete photo file after commit: {}",
-                                    file,
-                                    ex
-                            );
-                        }
-                    }
-                }
-        );
-    }
-
-    private void validateDecodedImage(MultipartFile file, String expectedType) {
-        try (InputStream stream = file.getInputStream();
-             ImageInputStream imageInput = ImageIO.createImageInputStream(stream)) {
-            if (imageInput == null) {
-                throw new IllegalArgumentException("Cannot decode photo");
-            }
-            var readers = ImageIO.getImageReaders(imageInput);
-            if (!readers.hasNext()) {
-                throw new IllegalArgumentException("Unsupported or corrupted image");
-            }
-            ImageReader reader = readers.next();
-            try {
-                reader.setInput(imageInput, true, true);
-                String decodedFormat = reader.getFormatName().toLowerCase(java.util.Locale.ROOT);
-                String expectedFormat = switch (expectedType) {
-                    case "image/jpeg" -> "jpeg";
-                    case "image/png" -> "png";
-                    case "image/webp" -> "webp";
-                    default -> throw new IllegalArgumentException("Unsupported image format");
-                };
-                if (!decodedFormat.equals(expectedFormat)
-                        && !(expectedFormat.equals("jpeg") && decodedFormat.equals("jpg"))) {
-                    throw new IllegalArgumentException("Image format does not match its signature");
-                }
-                int width = reader.getWidth(0);
-                int height = reader.getHeight(0);
-                if (width <= 0 || height <= 0 || (long) width * height > 20_000_000L) {
-                    throw new IllegalArgumentException("Image dimensions are invalid or too large");
-                }
-                BufferedImage decoded = reader.read(0);
-                if (decoded == null || decoded.getWidth() != width || decoded.getHeight() != height) {
-                    throw new IllegalArgumentException("Cannot decode complete image");
-                }
-            } finally {
-                reader.dispose();
-            }
-        } catch (IOException | RuntimeException ex) {
-            throw new IllegalArgumentException("Corrupted or unsupported photo", ex);
-        }
-    }
-
-    private String detectType(byte[] bytes) {
-        if (bytes.length >= 3
-                && (bytes[0] & 255) == 255
-                && (bytes[1] & 255) == 216
-                && (bytes[2] & 255) == 255) {
-            return "image/jpeg";
-        }
-
-        if (bytes.length >= 8
-                && Arrays.equals(
-                Arrays.copyOf(bytes, 8),
-                new byte[] {
-                        (byte) 137, 80, 78, 71,
-                        13, 10, 26, 10
-                }
-        )) {
-            return "image/png";
-        }
-
-        if (bytes.length >= 12
-                && bytes[0] == 'R'
-                && bytes[1] == 'I'
-                && bytes[2] == 'F'
-                && bytes[3] == 'F'
-                && bytes[8] == 'W'
-                && bytes[9] == 'E'
-                && bytes[10] == 'B'
-                && bytes[11] == 'P') {
-            return "image/webp";
-        }
-
-        return null;
-    }
 }
