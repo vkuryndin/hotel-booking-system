@@ -150,7 +150,7 @@ chmod +x ./gradlew
 .\gradlew.bat :booking-service:bootRun
 ```
 
-На macOS/Linux используйте `./gradlew` вместо ` .\gradlew.bat`. Дождитесь регистрации Gateway, Booking и Hotel в Eureka: `http://localhost:8761/`. При холодном старте discovery короткие `503` возможны до регистрации сервисов. HTTP-запросы для ручной проверки находятся в `requests.http` и вспомогательных `.http` файлах репозитория.
+На macOS/Linux используйте `./gradlew` вместо ` .\gradlew.bat`. Дождитесь регистрации Gateway, Booking и Hotel в Eureka: `http://localhost:8761/`. При холодном старте discovery короткие `503` возможны до регистрации сервисов. HTTP-запросы для ручной проверки находятся в `test/manual/requests.http` и вспомогательных `.http` файлах репозитория.
 
 ## Использование API
 
