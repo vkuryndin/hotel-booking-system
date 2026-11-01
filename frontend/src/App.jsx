@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes, Link } from 'react-router-dom'
 import { DashboardLayout, Layout, Protected } from './components/Shared.jsx'
 import { CatalogPage, HomePage, HotelPage } from './pages/Public.jsx'
-import { AccountBookings, AccountOverview, AccountProfile, AuthPage, BookingPage } from './pages/Account.jsx'
+import { AccountBookings, AccountOverview, AccountProfile, AuthPage, ForcedPasswordChangePage, BookingPage } from './pages/Account.jsx'
 import { AdminBookings, AdminOverview, AdminRooms, AdminStatistics } from './pages/Admin.jsx'
 import { AdminHotels } from './pages/AdminHotels.jsx'
 import { AdminUsers } from './pages/AdminUsers.jsx'
@@ -13,6 +13,7 @@ export default function App(){return <Routes><Route element={<Layout/>}>
   <Route path="hotels/:id" element={<HotelPage/>}/>
   <Route path="login" element={<AuthPage mode="login"/>}/>
   <Route path="register" element={<AuthPage mode="register"/>}/>
+  <Route path="change-password" element={<ForcedPasswordChangePage/>}/>
   <Route element={<Protected/>}>
     <Route path="book/:hotelId" element={<BookingPage/>}/>
     <Route path="account" element={<DashboardLayout/>}>

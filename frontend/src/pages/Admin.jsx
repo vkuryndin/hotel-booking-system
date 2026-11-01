@@ -5,7 +5,7 @@ import { ArrowRight, BarChart3, BedDouble, CalendarDays, ChartNoAxesColumn, Chec
 import { api } from '../api/client.js'
 import { RoomPhotoImage } from '../components/RoomPhotos.jsx'
 import { RoomCreationWizard } from '../components/RoomCreationWizard.jsx'
-import { Alert, Amenities, Button, Empty, ImageBlock, PageTitle, Spinner, Status } from '../components/Shared.jsx'
+import { Alert, Amenities, Button, Empty, ImageBlock, PageTitle, Spinner, Status, Pagination } from '../components/Shared.jsx'
 import { arrayOf, formatDate, formatMoney, normalRoom } from '../utils/format.js'
 
 function useHotels(){const [hotels,setHotels]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');async function reload(){setLoading(true);setError('');try{setHotels(arrayOf(await api.hotelsAll()))}catch(e){setError(e.message)}finally{setLoading(false)}}useEffect(()=>{reload()},[]);return {hotels,loading,error,reload}}
@@ -17,11 +17,13 @@ export function AdminRooms() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [wizard, setWizard] = useState(null)
+  const [roomPage,setRoomPage]=useState(0)
+  const ROOM_PAGE_SIZE=20
   useEffect(() => { if (!hotelId && hotels.length) setHotelId(String(hotels[0].id)) }, [hotels, hotelId])
   async function reload() {
     if (!hotelId) return
     setLoading(true)
-    try { setRooms(arrayOf(await api.roomsAll(hotelId)).map(normalRoom)); setError('') }
+    try { setRooms(arrayOf(await api.roomsAll(hotelId)).map(normalRoom));setRoomPage(0); setError('') }
     catch (err) { setError(err.message) }
     finally { setLoading(false) }
   }
@@ -30,7 +32,7 @@ export function AdminRooms() {
   return <>
     <PageTitle eyebrow="НОМЕРНОЙ ФОНД" title="Управление номерами" subtitle="Все изменения — в мастере поверх страницы, без форм внизу."
       action={<Button type="button" disabled={!hotelId} onClick={() => setWizard({ mode:'create' })}><Plus size={17}/> Добавить номер</Button>}/>
-    <div className="admin-filter"><label>Отель<select value={hotelId} onChange={e => {setHotelId(e.target.value); setWizard(null)}}>
+    <div className="admin-filter"><label>Отель<select value={hotelId} onChange={e => {setHotelId(e.target.value);setRoomPage(0); setWizard(null)}}>
       {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
     </select></label><Button type="button" variant="outline" onClick={reload}><RefreshCcw size={16}/> Обновить</Button></div>
     <Alert error={hotelsError || error}/>
@@ -41,7 +43,7 @@ export function AdminRooms() {
       onClose={() => {setWizard(null);reload()}}
     />, document.body)}
     {loading ? <Spinner/> : <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Номер</th><th>Категория</th><th>Гости</th><th>Цена за ночь</th><th>Удобства</th><th>Фото</th><th>Действия</th></tr></thead>
-      <tbody>{rooms.map(room => <tr key={room.id}>
+      <tbody>{rooms.slice(roomPage*ROOM_PAGE_SIZE,(roomPage+1)*ROOM_PAGE_SIZE).map(room => <tr key={room.id}>
         <td><b>№ {room.number}</b><small>ID {room.id}</small></td><td>{room.category}</td><td>{room.capacity}</td><td>{formatMoney(room.pricePerNight)}</td><td><Amenities items={room.amenities} limit={2}/></td>
         <td className="room-admin-preview"><RoomPhotoImage roomId={room.id} hotelId={hotelId} alt={`Номер ${room.number}`}/></td>
         <td className="room-admin-controls">
@@ -49,7 +51,7 @@ export function AdminRooms() {
           <Button type="button" size="small" variant="outline" onClick={() => setWizard({mode:'edit',room,initialStep:1})}><ImagePlus size={15}/> Фотографии</Button>
         </td>
       </tr>)}</tbody></table>
-      {rooms.length === 0 && <Empty title="Для этого отеля нет номеров" action={<Button type="button" onClick={() => setWizard({mode:'create'})}>Создать номер</Button>}/>}</div>}
+      {rooms.length === 0 && <Empty title="Для этого отеля нет номеров" action={<Button type="button" onClick={() => setWizard({mode:'create'})}>Создать номер</Button>}/>}<Pagination page={roomPage} totalPages={Math.ceil(rooms.length/ROOM_PAGE_SIZE)} onChange={setRoomPage}/></div>}
   </>
 }
 export function AdminPhotos() {
@@ -102,5 +104,5 @@ export function AdminPhotos() {
     </>:<Empty icon={FileImage} title="Фотографий пока нет" text="В API отеля пока нет фотографий. Проверьте демозагрузку Hotel Service."/>}
   </>
 }
-export function AdminBookings(){const [bookings,setBookings]=useState([]);const [status,setStatus]=useState('ALL');const [error,setError]=useState('');const [loading,setLoading]=useState(true);const [page,setPage]=useState(0);const [totalPages,setTotalPages]=useState(1);async function load(){setLoading(true);setError('');try{const data=await api.bookingsAdmin({page,size:20,...(status==='ALL'?{}:{status})});setBookings(arrayOf(data));setTotalPages(data?.totalPages||1)}catch(e){setError(e.message)}finally{setLoading(false)}}useEffect(()=>{load()},[status,page]);return <><PageTitle eyebrow="ЗАКАЗЫ" title="Все бронирования" subtitle="Статусы бронирований в Booking Service."/><div className="admin-filter"><label>Статус<select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="ALL">Все</option>{['CONFIRMED','CANCELLED','COMPLETED','PENDING','FAILED'].map(s=><option key={s}>{s}</option>)}</select></label><Button variant="outline" onClick={load}><RefreshCcw size={16}/> Обновить</Button></div><Alert error={error}/>{loading?<Spinner/>:<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Заказ</th><th>Пользователь</th><th>Номер</th><th>Заезд / выезд</th><th>Статус</th></tr></thead><tbody>{bookings.map(b=><tr key={b.id}><td><b>#{b.id}</b></td><td>{b.userEmail||b.userId||'—'}</td><td>#{b.roomId||'—'}</td><td>{formatDate(b.checkIn)} — {formatDate(b.checkOut)}</td><td><Status value={b.status}/></td></tr>)}</tbody></table>{bookings.length===0&&<Empty title="Бронирования отсутствуют"/>}<div className="pagination">{page>0&&<Button variant="outline" size="small" onClick={()=>setPage(p=>p-1)}>Назад</Button>}{totalPages>1&&<span>Страница {page+1} / {totalPages}</span>}{page+1<totalPages&&<Button variant="outline" size="small" onClick={()=>setPage(p=>p+1)}>Далее</Button>}</div></div>}</>}
+export function AdminBookings(){const [bookings,setBookings]=useState([]);const [status,setStatus]=useState('ALL');const [error,setError]=useState('');const [loading,setLoading]=useState(true);const [page,setPage]=useState(0);const [totalPages,setTotalPages]=useState(1);async function load(){setLoading(true);setError('');try{const data=await api.bookingsAdmin({page,size:20,...(status==='ALL'?{}:{status})});setBookings(arrayOf(data));setTotalPages(data?.totalPages||1)}catch(e){setError(e.message)}finally{setLoading(false)}}useEffect(()=>{load()},[status,page]);return <><PageTitle eyebrow="ЗАКАЗЫ" title="Все бронирования" subtitle="Статусы бронирований в Booking Service."/><div className="admin-filter"><label>Статус<select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="ALL">Все</option>{['CONFIRMED','CANCELLED','PENDING','FAILED'].map(s=><option key={s}>{s}</option>)}</select></label><Button variant="outline" onClick={load}><RefreshCcw size={16}/> Обновить</Button></div><Alert error={error}/>{loading?<Spinner/>:<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Заказ</th><th>Пользователь</th><th>Номер</th><th>Заезд / выезд</th><th>Статус</th></tr></thead><tbody>{bookings.map(b=><tr key={b.id}><td><b>#{b.id}</b></td><td>{b.userEmail||b.userId||'—'}</td><td>#{b.roomId||'—'}</td><td>{formatDate(b.checkIn)} — {formatDate(b.checkOut)}</td><td><Status value={b.status}/></td></tr>)}</tbody></table>{bookings.length===0&&<Empty title="Бронирования отсутствуют"/>}<Pagination page={page} totalPages={totalPages} onChange={setPage}/></div>}</>}
 export function AdminStatistics(){const {hotels}=useHotels();const [hotelId,setHotelId]=useState('');const [stats,setStats]=useState(null);const [error,setError]=useState('');const [loading,setLoading]=useState(false);useEffect(()=>{if(!hotelId&&hotels.length)setHotelId(String(hotels[0].id))},[hotels,hotelId]);useEffect(()=>{if(!hotelId)return;let active=true;setLoading(true);setError('');api.statistics(hotelId).then(s=>{if(active)setStats(s)}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[hotelId]);const labels={totalRooms:'Всего номеров',availableRooms:'Доступно номеров',totalBookings:'Всего бронирований',confirmedBookings:'Подтверждено',cancelledBookings:'Отменено',occupancyRate:'Загрузка, %',timesBooked:'Количество броней',totalRevenue:'Выручка (если рассчитывается)',hotelId:'ID отеля'};const metrics=Object.entries(stats||{}).filter(([,v])=>typeof v==='number'||typeof v==='string'||typeof v==='boolean');return <><PageTitle eyebrow="АНАЛИТИКА" title="Статистика отелей" subtitle="Актуальные показатели Hotel Service, без имитации данных."/><div className="admin-filter"><label>Выберите отель<select value={hotelId} onChange={e=>setHotelId(e.target.value)}>{hotels.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}</select></label></div><Alert error={error}/>{loading?<Spinner/>:stats?<><div className="stat-cards">{metrics.map(([k,v],i)=><div key={k}><span className={`stat-icon ${['blue','green','orange'][i%3]}`}><BarChart3 size={22}/></span><b>{String(v)}</b><span>{labels[k]||k.replace(/([A-Z])/g,' $1')}</span></div>)}</div>{metrics.length===0&&<div className="white-card"><h3>Ответ сервера</h3><pre className="data-preview">{JSON.stringify(stats,null,2)}</pre></div>}</>:<Empty icon={ChartNoAxesColumn} title="Выберите отель для просмотра статистики"/>}</>}

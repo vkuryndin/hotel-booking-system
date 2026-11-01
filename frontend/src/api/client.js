@@ -10,7 +10,7 @@ export class ApiError extends Error {
 }
 function errorText(data, response) {
   if (typeof data === 'string' && data.trim()) return data
-  const messages = { REQUEST_IN_PROGRESS:'Бронирование уже обрабатывается. Проверьте историю заказов.', ROOM_ALREADY_BOOKED:'Этот номер уже занят на выбранные даты.', NO_AVAILABLE_ROOMS:'Нет свободных номеров на выбранные даты.', IDEMPOTENCY_KEY_CONFLICT:'Данные заказа изменились. Начните новое бронирование.', INVALID_CREDENTIALS:'Неверный email или пароль.' }
+  const messages = { PASSWORD_CHANGE_REQUIRED:'Для продолжения смените временный пароль.', REQUEST_IN_PROGRESS:'Бронирование уже обрабатывается. Проверьте историю заказов.', ROOM_ALREADY_BOOKED:'Этот номер уже занят на выбранные даты.', NO_AVAILABLE_ROOMS:'Нет свободных номеров на выбранные даты.', IDEMPOTENCY_KEY_CONFLICT:'Данные заказа изменились. Начните новое бронирование.', INVALID_CREDENTIALS:'Неверный email или пароль.' }
   return messages[data?.code] || data?.message || data?.detail || ({400:'Проверьте введённые данные.',401:'Для продолжения войдите в аккаунт.',403:'Недостаточно прав для этой операции.',404:'Данные не найдены.',409:'Конфликт данных. Обновите страницу и повторите действие.',502:'Сервис временно недоступен.',503:'Сервис временно недоступен.'}[response.status]) || `Ошибка сервера (${response.status})`
 }
 export async function request(path, { method='GET', body, auth=true, headers={}, signal }={}) {
@@ -27,6 +27,7 @@ export async function request(path, { method='GET', body, auth=true, headers={},
     const data = response.status === 204 ? null : contentType.includes('application/json') ? await response.json().catch(()=>null) : await response.text().catch(()=> '')
     if (!response.ok) {
       if (response.status===401 && auth && token) window.dispatchEvent(new Event('hotel:auth-expired'))
+      if (response.status===403 && data?.code==='PASSWORD_CHANGE_REQUIRED' && auth && token) window.dispatchEvent(new Event('hotel:password-change-required'))
       throw new ApiError(errorText(data, response), response.status, data?.code, response.headers.get('X-Trace-Id') || data?.traceId)
     }
     return data
@@ -62,6 +63,19 @@ export const api = {
   register: data => request('/users/register', { method:'POST', body:data, auth:false }),
   // ADMIN users: contracts verified against Booking Service controllers / DTOs.
   adminUsers: query => request(`/users?${new URLSearchParams(query)}`),
+  adminUsersAll: async () => {
+    // No server-side name filter. Do not pretend a truncated list is complete.
+    const first = await request('/users?page=0&size=100')
+    const rows = Array.isArray(first?.content) ? [...first.content] : []
+    const pages = Number(first?.totalPages || 1)
+    if (pages > 100) throw new ApiError('Поиск по имени для базы больше 10 000 пользователей требует серверного API-фильтра.', 0, 'SEARCH_LIMIT')
+    for (let page=1;page<pages;page++) {
+      const response = await request(`/users?page=${page}&size=100`)
+      if (!Array.isArray(response?.content)) throw new ApiError('Сервер вернул некорректную страницу пользователей.', 0, 'INVALID_PAGE')
+      rows.push(...response.content)
+    }
+    return rows
+  },
   adminUser: id => request(`/users/${encodeURIComponent(id)}`),
   adminCreateUser: data => request('/users', {method:'POST', body:data}),
   adminUpdateUser: (id,data) => request(`/users/${encodeURIComponent(id)}`, {method:'PATCH', body:data}),
@@ -69,6 +83,7 @@ export const api = {
   adminResetPassword: (id,newPassword) => request(`/users/${encodeURIComponent(id)}/reset-password`, {method:'POST', body:{newPassword}}),
   me: () => request('/users/me'),
   editMe: data => request('/users/me', { method:'PATCH', body:data }),
+  changeMyPassword: data => request('/users/me/change-password', { method:'POST', body:data }),
   hotelsAll: () => fetchAll('/hotels'),
   roomsAll: id => fetchAll('/rooms',{hotelId:id}),
   room: id => request(`/rooms/${encodeURIComponent(id)}`),

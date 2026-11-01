@@ -1,16 +1,55 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, CheckCircle2, ChevronRight, CircleUserRound, MapPin, Search, Shield, UserRound } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, CheckCircle2, ChevronRight, CircleUserRound, MapPin, Search, Shield, KeyRound, UserRound } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
-import { Alert, Button, Empty, ImageBlock, PageTitle, Spinner, Status } from '../components/Shared.jsx'
+import { Alert, Button, Empty, ImageBlock, PageTitle, Spinner, Status, PasswordInput, Pagination } from '../components/Shared.jsx'
 import { RoomPhotoImage } from '../components/RoomPhotos.jsx'
 import { arrayOf, formatDate, formatMoney, fullName, getHotelId, nights, normalRoom, plusDays, validDates } from '../utils/format.js'
 
-export function AuthPage({mode='login'}){const {login,register,user}=useAuth();const navigate=useNavigate();const location=useLocation();const [form,setForm]=useState({email:'',password:'',username:'',firstName:'',lastName:''});const [error,setError]=useState('');const [saving,setSaving]=useState(false)
- if(user) return <div className="container section-space"><div className="auth-panel"><h2>Вы уже вошли в аккаунт</h2><Link className="btn btn-primary" to="/account">Личный кабинет <ArrowRight size={17}/></Link></div></div>
- async function submit(e){e.preventDefault();setSaving(true);setError('');try{if(mode==='register'){await register(form);await login(form.email,form.password)}else await login(form.email,form.password);navigate(location.state?.from ? `${location.state.from.pathname}${location.state.from.search || ''}` : '/account', {replace:true})}catch(err){setError(err.message)}finally{setSaving(false)}}
- return <div className="auth-area"><div className="auth-image"><div><span className="eyebrow">HOTEL BOOKING</span><h2>Ваше следующее путешествие начинается здесь</h2><p>Исследуйте новые направления и управляйте поездками в одном месте.</p></div></div><div className="auth-form-side"><div className="auth-panel"><Link to="/" className="back-link"><ArrowLeft size={17}/> На главную</Link><span className="eyebrow">{mode==='login'?'С ВОЗВРАЩЕНИЕМ':'НАЧНИТЕ ПУТЕШЕСТВИЕ'}</span><h1>{mode==='login'?'Вход в аккаунт':'Создать аккаунт'}</h1><p className="muted">{mode==='login'?'Войдите, чтобы управлять своими бронированиями.':'Зарегистрируйтесь, чтобы бронировать отели.'}</p><Alert error={error}/><form onSubmit={submit} className="form-stack">{mode==='register'&&<><div className="form-row"><label>Имя<input required maxLength="100" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} placeholder="Иван"/></label><label>Фамилия<input required maxLength="100" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} placeholder="Петров"/></label></div><label>Имя пользователя<input required minLength="3" maxLength="100" autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="ivanpetrov"/></label></>}<label>Email<input type="email" required autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="you@example.com"/></label><label>Пароль<input type="password" required minLength={mode==='register'?8:1} autoComplete={mode==='register'?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Введите пароль"/></label><Button type="submit" disabled={saving}>{saving?'Подождите...':mode==='register'?'Зарегистрироваться':'Войти'} <ArrowRight size={17}/></Button></form><div className="auth-switch">{mode==='login'?<>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></>:<>Уже зарегистрированы? <Link to="/login">Войти</Link></>}</div></div></div></div>
+export function AuthPage({mode='login'}){const {login,register,user,passwordChangeRequired}=useAuth();const navigate=useNavigate();const location=useLocation();const [form,setForm]=useState({email:'',password:'',username:'',firstName:'',lastName:''});const [error,setError]=useState('');const [saving,setSaving]=useState(false)
+ if(user) return passwordChangeRequired ? <Navigate to="/change-password" replace/> : <div className="container section-space"><div className="auth-panel"><h2>Вы уже вошли в аккаунт</h2><Link className="btn btn-primary" to="/account">Личный кабинет <ArrowRight size={17}/></Link></div></div>
+ async function submit(e){e.preventDefault();setSaving(true);setError('');try{let signedIn;if(mode==='register'){await register(form);signedIn=await login(form.email,form.password)}else signedIn=await login(form.email,form.password);if(signedIn?.passwordChangeRequired){navigate('/change-password', {replace:true});return}navigate(location.state?.from ? `${location.state.from.pathname}${location.state.from.search || ''}` : '/account', {replace:true})}catch(err){setError(err.message)}finally{setSaving(false)}}
+ return <div className="auth-area"><div className="auth-image"><div><span className="eyebrow">HOTEL BOOKING</span><h2>Ваше следующее путешествие начинается здесь</h2><p>Исследуйте новые направления и управляйте поездками в одном месте.</p></div></div><div className="auth-form-side"><div className="auth-panel"><Link to="/" className="back-link"><ArrowLeft size={17}/> На главную</Link><span className="eyebrow">{mode==='login'?'С ВОЗВРАЩЕНИЕМ':'НАЧНИТЕ ПУТЕШЕСТВИЕ'}</span><h1>{mode==='login'?'Вход в аккаунт':'Создать аккаунт'}</h1><p className="muted">{mode==='login'?'Войдите, чтобы управлять своими бронированиями.':'Зарегистрируйтесь, чтобы бронировать отели.'}</p><Alert error={error}/><Alert success={location.state?.passwordChanged ? "Пароль изменён. Войдите с новым паролем." : ""}/><form onSubmit={submit} className="form-stack">{mode==='register'&&<><div className="form-row"><label>Имя<input required maxLength="100" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} placeholder="Иван"/></label><label>Фамилия<input required maxLength="100" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} placeholder="Петров"/></label></div><label>Имя пользователя<input required minLength="3" maxLength="100" autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="ivanpetrov"/></label></>}<label>Email<input type="email" required autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="you@example.com"/></label><label>Пароль<PasswordInput required minLength={mode==='register'?8:1} autoComplete={mode==='register'?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Введите пароль"/></label><Button type="submit" disabled={saving}>{saving?'Подождите...':mode==='register'?'Зарегистрироваться':'Войти'} <ArrowRight size={17}/></Button></form><div className="auth-switch">{mode==='login'?<>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></>:<>Уже зарегистрированы? <Link to="/login">Войти</Link></>}</div></div></div></div>
+}
+/** Only screen allowed for an authenticated account that must replace its temporary password. */
+export function ForcedPasswordChangePage() {
+  const {user,loading,passwordChangeRequired,logout}=useAuth()
+  const navigate=useNavigate()
+  const [form,setForm]=useState({currentPassword:'',newPassword:'',confirmation:''})
+  const [error,setError]=useState('')
+  const [saving,setSaving]=useState(false)
+  if(loading)return <Spinner/>
+  if(!user)return <Navigate to="/login" replace/>
+  if(!passwordChangeRequired)return <Navigate to="/account" replace/>
+  async function submit(event){
+    event.preventDefault();setError('')
+    const {currentPassword,newPassword,confirmation}=form
+    if(newPassword!==confirmation)return setError('Новые пароли не совпадают.')
+    if(newPassword===currentPassword)return setError('Новый пароль должен отличаться от временного.')
+    if(newPassword.length<8||newPassword.length>64||new TextEncoder().encode(newPassword).length>72)return setError('Новый пароль: 8–64 символа, не более 72 байт UTF-8.')
+    setSaving(true)
+    try{
+      await api.changeMyPassword({currentPassword,newPassword})
+      setForm({currentPassword:'',newPassword:'',confirmation:''})
+      logout()
+      navigate('/login',{replace:true,state:{passwordChanged:true}})
+    }catch(err){setError(err.message)}finally{setSaving(false)}
+  }
+  return <div className="container forced-password-page"><div className="profile-card forced-password-card">
+    <div className="profile-password-heading"><KeyRound size={26}/><div><h1>Требуется сменить пароль</h1><p>Администратор сбросил пароль вашей учётной записи. Для продолжения установите новый пароль.</p></div></div>
+    <div className="forced-account-identity"><CircleUserRound size={19}/><div><span>Вы вошли в учётную запись</span><strong>{user.email || `ID #${user.id}`}</strong></div></div>
+    <div className="admin-users-help"><Shield size={18}/> Используйте временный пароль, с которым только что вошли. Остальные действия станут доступны после смены пароля и повторного входа.</div>
+    <Alert error={error}/>
+    <form className="form-stack" onSubmit={submit}>
+      <label>Текущий (временный) пароль<PasswordInput required autoComplete="current-password" value={form.currentPassword} onChange={e=>setForm(p=>({...p,currentPassword:e.target.value}))}/></label>
+      <label>Новый пароль<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={form.newPassword} onChange={e=>setForm(p=>({...p,newPassword:e.target.value}))}/></label>
+      <label>Подтверждение нового пароля<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={form.confirmation} onChange={e=>setForm(p=>({...p,confirmation:e.target.value}))}/></label>
+      <p className="muted smaller">8–64 символа, максимум 72 байта UTF-8. Старый и новый пароли должны отличаться.</p>
+      <Button disabled={saving} type="submit">{saving?'Сохраняем...':'Сменить пароль и войти заново'} <ArrowRight size={17}/></Button>
+    </form>
+    <button className="link-button forced-logout" type="button" onClick={()=>{logout();navigate('/login',{replace:true})}}>Выйти из аккаунта</button>
+  </div></div>
 }
 export function BookingPage(){const {hotelId}=useParams();const [params]=useSearchParams();const navigate=useNavigate();const {user}=useAuth();const roomId=params.get('roomId');const autoSelect=!roomId;const [checkIn,setCheckIn]=useState(params.get('checkIn')||plusDays(1));const [checkOut,setCheckOut]=useState(params.get('checkOut')||plusDays(3));const [guests,setGuests]=useState(Number(params.get('guests')||2));const [hotel,setHotel]=useState(null);const [room,setRoom]=useState(null);const [error,setError]=useState('');const [saving,setSaving]=useState(false);const [result,setResult]=useState(null);const [key,setKey]=useState(()=>crypto.randomUUID());const [ready,setReady]=useState(false)
  useEffect(()=>{let alive=true;Promise.allSettled([api.hotel(hotelId),roomId?api.roomsAll(hotelId):Promise.resolve([])]).then(([h,r])=>{if(!alive)return;if(h.status==='fulfilled')setHotel(h.value);else setError(h.reason.message);if(r.status==='fulfilled')setRoom(arrayOf(r.value).map(normalRoom).find(x=>String(x.id)===String(roomId)))}).finally(()=>{if(alive)setReady(true)});return()=>{alive=false}},[hotelId,roomId])
@@ -79,10 +118,94 @@ export function BookingItem({booking,onCancel,cancelling=false}) {
     </div>
   </div>
 }
-export function AccountBookings(){const [list,setList]=useState([]);const [status,setStatus]=useState('ALL');const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [success,setSuccess]=useState('');const [cancelling,setCancelling]=useState(null);async function load(){setLoading(true);try{setList(arrayOf(await api.bookingsMyAll()))}catch(e){setError(e.message)}finally{setLoading(false)}}useEffect(()=>{load()},[])
+export function AccountBookings(){const [list,setList]=useState([]);const [status,setStatus]=useState('ALL');const [bookingPage,setBookingPage]=useState(0);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [success,setSuccess]=useState('');const [cancelling,setCancelling]=useState(null);async function load(){setLoading(true);try{setList(arrayOf(await api.bookingsMyAll()))}catch(e){setError(e.message)}finally{setLoading(false)}}useEffect(()=>{load()},[])
  async function cancel(booking){if(!window.confirm(`Отменить бронирование #${booking.id}?`))return;setCancelling(booking.id);setError('');setSuccess('');try{await api.cancelBooking(booking.id);setSuccess('Бронирование отменено.');await load()}catch(e){setError(e.message)}finally{setCancelling(null)}}
  const tabs=[['ALL','Все'],['CONFIRMED','Подтверждённые'],['CANCELLED','Отменённые']];const filtered=status==='ALL'?list:list.filter(b=>b.status===status)
- return <><PageTitle eyebrow="ИСТОРИЯ ПОЕЗДОК" title="Мои бронирования" subtitle="Все ваши поездки и их актуальный статус." action={<Link to="/hotels" className="btn btn-primary btn-small">Найти отель <ArrowRight size={16}/></Link>}/><div className="tab-row">{tabs.map(([value,label])=><button key={value} className={status===value?'active':''} onClick={()=>setStatus(value)}>{label} <span>({value==='ALL'?list.length:list.filter(b=>b.status===value).length})</span></button>)}</div><Alert error={error} success={success}/>{loading?<Spinner/>:filtered.length?<div className="booking-list">{filtered.map(b=><BookingItem key={b.id} booking={b} onCancel={cancel} cancelling={cancelling===b.id}/>)}</div>:<Empty title="Бронирований пока нет" text="Здесь будут отображаться все ваши будущие и прошлые поездки." action={<Link to="/hotels" className="btn btn-primary">Выбрать отель</Link>}/>}</>
+ useEffect(()=>{if(bookingPage>=Math.max(1,Math.ceil(filtered.length/10)))setBookingPage(Math.max(0,Math.ceil(filtered.length/10)-1))},[filtered.length,bookingPage])
+ return <><PageTitle eyebrow="ИСТОРИЯ ПОЕЗДОК" title="Мои бронирования" subtitle="Все ваши поездки и их актуальный статус." action={<Link to="/hotels" className="btn btn-primary btn-small">Найти отель <ArrowRight size={16}/></Link>}/><div className="tab-row">{tabs.map(([value,label])=><button key={value} className={status===value?'active':''} onClick={()=>{setStatus(value);setBookingPage(0)}}>{label} <span>({value==='ALL'?list.length:list.filter(b=>b.status===value).length})</span></button>)}</div><Alert error={error} success={success}/>{loading?<Spinner/>:filtered.length?<div className="booking-list">{filtered.slice(bookingPage*10,(bookingPage+1)*10).map(b=><BookingItem key={b.id} booking={b} onCancel={cancel} cancelling={cancelling===b.id}/>)}</div>:<Empty title={status==='CONFIRMED'?'Подтверждённых бронирований нет':status==='CANCELLED'?'Отменённых бронирований нет':'Бронирований пока нет'} text="Выберите отель, чтобы забронировать номер." action={<Link to="/hotels" className="btn btn-primary">Выбрать отель</Link>}/>} {!loading && <Pagination page={bookingPage} totalPages={Math.ceil(filtered.length/10)} onChange={setBookingPage}/>}</>
 }
-export function AccountProfile(){const {user,refreshUser}=useAuth();const [form,setForm]=useState({firstName:'',lastName:'',username:'',phone:''});const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);const [error,setError]=useState('');const [success,setSuccess]=useState('');useEffect(()=>{api.me().then(data=>setForm({firstName:data.firstName||'',lastName:data.lastName||'',username:data.username||'',phone:data.phone||''})).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[])
- async function submit(e){e.preventDefault();setSaving(true);setError('');setSuccess('');try{await api.editMe(form);await refreshUser();setSuccess('Данные профиля обновлены.')}catch(e){setError(e.message)}finally{setSaving(false)}}return <><PageTitle eyebrow="ЛИЧНЫЕ ДАННЫЕ" title="Мой профиль" subtitle="Измените информацию, которая отображается в вашем аккаунте."/><div className="profile-card"><div className="profile-top"><div className="large-avatar"><UserRound size={44}/></div><div><h2>{fullName(user)}</h2><span>{user?.email}</span></div></div>{loading?<Spinner/>:<form className="form-stack" onSubmit={submit}><Alert error={error} success={success}/><div className="form-row"><label>Имя<input required value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})}/></label><label>Фамилия<input required value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})}/></label></div><label>Имя пользователя<input required value={form.username} onChange={e=>setForm({...form,username:e.target.value})}/></label><label>Телефон<input type="tel" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="+374 ..."/></label><label>Email <span className="muted-inline">(используется для входа)</span><input value={user?.email||''} disabled/></label><div className="profile-actions"><Button type="submit" disabled={saving}>{saving?'Сохраняем...':'Сохранить изменения'}</Button></div></form>}</div><div className="profile-security"><Shield size={21}/><div><b>Безопасность аккаунта</b><p>Вход защищён JWT. Для выхода из аккаунта используйте кнопку в боковом меню.</p></div></div></>}
+export function AccountProfile() {
+  const { user, refreshUser, logout } = useAuth()
+  const navigate = useNavigate()
+  const [form, setForm] = useState({firstName:'',lastName:'',username:'',phone:''})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [passwords, setPasswords] = useState({currentPassword:'',newPassword:'',confirmation:''})
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+
+  useEffect(() => {
+    api.me()
+      .then(data => setForm({firstName:data.firstName||'',lastName:data.lastName||'',username:data.username||'',phone:data.phone||''}))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function submit(e) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      await api.editMe(form)
+      await refreshUser()
+      setSuccess('Данные профиля обновлены.')
+    } catch(e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  async function changePassword(e) {
+    e.preventDefault()
+    setPasswordError('')
+    const {currentPassword,newPassword,confirmation} = passwords
+    if (!currentPassword) return setPasswordError('Укажите текущий пароль.')
+    if (newPassword.length < 8 || newPassword.length > 64 || new TextEncoder().encode(newPassword).length > 72) {
+      return setPasswordError('Новый пароль: от 8 до 64 символов, не более 72 байт UTF-8.')
+    }
+    if (newPassword !== confirmation) return setPasswordError('Новые пароли не совпадают.')
+    if (currentPassword === newPassword) return setPasswordError('Новый пароль должен отличаться от текущего.')
+    setPasswordSaving(true)
+    try {
+      await api.changeMyPassword({currentPassword,newPassword})
+      setPasswords({currentPassword:'',newPassword:'',confirmation:''})
+      // The backend invalidates previous tokens after a password change.
+      logout()
+      navigate('/login', {replace:true, state:{passwordChanged:true}})
+    } catch(e) { setPasswordError(e.message) }
+    finally { setPasswordSaving(false) }
+  }
+
+  return <>
+    <PageTitle eyebrow="ЛИЧНЫЕ ДАННЫЕ" title="Мой профиль" subtitle="Измените информацию, которая отображается в вашем аккаунте."/>
+    <div className="profile-card">
+      <div className="profile-top"><div className="large-avatar"><UserRound size={44}/></div><div><h2>{fullName(user)}</h2><span>{user?.email}</span></div></div>
+      {loading ? <Spinner/> : <form className="form-stack" onSubmit={submit}>
+        <Alert error={error} success={success}/>
+        <div className="form-row">
+          <label>Имя<input required value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})}/></label>
+          <label>Фамилия<input required value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})}/></label>
+        </div>
+        <label>Имя пользователя<input required value={form.username} onChange={e=>setForm({...form,username:e.target.value})}/></label>
+        <label>Телефон<input type="tel" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="+374 ..."/></label>
+        <label>Email <span className="muted-inline">(используется для входа)</span><input value={user?.email||''} disabled/></label>
+        <div className="profile-actions"><Button type="submit" disabled={saving}>{saving?'Сохраняем...':'Сохранить изменения'}</Button></div>
+      </form>}
+    </div>
+    <section className="profile-card profile-password-card" aria-labelledby="change-password-title">
+      <div className="profile-password-heading"><KeyRound size={24}/><div><h2 id="change-password-title">Смена пароля</h2><p>Доступна для всех пользователей, включая администратора.</p></div></div>
+      <form className="form-stack" onSubmit={changePassword}>
+        <Alert error={passwordError}/>
+        <label>Текущий пароль<PasswordInput required autoComplete="current-password" value={passwords.currentPassword} onChange={e=>setPasswords(p=>({...p,currentPassword:e.target.value}))}/></label>
+        <div className="form-row">
+          <label>Новый пароль<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={passwords.newPassword} onChange={e=>setPasswords(p=>({...p,newPassword:e.target.value}))}/></label>
+          <label>Повторите новый пароль<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={passwords.confirmation} onChange={e=>setPasswords(p=>({...p,confirmation:e.target.value}))}/></label>
+        </div>
+        <p className="profile-password-note">8–64 символа, не более 72 байт UTF-8. После успешной смены пароля потребуется войти заново.</p>
+        <div className="profile-actions"><Button type="submit" disabled={passwordSaving}>{passwordSaving?'Меняем пароль...':'Сменить пароль'}</Button></div>
+      </form>
+    </section>
+    <div className="profile-security"><Shield size={21}/><div><b>Безопасность аккаунта</b><p>Вход защищён JWT. При смене пароля прежние токены перестают действовать.</p></div></div>
+  </>
+}

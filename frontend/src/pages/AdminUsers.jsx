@@ -5,7 +5,7 @@ import {
   RefreshCcw, ShieldCheck, Trash2, UsersRound, X,
 } from 'lucide-react'
 import { api } from '../api/client.js'
-import { Alert, Button, Empty, PageTitle, Spinner } from '../components/Shared.jsx'
+import { Alert, Button, Empty, PageTitle, Spinner, PasswordInput, Pagination } from '../components/Shared.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const PAGE_SIZE = 20
@@ -144,9 +144,10 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
                 <label>Email *<input name="email" type="email" required maxLength={255} value={data.email} onChange={change} autoComplete="off"/></label>
                 <label>Телефон (необязательно)<input name="phone" type="tel" placeholder="+374XXXXXXXX" pattern={"\\+[1-9][0-9]{7,14}"} title="Международный формат: + и 8–15 цифр" value={data.phone} onChange={change} autoComplete="off"/></label>
                 <label>Роль *<select name="role" value={data.role} onChange={change} disabled={isSelf} required><option value="USER">Пользователь (USER)</option><option value="ADMIN">Администратор (ADMIN)</option></select></label>
-                {isCreate && <label className="admin-users-wide">Начальный пароль *<input name="password" type="password" required minLength={8} autoComplete="new-password" value={data.password} onChange={change}/><small>Не менее 8 символов, максимум 72 байта UTF-8. Пароль не отображается при проверке.</small></label>}
+                {isCreate && <label className="admin-users-wide">Начальный пароль *<PasswordInput name="password" required minLength={8} autoComplete="new-password" value={data.password} onChange={change}/><small>Не менее 8 символов, максимум 72 байта UTF-8. Пароль не отображается при проверке.</small></label>}
               </div>
               {isSelf && <p className="admin-users-help"><ShieldCheck size={16}/> Изменение собственной роли запрещено backend.</p>}
+              {isEdit && <p className="admin-users-password-note"><KeyRound size={16}/> Пароль не меняется вместе с данными профиля. Для другого пользователя используйте «Сбросить пароль». Для своего — «Мой профиль».</p>}
             </> : <div className="admin-users-review">
               <h3>Проверьте сведения перед сохранением</h3>
               <dl>
@@ -164,9 +165,9 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
             {[['ID',user.id],['Имя',fullUserName(user)],['Имя пользователя',user.username],['Email',user.email],['Телефон',user.phone || 'Не указан'],['Роль',roleName(user.role)]].map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}
           </dl></div>}
           {mode === 'reset' && <form id="admin-user-reset-form" className="admin-form admin-users-form" onSubmit={resetPassword}>
-            <p className="admin-users-help"><KeyRound size={17}/> Укажите новый пароль для {name}. Backend потребует сменить его после сброса.</p>
-            <label>Новый пароль *<input type="password" required minLength={8} maxLength={64} autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)}/></label>
-            <label>Повторите пароль *<input type="password" required minLength={8} maxLength={64} autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)}/></label>
+            <p className="admin-users-help"><KeyRound size={17}/> Укажите новый пароль для {name}. После входа с временным паролем пользователю необходимо сразу установить новый пароль.</p>
+            <label>Новый пароль *<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)}/></label>
+            <label>Повторите пароль *<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)}/></label>
             <small>8–64 символа, не более 72 байт UTF-8. Пароль не включается в ответы API.</small>
           </form>}
           {mode === 'delete' && <div className="admin-users-delete-warning">
@@ -178,6 +179,7 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
           <span>{isCreate || isEdit ? `Шаг ${step + 1} из 2` : `Пользователь #${user.id}`}</span>
           <div className="wizard-footer-actions">
             {(isCreate || isEdit) ? <>
+              {isEdit && <Button variant="outline" onClick={() => onModeChange('reset', user)} disabled={busy}><KeyRound size={16}/> Сбросить пароль</Button>}
               {step === 1 && <Button variant="outline" onClick={() => {setError('');setStep(0)}} disabled={busy}><ArrowLeft size={16}/> Назад</Button>}
               <Button disabled={busy} form="admin-user-form" type="submit">{step === 0 ? 'Далее' : busy ? 'Сохраняем...' : isCreate ? 'Создать пользователя' : 'Сохранить изменения'} <ArrowRight size={16}/></Button>
             </> : mode === 'view' ? <>
@@ -210,7 +212,12 @@ export function AdminUsers() {
   const [revision, setRevision] = useState(0)
   const [dialog, setDialog] = useState(null)
   const [searchId, setSearchId] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [nameQuery, setNameQuery] = useState('')
+  const [matchedUsers, setMatchedUsers] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
   useEffect(() => {
+    if (nameQuery) return
     let active = true
     setLoading(true)
     setError('')
@@ -225,7 +232,34 @@ export function AdminUsers() {
     }).catch(err => { if (active) setError(err.message) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [page, revision])
+  }, [page, revision, nameQuery])
+
+  // Booking Service currently exposes only GET /api/users?page&size, without a name filter.
+  // Load all pages through that ADMIN endpoint only while a name search is active.
+  useEffect(() => {
+    if (!nameQuery) return
+    let active = true
+    setSearchLoading(true)
+    setError('')
+    api.adminUsersAll().then(all => {
+      if (!active) return
+      const needle = nameQuery.toLocaleLowerCase('ru')
+      const matches = all.filter(person => [
+        person.firstName,person.lastName,person.username,person.email,
+        [person.firstName,person.lastName].filter(Boolean).join(' '),
+      ].some(value => String(value||'').toLocaleLowerCase('ru').includes(needle)))
+      setMatchedUsers(matches)
+      if (page >= Math.max(1, Math.ceil(matches.length/PAGE_SIZE))) setPage(0)
+    }).catch(err => {if (active) setError(err.message)})
+      .finally(() => {if (active) setSearchLoading(false)})
+    return () => { active = false }
+  }, [nameQuery, revision])
+
+  const isSearching = !!nameQuery
+  const visibleUsers = isSearching ? matchedUsers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : users
+  const displayTotal = isSearching ? matchedUsers.length : totalElements
+  const displayPages = isSearching ? Math.max(1,Math.ceil(matchedUsers.length / PAGE_SIZE)) : totalPages
+  const waiting = isSearching ? searchLoading : loading
 
   async function openUser(id, mode) {
     setError('')
@@ -242,9 +276,22 @@ export function AdminUsers() {
   const onSuccess = (message, action) => {
     setDialog(null)
     setSuccess(message)
-    if (action === 'create') setPage(Math.floor(totalElements / PAGE_SIZE))
-    else if (action === 'delete' && users.length === 1 && page > 0) setPage(page - 1)
+    if (action === 'create') setPage(isSearching ? 0 : Math.floor(totalElements / PAGE_SIZE))
+    else if (action === 'delete' && visibleUsers.length === 1 && page > 0) setPage(page - 1)
     setRevision(current => current + 1)
+  }
+  function findByName(event) {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+    setPage(0)
+    setNameQuery(searchInput.trim())
+  }
+  function clearNameSearch(){
+    setSearchInput('')
+    setNameQuery('')
+    setMatchedUsers([])
+    setPage(0)
   }
   function findById(event) {
     event.preventDefault()
@@ -261,18 +308,27 @@ export function AdminUsers() {
       subtitle="Просмотр, создание, изменение ролей и сброс паролей пользователей Booking Service."
       action={<Button onClick={() => {setError('');setSuccess('');setDialog({mode:'create',user:null})}}><Plus size={17}/> Добавить пользователя</Button>}/>
     <div className="admin-users-toolbar">
-      <form onSubmit={findById} className="admin-users-id-search">
+      <form onSubmit={findById} className="admin-users-id-search admin-users-search-form">
         <label htmlFor="admin-user-id-search">Поиск по ID</label>
-        <input id="admin-user-id-search" type="number" min="1" step="1" value={searchId} onChange={event => setSearchId(event.target.value)} placeholder="ID пользователя" />
-        <Button variant="outline" type="submit" disabled={loadingUserId != null}><Eye size={16}/> Найти</Button>
+        <div className="admin-users-search-controls">
+          <input id="admin-user-id-search" type="number" min="1" step="1" value={searchId} onChange={event => setSearchId(event.target.value)} placeholder="ID пользователя" />
+          <Button variant="outline" type="submit" disabled={loadingUserId != null}><Eye size={16}/> Найти</Button>
+        </div>
       </form>
-      <Button variant="outline" onClick={() => setRevision(current => current + 1)}><RefreshCcw size={16}/> Обновить</Button>
+      <form onSubmit={findByName} className="admin-users-name-search admin-users-search-form">
+        <label htmlFor="admin-user-name-search">Поиск по имени, фамилии или логину</label>
+        <div className="admin-users-search-controls"><input id="admin-user-name-search" type="search" value={searchInput} onChange={e=>setSearchInput(e.target.value)} placeholder="Например: Анна Петрова"/>
+          <Button type="submit" variant="outline">Найти</Button>
+          {isSearching && <Button type="button" variant="outline" onClick={clearNameSearch}>Сбросить</Button>}
+        </div>
+      </form>
+      <Button className="admin-users-refresh" variant="outline" onClick={() => setRevision(current => current + 1)}><RefreshCcw size={16}/> Обновить</Button>
     </div>
     <Alert error={error} success={success} onClose={() => {setError('');setSuccess('')}}/>
-    {!loading && <p className="admin-users-count">Всего пользователей: <b>{totalElements}</b></p>}
-    {loading ? <Spinner/> : users.length ? <div className="admin-table-scroll admin-users-table-scroll"><table className="admin-table admin-users-table">
+    {!waiting && <p className="admin-users-count">{isSearching ? 'Найдено пользователей' : 'Всего пользователей'}: <b>{displayTotal}</b></p>}
+    {waiting ? <Spinner/> : visibleUsers.length ? <div className="admin-table-scroll admin-users-table-scroll"><table className="admin-table admin-users-table">
       <thead><tr><th>ID</th><th>Пользователь</th><th>Email</th><th>Телефон</th><th>Роль</th><th>Действия</th></tr></thead>
-      <tbody>{users.map(person => <tr key={person.id}>
+      <tbody>{visibleUsers.map(person => <tr key={person.id}>
         <td>#{person.id}</td>
         <td><b>{fullUserName(person)}</b><small>@{person.username}</small></td>
         <td className="admin-users-email">{person.email}</td>
@@ -281,16 +337,12 @@ export function AdminUsers() {
         <td><div className="admin-users-actions">
           <Button size="small" variant="outline" disabled={loadingUserId != null} onClick={() => openUser(person.id,'view')}><Eye size={15}/> Просмотр</Button>
           <Button size="small" variant="outline" disabled={loadingUserId != null} onClick={() => openUser(person.id,'edit')}><Pencil size={15}/> Изменить</Button>
-          <Button size="small" variant="outline" disabled={loadingUserId != null} onClick={() => openUser(person.id,'reset')}><KeyRound size={15}/> Пароль</Button>
+          <Button size="small" variant="outline" disabled={loadingUserId != null} onClick={() => openUser(person.id,'reset')}><KeyRound size={15}/> Сбросить пароль</Button>
           <Button size="small" variant="danger-light" disabled={loadingUserId != null || sameUser(person.id,activeUser?.id)} onClick={() => openUser(person.id,'delete')} title={sameUser(person.id, activeUser?.id) ? 'Себя удалить нельзя' : 'Удалить пользователя'}><Trash2 size={15}/></Button>
         </div></td>
       </tr>)}</tbody>
-    </table></div> : <Empty icon={UsersRound} title="Пользователей пока нет" text="Добавьте первого пользователя с помощью формы администратора."/>}
-    {!loading && totalPages > 1 && <nav className="admin-users-pagination" aria-label="Страницы пользователей">
-      <Button variant="outline" disabled={page === 0} onClick={() => setPage(value => Math.max(0,value-1))}><ArrowLeft size={16}/> Назад</Button>
-      <span>Страница {page + 1} из {totalPages}</span>
-      <Button variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage(value => value + 1)}>Вперёд <ArrowRight size={16}/></Button>
-    </nav>}
+    </table></div> : <Empty icon={UsersRound} title={isSearching?'Ничего не найдено':'Пользователей пока нет'} text={isSearching?'Измените запрос или сбросьте поиск.':'Добавьте первого пользователя с помощью формы администратора.'}/>}
+    {!waiting && <Pagination page={page} totalPages={displayPages} onChange={setPage} className="admin-users-pagination"/>}
     {dialog && <UserDialog key={`${dialog.mode}-${dialog.user?.id || 'new'}`} {...dialog}
       currentUserId={activeUser?.id} onClose={() => setDialog(null)}
       onModeChange={openNextDialog} onSuccess={onSuccess}/>

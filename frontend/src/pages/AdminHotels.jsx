@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, BedDouble, Check, CheckCircle2, ChevronLeft, Che
 import { api } from '../api/client.js'
 import { RoomPhotoImage, RoomPreviewSlider } from '../components/RoomPhotos.jsx'
 import { RoomCreationWizard } from '../components/RoomCreationWizard.jsx'
-import { Alert, Button, Empty, ImageBlock, HotelNoPhotos, PageTitle, Spinner } from '../components/Shared.jsx'
+import { Alert, Button, Empty, ImageBlock, HotelNoPhotos, PageTitle, Spinner, Pagination } from '../components/Shared.jsx'
 import { arrayOf, formatMoney, normalRoom } from '../utils/format.js'
 import { HOTEL_AMENITIES, AMENITY_LABEL } from '../constants/amenities.js'
 
@@ -594,6 +594,8 @@ export function AdminHotels() {
   const [wizard, setWizard] = useState(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [message, setMessage] = useState('')
+  const [listPage,setListPage] = useState(0)
+  const HOTEL_LIST_PAGE_SIZE=20
 
   async function reload() {
     setLoading(true)
@@ -629,7 +631,7 @@ export function AdminHotels() {
     />, document.body)}
 
     {loading ? <Spinner/> : <div className="admin-hotel-list">
-      {hotels.map((hotel,index) => <div className="admin-hotel-row" key={hotel.id}>
+      {hotels.slice(listPage*HOTEL_LIST_PAGE_SIZE,(listPage+1)*HOTEL_LIST_PAGE_SIZE).map((hotel,index) => <div className="admin-hotel-row" key={hotel.id}>
         <ImageBlock key={`${hotel.id}-${refreshVersion}`} hotelId={hotel.id} fallback={index} alt={hotel.name}/>
         <div><b>{hotel.name}</b><p>{hotel.address || hotel.city}</p>
           <small>ID: {hotel.id} · {hotel.rating != null ? `Рейтинг: ${hotel.rating}` : 'Без рейтинга'}</small>
@@ -639,6 +641,7 @@ export function AdminHotels() {
         </Button>
       </div>)}
       {hotels.length === 0 && <Empty icon={Hotel} title="Отелей пока нет" text="Для демоданных проверьте APP_DEMO_ENABLED=true в запуске Hotel Service." action={<Button type="button" onClick={() => setWizard({mode:'create'})}>Создать первый отель</Button>}/>}
+      <Pagination page={listPage} totalPages={Math.ceil(hotels.length/HOTEL_LIST_PAGE_SIZE)} onChange={setListPage}/>
     </div>}
   </>
 }
