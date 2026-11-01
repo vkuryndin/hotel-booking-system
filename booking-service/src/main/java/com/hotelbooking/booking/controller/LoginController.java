@@ -12,7 +12,10 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @SecurityRequirements // Public endpoint: no JWT required.
 @Tag(name = "Аутентификация", description = "Получение JWT по email и паролю.")
@@ -29,7 +32,8 @@ public class LoginController {
   @Operation(
       summary = "Войти и получить JWT",
       description =
-          "Проверяет email и пароль, выдаёт JWT для последующих запросов. Авторизация не требуется.")
+          "Проверяет email и пароль, выдаёт JWT для последующих "
+              + "запросов. Авторизация не требуется.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",

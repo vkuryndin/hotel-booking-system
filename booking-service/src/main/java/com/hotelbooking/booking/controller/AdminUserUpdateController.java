@@ -18,7 +18,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(
     name = "Администрирование пользователей",
@@ -36,7 +41,9 @@ public class AdminUserUpdateController {
   @Operation(
       summary = "Изменить пользователя (ADMIN)",
       description =
-          "Частично обновляет учётную запись. Передаются только изменяемые поля; действуют ограничения на изменение собственной роли и последнего администратора.")
+          "Частично обновляет учётную запись. Передаются только "
+              + "изменяемые поля; действуют ограничения на изменение "
+              + "собственной роли и последнего администратора.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",

@@ -13,7 +13,11 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Профиль и пароль", description = "Просмотр и изменение данных текущего пользователя.")
 @RestController
@@ -62,7 +66,8 @@ public class UserProfileController {
   @Operation(
       summary = "Изменить свой профиль",
       description =
-          "Частично изменяет доступные владельцу поля профиля: имя пользователя, телефон, имя и фамилию.")
+          "Частично изменяет доступные владельцу поля профиля: имя "
+              + "пользователя, телефон, имя и фамилию.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",

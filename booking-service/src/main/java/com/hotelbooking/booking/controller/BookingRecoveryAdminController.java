@@ -12,7 +12,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(
     name = "Восстановление Saga (ADMIN)",
@@ -30,7 +34,9 @@ public class BookingRecoveryAdminController {
   @Operation(
       summary = "Получить исчерпанные попытки восстановления Saga (ADMIN)",
       description =
-          "Возвращает до 100 бронирований, у которых автоматическое восстановление Saga исчерпало попытки и требуется вмешательство администратора.")
+          "Возвращает до 100 бронирований, у которых автоматическое "
+              + "восстановление Saga исчерпало попытки и требуется "
+              + "вмешательство администратора.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -63,7 +69,9 @@ public class BookingRecoveryAdminController {
   @Operation(
       summary = "Повторить восстановление Saga (ADMIN)",
       description =
-          "Помещает ранее исчерпавшее попытки восстановление бронирования в очередь повторной обработки. HTTP 202 означает приём запроса, а не завершение восстановления.")
+          "Помещает ранее исчерпавшее попытки восстановление "
+              + "бронирования в очередь повторной обработки. HTTP 202 "
+              + "означает приём запроса, а не завершение восстановления.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "202",

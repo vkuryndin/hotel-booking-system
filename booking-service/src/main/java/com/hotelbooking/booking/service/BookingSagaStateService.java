@@ -16,6 +16,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class BookingSagaStateService {
+
+  private static final Logger log = LoggerFactory.getLogger(BookingSagaStateService.class);
 
   private final BookingRepository bookingRepository;
   private final AppUserRepository userRepository;
@@ -57,6 +61,13 @@ public class BookingSagaStateService {
     booking.assignGuestCount(request.guestCount());
     bookingRepository.saveAndFlush(booking);
 
+    log.atInfo()
+        .addKeyValue("event", "booking.pending")
+        .addKeyValue("bookingId", booking.getId())
+        .addKeyValue("roomId", booking.getRoomId())
+        .addKeyValue("reservationId", booking.getReservationId())
+        .addKeyValue("status", "PENDING")
+        .log("Booking created in PENDING state");
     return snapshot(booking);
   }
 
@@ -71,6 +82,14 @@ public class BookingSagaStateService {
       throw new InvalidBookingStatusException(bookingId, "confirm");
     }
 
+    log.atInfo()
+        .addKeyValue("event", "booking.confirmed")
+        .addKeyValue("bookingId", booking.getId())
+        .addKeyValue("roomId", booking.getRoomId())
+        .addKeyValue("reservationId", booking.getReservationId())
+        .addKeyValue("fromStatus", "PENDING")
+        .addKeyValue("status", "CONFIRMED")
+        .log("Booking confirmed");
     return bookingMapper.toResponse(booking);
   }
 
@@ -90,6 +109,14 @@ public class BookingSagaStateService {
     }
 
     booking.cancel();
+    log.atInfo()
+        .addKeyValue("event", "booking.cancelled")
+        .addKeyValue("bookingId", booking.getId())
+        .addKeyValue("roomId", booking.getRoomId())
+        .addKeyValue("reservationId", booking.getReservationId())
+        .addKeyValue("fromStatus", "CANCELLING")
+        .addKeyValue("status", "CANCELLED")
+        .log("Booking cancellation finalized");
     return bookingMapper.toResponse(booking);
   }
 
@@ -117,6 +144,14 @@ public class BookingSagaStateService {
     }
 
     booking.requestCancellation();
+    log.atInfo()
+        .addKeyValue("event", "booking.cancelling")
+        .addKeyValue("bookingId", booking.getId())
+        .addKeyValue("roomId", booking.getRoomId())
+        .addKeyValue("reservationId", booking.getReservationId())
+        .addKeyValue("fromStatus", "CONFIRMED")
+        .addKeyValue("status", "CANCELLING")
+        .log("Booking cancellation requested");
     return Optional.of(snapshot(booking));
   }
 
@@ -173,7 +208,15 @@ public class BookingSagaStateService {
     }
     booking.cancel();
     booking.markCreationOutcome(outcome);
-
+    log.atInfo()
+        .addKeyValue("event", "booking.creation_cancelled")
+        .addKeyValue("bookingId", booking.getId())
+        .addKeyValue("roomId", booking.getRoomId())
+        .addKeyValue("reservationId", booking.getReservationId())
+        .addKeyValue("fromStatus", "PENDING")
+        .addKeyValue("status", "CANCELLED")
+        .addKeyValue("outcome", outcome.name())
+        .log("Failed booking creation marked CANCELLED");
     return bookingMapper.toResponse(booking);
   }
 

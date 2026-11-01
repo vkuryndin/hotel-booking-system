@@ -7,6 +7,8 @@ import com.hotelbooking.hotel.repository.RoomRepository;
 import com.hotelbooking.hotel.repository.RoomReservationRepository;
 import com.hotelbooking.hotel.repository.RoomReservationNightRepository;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,8 @@ import java.util.UUID;
 
 @Service
 public class RoomReservationService {
+
+    private static final Logger log = LoggerFactory.getLogger(RoomReservationService.class);
 
     private final RoomRepository roomRepository;
     private final RoomReservationRepository reservationRepository;
@@ -69,6 +73,11 @@ public class RoomReservationService {
                     && Objects.equals(previous.getCheckIn(), checkIn)
                     && Objects.equals(previous.getCheckOut(), checkOut)
                     && Objects.equals(previous.getGuestCount(), guestCount)) {
+                log.atDebug()
+                        .addKeyValue("event", "room.reservation_replayed")
+                        .addKeyValue("reservationId", reservationId)
+                        .addKeyValue("roomId", roomId)
+                        .log("Idempotent room reservation replay");
                 return previous;
             }
 
@@ -119,6 +128,13 @@ public class RoomReservationService {
         nightRepository.saveAllAndFlush(nights);
 
         room.incrementTimesBooked();
+        log.atInfo()
+                .addKeyValue("event", "room.reserved")
+                .addKeyValue("reservationId", reservationId)
+                .addKeyValue("roomId", roomId)
+                .addKeyValue("checkIn", checkIn)
+                .addKeyValue("checkOut", checkOut)
+                .log("Room reservation confirmed");
 
         return reservation;
     }
@@ -171,9 +187,16 @@ public class RoomReservationService {
                 .orElse(null);
 
         if (reservation == null) {
-            return saveNewReservation(
+            RoomReservation tombstone = saveNewReservation(
                     RoomReservation.released(reservationId, room)
             );
+            log.atInfo()
+                    .addKeyValue("event", "room.release_tombstone")
+                    .addKeyValue("reservationId", reservationId)
+                    .addKeyValue("roomId", roomId)
+                    .addKeyValue("compensation", compensation)
+                    .log("Room release recorded before reservation");
+            return tombstone;
         }
 
         if (!reservation.getRoom().getId().equals(roomId)) {
@@ -187,6 +210,18 @@ public class RoomReservationService {
             nightRepository.deleteByReservationId(reservationId);
             room.decrementTimesBooked();
             reservation.release();
+            log.atInfo()
+                    .addKeyValue("event", compensation ? "room.compensated" : "room.released")
+                    .addKeyValue("reservationId", reservationId)
+                    .addKeyValue("roomId", roomId)
+                    .addKeyValue("compensation", compensation)
+                    .log("Room reservation released");
+        } else {
+            log.atDebug()
+                    .addKeyValue("event", "room.release_replayed")
+                    .addKeyValue("reservationId", reservationId)
+                    .addKeyValue("roomId", roomId)
+                    .log("Idempotent room release replay");
         }
         return reservation;
     }

@@ -62,7 +62,9 @@ public class SensitiveActionRateLimitInterceptor implements HandlerInterceptor {
     }
     String identity = auth.getName();
     long retry = limiter.acquire("sensitive:" + operation + ":" + identity, max, window);
-    if (retry > 0) throw new RateLimitExceededException(retry);
+    if (retry > 0) {
+      throw new RateLimitExceededException(retry);
+    }
     return true;
   }
 }

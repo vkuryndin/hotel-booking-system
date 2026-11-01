@@ -2,7 +2,11 @@ package com.hotelbooking.booking.dto.request;
 
 import com.hotelbooking.booking.entity.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 public record CreateAdminUserRequest(
     @Schema(description = "Уникальный email пользователя.") @NotBlank @Email String email,
@@ -13,7 +17,9 @@ public record CreateAdminUserRequest(
     @Schema(description = "Роль создаваемого пользователя: USER или ADMIN.") @NotNull Role role,
     @Schema(
             description =
-                "Уникальное имя пользователя: 3–30 латинских символов, цифры, точка, дефис или подчёркивание; первый символ — буква.")
+                "Уникальное имя пользователя: 3–30 латинских символов, "
+                    + "цифры, точка, дефис или подчёркивание; первый символ — "
+                    + "буква.")
         @NotBlank
         @Pattern(regexp = "[A-Za-z][A-Za-z0-9._-]{2,29}")
         String username,

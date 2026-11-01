@@ -8,8 +8,10 @@ import com.hotelbooking.booking.repository.BookingRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -92,26 +94,34 @@ public class BookingSagaRecoveryService {
         cursorTime = booking.getSagaUpdatedAt();
         cursorId = booking.getId();
 
-        try {
-          var candidate = sagaStateService.prepareRecovery(booking.getId(), cutoff);
+        try (MDC.MDCCloseable trace =
+            MDC.putCloseable("traceId", UUID.randomUUID().toString())) {
+          try {
+            var candidate = sagaStateService.prepareRecovery(booking.getId(), cutoff);
 
-          if (candidate.isEmpty()) {
-            continue;
+            if (candidate.isEmpty()) {
+              continue;
+            }
+
+            var recovery = candidate.get();
+
+            hotelServiceClient.compensateRoom(recovery.roomId(), recovery.reservationId());
+
+            sagaStateService.cancelCreation(recovery.bookingId(), BookingCreationOutcome.FAILED);
+
+            log.atInfo()
+                .addKeyValue("event", "saga.recovery_completed")
+                .addKeyValue("bookingId", recovery.bookingId())
+                .addKeyValue("reservationId", recovery.reservationId())
+                .addKeyValue("roomId", recovery.roomId())
+                .log("Pending booking Saga recovered");
+          } catch (Exception ex) {
+            log.atWarn()
+                .addKeyValue("event", "saga.recovery_failed")
+                .addKeyValue("bookingId", booking.getId())
+                .setCause(ex)
+                .log("Pending booking Saga recovery failed");
           }
-
-          var recovery = candidate.get();
-
-          hotelServiceClient.compensateRoom(recovery.roomId(), recovery.reservationId());
-
-          sagaStateService.cancelCreation(recovery.bookingId(), BookingCreationOutcome.FAILED);
-
-          log.info(
-              "Saga recovered: bookingId={}, reservationId={}",
-              recovery.bookingId(),
-              recovery.reservationId());
-
-        } catch (Exception ex) {
-          log.warn("Saga recovery failed: bookingId={}", booking.getId(), ex);
         }
       }
     }
@@ -164,23 +174,34 @@ public class BookingSagaRecoveryService {
         cursorTime = booking.getCancellationRequestedAt();
         cursorId = booking.getId();
 
-        try {
-          var candidate = sagaStateService.prepareCancellationRecovery(booking.getId(), cutoff);
+        try (MDC.MDCCloseable trace =
+            MDC.putCloseable("traceId", UUID.randomUUID().toString())) {
+          try {
+            var candidate = sagaStateService.prepareCancellationRecovery(booking.getId(), cutoff);
 
-          if (candidate.isEmpty()) {
-            continue;
+            if (candidate.isEmpty()) {
+              continue;
+            }
+
+            var recovery = candidate.get();
+
+            hotelServiceClient.releaseRoom(recovery.roomId(), recovery.reservationId());
+
+            sagaStateService.finishCancellation(recovery.bookingId());
+
+            log.atInfo()
+                .addKeyValue("event", "booking.cancellation_recovered")
+                .addKeyValue("bookingId", recovery.bookingId())
+                .addKeyValue("reservationId", recovery.reservationId())
+                .addKeyValue("roomId", recovery.roomId())
+                .log("Booking cancellation recovered");
+          } catch (Exception ex) {
+            log.atWarn()
+                .addKeyValue("event", "booking.cancellation_recovery_failed")
+                .addKeyValue("bookingId", booking.getId())
+                .setCause(ex)
+                .log("Booking cancellation recovery failed");
           }
-
-          var recovery = candidate.get();
-
-          hotelServiceClient.releaseRoom(recovery.roomId(), recovery.reservationId());
-
-          sagaStateService.finishCancellation(recovery.bookingId());
-
-          log.info("Cancellation recovered: bookingId={}", recovery.bookingId());
-
-        } catch (Exception ex) {
-          log.warn("Cancellation recovery failed: bookingId={}", booking.getId(), ex);
         }
       }
     }

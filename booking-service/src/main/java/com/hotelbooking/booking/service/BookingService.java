@@ -170,6 +170,13 @@ public class BookingService {
       throw ex;
     }
 
+    log.atInfo()
+        .addKeyValue("event", "saga.started")
+        .addKeyValue("bookingId", pending.bookingId())
+        .addKeyValue("reservationId", pending.reservationId())
+        .addKeyValue("roomId", pending.roomId())
+        .log("Booking Saga started");
+
     for (int i = 0; i < candidateIds.size(); i++) {
       Long selectedRoomId = candidateIds.get(i);
 
@@ -239,15 +246,35 @@ public class BookingService {
     }
 
     var booking = candidate.get();
+    log.atInfo()
+        .addKeyValue("event", "booking.cancellation_started")
+        .addKeyValue("bookingId", booking.bookingId())
+        .addKeyValue("roomId", booking.roomId())
+        .addKeyValue("reservationId", booking.reservationId())
+        .log("Booking cancellation started");
 
     try {
       hotelServiceClient.releaseRoom(booking.roomId(), booking.reservationId());
     } catch (RuntimeException ex) {
+      log.atWarn()
+          .addKeyValue("event", "booking.cancellation_release_failed")
+          .addKeyValue("bookingId", bookingId)
+          .addKeyValue("roomId", booking.roomId())
+          .setCause(ex)
+          .log("Room release failed during booking cancellation");
       throw new BookingSagaUnavailableException(
           "Cannot release reservation for booking: " + bookingId, ex);
     }
 
-    return sagaStateService.finishCancellation(bookingId);
+    BookingResponse response = sagaStateService.finishCancellation(bookingId);
+    log.atInfo()
+        .addKeyValue("event", "booking.cancellation_completed")
+        .addKeyValue("bookingId", bookingId)
+        .addKeyValue("roomId", booking.roomId())
+        .addKeyValue("reservationId", booking.reservationId())
+        .addKeyValue("status", response.status().name())
+        .log("Booking cancellation completed");
+    return response;
   }
 
   @PreAuthorize("hasRole('ADMIN')")
@@ -310,6 +337,13 @@ public class BookingService {
                       : BookingCreationOutcome.FAILED;
 
       sagaStateService.cancelCreation(pending.bookingId(), outcome);
+      log.atInfo()
+          .addKeyValue("event", "saga.compensation_completed")
+          .addKeyValue("bookingId", pending.bookingId())
+          .addKeyValue("roomId", pending.roomId())
+          .addKeyValue("reservationId", pending.reservationId())
+          .addKeyValue("outcome", outcome.name())
+          .log("Booking Saga compensation completed");
 
     } catch (RuntimeException compensationError) {
       log.error("Saga compensation failed for booking {}", pending.bookingId(), compensationError);

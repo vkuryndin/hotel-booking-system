@@ -32,7 +32,8 @@ public class ExhaustedSagaMonitor {
     if (!exhausted.isEmpty()) {
       log.error(
           "SAGA_REQUIRES_ATTENTION: {} exhausted bookings (up to 100). "
-              + "Use GET /api/bookings/recovery/exhausted and POST /api/bookings/{id}/recovery/retry",
+              + "Use GET /api/bookings/recovery/exhausted and "
+              + "POST /api/bookings/{id}/recovery/retry",
           exhausted.size());
     }
   }

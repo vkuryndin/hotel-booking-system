@@ -39,11 +39,15 @@ public class PublicAuthRateLimitInterceptor implements HandlerInterceptor {
   @Override
   public boolean preHandle(
       HttpServletRequest request, HttpServletResponse response, Object handler) {
-    if (!"POST".equalsIgnoreCase(request.getMethod())) return true;
+    if (!"POST".equalsIgnoreCase(request.getMethod())) {
+      return true;
+    }
     String path = request.getRequestURI();
     boolean login = "/api/users/login".equals(path);
     boolean register = "/api/users/register".equals(path);
-    if (!login && !register) return true;
+    if (!login && !register) {
+      return true;
+    }
     // Only the actual TCP peer is trusted: forwarding headers may be supplied by clients.
     String ip = request.getRemoteAddr();
     String secret = request.getHeader("X-Gateway-Internal-Secret");
@@ -60,7 +64,9 @@ public class PublicAuthRateLimitInterceptor implements HandlerInterceptor {
             (login ? "login:" : "register:") + ip,
             login ? loginLimit : registerLimit,
             login ? Duration.ofMinutes(1) : Duration.ofHours(1));
-    if (retry > 0) throw new RateLimitExceededException(retry);
+    if (retry > 0) {
+      throw new RateLimitExceededException(retry);
+    }
     return true;
   }
 }

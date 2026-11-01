@@ -22,7 +22,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.annotation.CurrentSecurityContext;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Бронирования", description = "Создание, получение и отмена бронирований.")
 @RestController
@@ -38,7 +46,13 @@ public class BookingController {
   @Operation(
       summary = "Создать бронирование",
       description =
-          "Создаёт бронирование для текущего пользователя. При autoSelect=false укажите roomId; при autoSelect=true — hotelId и при необходимости strategy. Даты задаются в формате YYYY-MM-DD, дата выезда позже даты заезда. Заголовок Idempotency-Key (UUID) обязателен: повтор с тем же ключом и данными не создаёт второй заказ. Подтверждение номера выполняется через Saga с Hotel Service.")
+          "Создаёт бронирование для текущего пользователя. При "
+              + "autoSelect=false укажите roomId; при autoSelect=true — "
+              + "hotelId и при необходимости strategy. Даты задаются в "
+              + "формате YYYY-MM-DD, дата выезда позже даты заезда. "
+              + "Заголовок Idempotency-Key (UUID) обязателен: повтор с тем "
+              + "же ключом и данными не создаёт второй заказ. Подтверждение "
+              + "номера выполняется через Saga с Hotel Service.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "201",
@@ -83,7 +97,8 @@ public class BookingController {
     @ApiResponse(
         responseCode = "409",
         description =
-            "Номер уже занят (ROOM_ALREADY_BOOKED), нет свободных номеров, конфликт Idempotency-Key или параллельный запрос.",
+            "Номер уже занят (ROOM_ALREADY_BOOKED), нет свободных "
+                + "номеров, конфликт Idempotency-Key или параллельный запрос.",
         content =
             @Content(
                 schema =
@@ -106,7 +121,8 @@ public class BookingController {
       @RequestBody BookingRequest request,
       @Parameter(
               description =
-                  "Уникальный UUID попытки бронирования. При повторах передавайте тот же ключ с теми же данными.")
+                  "Уникальный UUID попытки бронирования. При повторах "
+                      + "передавайте тот же ключ с теми же данными.")
           @RequestHeader("Idempotency-Key")
           UUID idempotencyKey) {
     Long userId = Long.valueOf(jwt.getSubject());
@@ -164,7 +180,8 @@ public class BookingController {
   @Operation(
       summary = "Получить бронирование по ID",
       description =
-          "Получает бронирование по идентификатору. USER может получить только своё бронирование; ADMIN — любое.")
+          "Получает бронирование по идентификатору. USER может "
+              + "получить только своё бронирование; ADMIN — любое.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -220,7 +237,10 @@ public class BookingController {
   @Operation(
       summary = "Отменить бронирование",
       description =
-          "Отменяет существующее бронирование. USER может отменять свои записи; ADMIN — любые. Освобождение номера выполняется через Hotel Service; повторная отмена/неподходящий статус могут вернуть конфликт.")
+          "Отменяет существующее бронирование. USER может отменять "
+              + "свои записи; ADMIN — любые. Освобождение номера выполняется "
+              + "через Hotel Service; повторная отмена/неподходящий статус "
+              + "могут вернуть конфликт.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -294,7 +314,9 @@ public class BookingController {
   @Operation(
       summary = "Получить все бронирования (ADMIN)",
       description =
-          "Административный постраничный список бронирований с необязательным фильтром по статусу. Пагинация: page (с 0), size, sort.")
+          "Административный постраничный список бронирований с "
+              + "необязательным фильтром по статусу. Пагинация: page (с 0), "
+              + "size, sort.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",

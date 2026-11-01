@@ -12,3 +12,8 @@ eureka:
 
   server:
     use-read-only-response-cache: false
+
+logging:
+  structured:
+    format:
+      console: logstash

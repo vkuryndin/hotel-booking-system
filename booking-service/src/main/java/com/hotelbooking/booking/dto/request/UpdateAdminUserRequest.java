@@ -2,7 +2,9 @@ package com.hotelbooking.booking.dto.request;
 
 import com.hotelbooking.booking.entity.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 public record UpdateAdminUserRequest(
     @Schema(description = "Новый email (если изменяется).") @Email @Size(max = 255) String email,

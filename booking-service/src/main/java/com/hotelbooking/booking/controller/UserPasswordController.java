@@ -15,7 +15,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Профиль и пароль", description = "Управление собственным паролем и проверка JWT.")
 @RestController
@@ -31,7 +35,9 @@ public class UserPasswordController {
   @Operation(
       summary = "Изменить свой пароль",
       description =
-          "Проверяет текущий пароль и устанавливает новый. После смены пароля необходимо выполнить вход заново; ранее выданные пользовательские токены могут быть отозваны.")
+          "Проверяет текущий пароль и устанавливает новый. После смены "
+              + "пароля необходимо выполнить вход заново; ранее выданные "
+              + "пользовательские токены могут быть отозваны.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -94,7 +100,9 @@ public class UserPasswordController {
   @Operation(
       summary = "Проверить актуальность JWT",
       description =
-          "Проверяет возможность использования текущего токена, включая отзыв после изменений учётной записи. Успешный ответ не содержит тела.")
+          "Проверяет возможность использования текущего токена, "
+              + "включая отзыв после изменений учётной записи. Успешный "
+              + "ответ не содержит тела.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "204",

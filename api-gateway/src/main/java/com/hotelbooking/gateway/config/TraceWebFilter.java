@@ -35,11 +35,12 @@ public class TraceWebFilter implements WebFilter {
               return Mono.empty();
             });
 
-    log.info(
-        "HTTP IN traceId={} method={} path={}",
-        traceId,
-        request.getMethod(),
-        request.getPath().value());
+    log.atInfo()
+        .addKeyValue("event", "http.request")
+        .addKeyValue("traceId", traceId)
+        .addKeyValue("method", request.getMethod().name())
+        .addKeyValue("path", request.getPath().value())
+        .log("HTTP IN");
 
     ServerWebExchange updatedExchange = exchange.mutate().request(request).build();
 
@@ -47,13 +48,14 @@ public class TraceWebFilter implements WebFilter {
         .filter(updatedExchange)
         .doFinally(
             signal ->
-                log.info(
-                    "HTTP OUT traceId={} method={} path={} status={} signal={}",
-                    traceId,
-                    request.getMethod(),
-                    request.getPath().value(),
-                    exchange.getResponse().getStatusCode(),
-                    signal));
+                log.atInfo()
+                    .addKeyValue("event", "http.response")
+                    .addKeyValue("traceId", traceId)
+                    .addKeyValue("method", request.getMethod().name())
+                    .addKeyValue("path", request.getPath().value())
+                    .addKeyValue("status", exchange.getResponse().getStatusCode())
+                    .addKeyValue("signal", signal.name())
+                    .log("HTTP OUT"));
   }
 
   private static String normalize(String supplied) {

@@ -24,8 +24,9 @@ public class FailedAccountLoginLimiter {
   }
 
   FailedAccountLoginLimiter(Clock clock, int maxFailures, long windowSeconds) {
-    if (maxFailures < 1 || windowSeconds < 1)
+    if (maxFailures < 1 || windowSeconds < 1) {
       throw new IllegalArgumentException("Invalid login rate limit");
+    }
     this.clock = clock;
     this.maxFailures = maxFailures;
     this.windowSeconds = windowSeconds;
@@ -34,7 +35,9 @@ public class FailedAccountLoginLimiter {
   public long retryAfter(String email) {
     long now = clock.instant().getEpochSecond();
     State state = attempts.get(email);
-    if (state == null) return 0;
+    if (state == null) {
+      return 0;
+    }
     if (now - state.window >= windowSeconds) {
       attempts.remove(email, state);
       return 0;

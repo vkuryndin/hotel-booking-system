@@ -18,8 +18,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(
     name = "Администрирование пользователей",
@@ -93,7 +97,8 @@ public class AdminUserController {
   @Operation(
       summary = "Удалить пользователя (ADMIN)",
       description =
-          "Администратор удаляет учётную запись. Нельзя удалить собственную запись или последнего активного администратора.")
+          "Администратор удаляет учётную запись. Нельзя удалить "
+              + "собственную запись или последнего активного администратора.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
