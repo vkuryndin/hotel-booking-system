@@ -1,73 +1,92 @@
 package com.hotelbooking.hotel.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(
-    name = "room_photos",
-    indexes = @Index(name = "idx_photo_room_order", columnList = "room_id, sort_order"))
+        name = "room_photos",
+        indexes = @Index(
+                name = "idx_photo_room_order",
+                columnList = "room_id, sort_order"
+        )
+)
 public class RoomPhoto {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "room_id", nullable = false)
-  private Room room;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "room_id", nullable = false)
+    private Room room;
 
-  @Column(name = "file_name", nullable = false, length = 64)
-  private String fileName;
+    @Column(name = "file_name", nullable = false, length = 64)
+    private String fileName;
 
-  @Column(name = "content_type", nullable = false, length = 30)
-  private String contentType;
+    @Column(name = "content_type", nullable = false, length = 30)
+    private String contentType;
 
-  @Column(name = "is_primary", nullable = false)
-  private boolean primaryPhoto;
+    @Column(name = "is_primary", nullable = false)
+    private boolean primaryPhoto;
 
-  @Column(name = "sort_order", nullable = false)
-  private int sortOrder;
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
 
-  protected RoomPhoto() {}
+    protected RoomPhoto() {
+    }
 
-  public RoomPhoto(
-      Room room, String fileName, String contentType, boolean primaryPhoto, int sortOrder) {
-    this.room = room;
-    this.fileName = fileName;
-    this.contentType = contentType;
-    this.primaryPhoto = primaryPhoto;
-    this.sortOrder = sortOrder;
-  }
+    public RoomPhoto(
+            Room room,
+            String fileName,
+            String contentType,
+            boolean primaryPhoto,
+            int sortOrder
+    ) {
+        this.room = room;
+        this.fileName = fileName;
+        this.contentType = contentType;
+        this.primaryPhoto = primaryPhoto;
+        this.sortOrder = sortOrder;
+    }
 
-  public Long getId() {
-    return id;
-  }
+    public Long getId() {
+        return id;
+    }
 
-  public Room getRoom() {
-    return room;
-  }
+    public Room getRoom() {
+        return room;
+    }
 
-  public String getFileName() {
-    return fileName;
-  }
+    public String getFileName() {
+        return fileName;
+    }
 
-  public String getContentType() {
-    return contentType;
-  }
+    public String getContentType() {
+        return contentType;
+    }
 
-  public boolean isPrimaryPhoto() {
-    return primaryPhoto;
-  }
+    public boolean isPrimaryPhoto() {
+        return primaryPhoto;
+    }
 
-  public int getSortOrder() {
-    return sortOrder;
-  }
+    public int getSortOrder() {
+        return sortOrder;
+    }
 
-  public void setPrimaryPhoto(boolean value) {
-    this.primaryPhoto = value;
-  }
+    public void setPrimaryPhoto(boolean value) {
+        this.primaryPhoto = value;
+    }
 
-  public void setSortOrder(int value) {
-    this.sortOrder = value;
-  }
+    public void setSortOrder(int value) {
+        this.sortOrder = value;
+    }
 }
