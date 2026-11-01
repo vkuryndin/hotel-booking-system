@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 /** Separate per-account failed credential counter, independent of source IP. */
 @Component
-public class FailedAccountLoginLimiter {
+public final class FailedAccountLoginLimiter {
   private record State(long window, int failures) {}
 
   private final ConcurrentHashMap<String, State> attempts = new ConcurrentHashMap<>();

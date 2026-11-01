@@ -91,7 +91,8 @@ public class RoomPhotoService {
 
     String fileName = UUID.randomUUID() + extension;
 
-    Path destination = roomDirectory(roomId).resolve(fileName);
+    Path directory = roomDirectory(roomId);
+    Path destination = directory.resolve(fileName);
 
     // №17: если БД откатится, удаляем созданный файл.
     // Регистрируем ДО копирования, чтобы убрать даже частично
@@ -99,7 +100,7 @@ public class RoomPhotoService {
     PhotoFileOperations.registerRollbackCleanup(destination, log);
 
     try {
-      Files.createDirectories(destination.getParent());
+      Files.createDirectories(directory);
 
       try (InputStream input = file.getInputStream()) {
         Files.copy(input, destination);

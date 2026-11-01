@@ -23,7 +23,9 @@ public record BookingRequest(
         RoomSelectionMode strategy) {
   public BookingRequest {
     autoSelect = Boolean.TRUE.equals(autoSelect);
-    guestCount = guestCount == null ? 1 : guestCount;
+    if (guestCount == null) {
+      guestCount = 1;
+    }
   }
 
   public String fingerprint() {

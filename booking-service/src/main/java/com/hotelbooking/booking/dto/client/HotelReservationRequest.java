@@ -6,7 +6,9 @@ import java.util.UUID;
 public record HotelReservationRequest(
     UUID reservationId, LocalDate checkIn, LocalDate checkOut, Integer guestCount) {
   public HotelReservationRequest {
-    guestCount = guestCount == null ? 1 : guestCount;
+    if (guestCount == null) {
+      guestCount = 1;
+    }
   }
 
   public HotelReservationRequest(UUID reservationId, LocalDate checkIn, LocalDate checkOut) {

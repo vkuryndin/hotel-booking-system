@@ -5,6 +5,7 @@ plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("com.diffplug.spotless")
+    id("com.github.spotbugs")
 }
 
 java {
@@ -86,4 +87,8 @@ spotless {
     java {
         googleJavaFormat("1.28.0")
     }
+}
+// Keep existing Hotel Service exclusions and add only documented Booking Service DI cases.
+spotbugs {
+    excludeFilter = rootProject.file("config/spotbugs/exclude.xml")
 }

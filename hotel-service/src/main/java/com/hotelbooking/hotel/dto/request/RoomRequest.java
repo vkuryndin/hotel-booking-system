@@ -9,6 +9,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public record RoomRequest(
@@ -19,4 +21,15 @@ public record RoomRequest(
     @Schema(description = "Вместимость — положительное целое число.") @Positive Integer capacity,
     @Schema(description = "Цена за ночь, неотрицательная.") @DecimalMin("0.00")
         BigDecimal pricePerNight,
-    @Schema(description = "Набор удобств комнаты.") Set<RoomAmenity> amenities) {}
+    @Schema(description = "Набор удобств комнаты.") Set<RoomAmenity> amenities) {
+  public RoomRequest {
+    if (amenities != null) {
+      amenities = Collections.unmodifiableSet(new LinkedHashSet<>(amenities));
+    }
+  }
+
+  @Override
+  public Set<RoomAmenity> amenities() {
+    return amenities == null ? null : Collections.unmodifiableSet(amenities);
+  }
+}

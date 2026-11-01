@@ -4,6 +4,8 @@ plugins {
     checkstyle
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("com.diffplug.spotless")
+    id("com.github.spotbugs")
 }
 
 java {
@@ -34,4 +36,15 @@ tasks.jacocoTestReport {
         html.required = true
         xml.required = true
     }
+}
+spotless {
+    java {
+        googleJavaFormat("1.28.0")
+    }
+}
+
+checkstyle {
+    toolVersion = "12.3.1"
+    configProperties["org.checkstyle.google.severity"] = "warning"
+    maxWarnings = Int.MAX_VALUE
 }

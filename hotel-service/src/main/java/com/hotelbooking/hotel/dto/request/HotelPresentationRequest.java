@@ -8,6 +8,8 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public record HotelPresentationRequest(
@@ -20,4 +22,15 @@ public record HotelPresentationRequest(
     @Schema(description = "Удобства отеля из перечисления HotelAmenity.")
         Set<HotelAmenity> amenities,
     @Schema(description = "Стандартное время заезда в формате HH:mm:ss.") LocalTime checkInTime,
-    @Schema(description = "Стандартное время выезда в формате HH:mm:ss.") LocalTime checkOutTime) {}
+    @Schema(description = "Стандартное время выезда в формате HH:mm:ss.") LocalTime checkOutTime) {
+  public HotelPresentationRequest {
+    if (amenities != null) {
+      amenities = Collections.unmodifiableSet(new LinkedHashSet<>(amenities));
+    }
+  }
+
+  @Override
+  public Set<HotelAmenity> amenities() {
+    return amenities == null ? null : Collections.unmodifiableSet(amenities);
+  }
+}

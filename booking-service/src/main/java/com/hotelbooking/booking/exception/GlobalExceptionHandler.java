@@ -306,8 +306,8 @@ public class GlobalExceptionHandler {
           case 429 -> "TOO_MANY_REQUESTS";
           default -> "HTTP_ERROR";
         };
-    String message =
-        ex.getReason() == null || ex.getReason().isBlank() ? "Request failed" : ex.getReason();
+    String reason = ex.getReason();
+    String message = reason == null || reason.isBlank() ? "Request failed" : reason;
     return buildError(status, code, message, request, Map.of());
   }
 

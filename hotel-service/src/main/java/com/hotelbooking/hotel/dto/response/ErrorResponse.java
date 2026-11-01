@@ -3,6 +3,8 @@ package com.hotelbooking.hotel.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.MDC;
 
@@ -20,5 +22,13 @@ public record ErrorResponse(
     if (traceId == null || traceId.isBlank()) {
       traceId = MDC.get("traceId");
     }
+    if (fieldErrors != null) {
+      fieldErrors = Collections.unmodifiableMap(new LinkedHashMap<>(fieldErrors));
+    }
+  }
+
+  @Override
+  public Map<String, String> fieldErrors() {
+    return fieldErrors == null ? null : Collections.unmodifiableMap(fieldErrors);
   }
 }

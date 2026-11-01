@@ -7,6 +7,8 @@ import java.util.UUID;
 public record RoomReservationRequest(
     UUID reservationId, LocalDate checkIn, LocalDate checkOut, @Positive Integer guestCount) {
   public RoomReservationRequest {
-    guestCount = guestCount == null ? 1 : guestCount;
+    if (guestCount == null) {
+      guestCount = 1;
+    }
   }
 }

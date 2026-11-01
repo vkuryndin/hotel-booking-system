@@ -5,6 +5,7 @@ plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("com.diffplug.spotless")
+    id("com.github.spotbugs")
 }
 
 java {
@@ -85,4 +86,9 @@ spotless {
     java {
         googleJavaFormat("1.28.0")
     }
+}
+// Only documented Spring DI and Hibernate-managed state are excluded.
+// Other SpotBugs findings still fail verification.
+spotbugs {
+    excludeFilter = rootProject.file("config/spotbugs/exclude.xml")
 }

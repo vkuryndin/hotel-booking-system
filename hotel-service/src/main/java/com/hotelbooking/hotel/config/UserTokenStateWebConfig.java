@@ -19,8 +19,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@Configuration
-public class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerInterceptor {
+@Configuration(proxyBeanMethods = false)
+public final class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerInterceptor {
 
   private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -53,8 +53,10 @@ public class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerInterce
     Jwt jwt = token.getToken();
 
     if ("SERVICE".equals(jwt.getClaimAsString("role"))) {
+      var audience = jwt.getAudience();
       if ("booking-service".equals(jwt.getSubject())
-          && jwt.getAudience().contains("hotel-service")) {
+          && audience != null
+          && audience.contains("hotel-service")) {
         return true;
       }
       return reject(request, response, 403, "INVALID_SERVICE_TOKEN");

@@ -4,6 +4,8 @@ import com.hotelbooking.hotel.entity.HotelAmenity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public record HotelResponse(
@@ -14,4 +16,15 @@ public record HotelResponse(
     @Schema(description = "Рейтинг (от 0 до 5).") BigDecimal rating,
     @Schema(description = "Набор удобств отеля.") Set<HotelAmenity> amenities,
     @Schema(description = "Стандартное время заезда.") LocalTime checkInTime,
-    @Schema(description = "Стандартное время выезда.") LocalTime checkOutTime) {}
+    @Schema(description = "Стандартное время выезда.") LocalTime checkOutTime) {
+  public HotelResponse {
+    if (amenities != null) {
+      amenities = Collections.unmodifiableSet(new LinkedHashSet<>(amenities));
+    }
+  }
+
+  @Override
+  public Set<HotelAmenity> amenities() {
+    return amenities == null ? null : Collections.unmodifiableSet(amenities);
+  }
+}

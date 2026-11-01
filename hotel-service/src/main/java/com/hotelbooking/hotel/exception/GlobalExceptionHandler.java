@@ -210,11 +210,13 @@ public class GlobalExceptionHandler {
     boolean nightConflict = false;
 
     for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-      if (cause instanceof org.hibernate.exception.ConstraintViolationException c
-          && c.getConstraintName() != null
-          && c.getConstraintName().toLowerCase(Locale.ROOT).contains("uk_room_night")) {
-        nightConflict = true;
-        break;
+      if (cause instanceof org.hibernate.exception.ConstraintViolationException c) {
+        String constraintName = c.getConstraintName();
+        if (constraintName != null
+            && constraintName.toLowerCase(Locale.ROOT).contains("uk_room_night")) {
+          nightConflict = true;
+          break;
+        }
       }
     }
 

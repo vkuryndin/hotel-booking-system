@@ -23,8 +23,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@Configuration
-public class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerInterceptor {
+@Configuration(proxyBeanMethods = false)
+public final class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerInterceptor {
 
   private static final ObjectMapper JSON = new ObjectMapper();
 
