@@ -65,6 +65,13 @@ public class LoginService {
     String token = jwtService.generateAccessToken(user);
 
     return new LoginResponse(
-        token, "Bearer", jwtService.getExpiresInSeconds(), user.isPasswordChangeRequired());
+        token,
+        "Bearer",
+        jwtService.getExpiresInSeconds(),
+        user.isPasswordChangeRequired(),
+        user.getUsername(),
+        user.getFirstName(),
+        user.getLastName(),
+        user.getEmail());
   }
 }

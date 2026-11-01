@@ -4,6 +4,7 @@ import com.hotelbooking.booking.dto.response.AdminUserResponse;
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.exception.UserOperationException;
 import com.hotelbooking.booking.repository.AppUserRepository;
+import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,11 @@ public class AdminUserReadService {
 
   @Transactional(readOnly = true)
   public Page<AdminUserResponse> getAllUsers(Pageable pageable) {
+    return getAllUsers(pageable, null);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<AdminUserResponse> getAllUsers(Pageable pageable, String query) {
     if (pageable.getPageSize() > 100) {
       throw new IllegalArgumentException("Page size must not exceed 100");
     }
@@ -29,7 +35,21 @@ public class AdminUserReadService {
     Pageable pageRequest =
         PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("id"));
 
-    return userRepository.findAll(pageRequest).map(this::toResponse);
+    if (query == null || query.isBlank()) {
+      return userRepository.findAll(pageRequest).map(this::toResponse);
+    }
+
+    // Treat LIKE metacharacters as literal input, not user-controlled wildcards.
+    String escaped =
+        query
+            .trim()
+            .toLowerCase(Locale.ROOT)
+            .replace("!", "!!")
+            .replace("%", "!%")
+            .replace("_", "!_");
+    return userRepository
+        .findByAdminSearchPattern("%" + escaped + "%", pageRequest)
+        .map(this::toResponse);
   }
 
   @Transactional(readOnly = true)

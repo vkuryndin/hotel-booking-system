@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(
@@ -34,7 +35,9 @@ public class AdminUserReadController {
   @Operation(
       summary = "Получить пользователей (ADMIN)",
       description =
-          "Возвращает постраничный список пользователей. Пагинация: page (с 0), size, sort.")
+          "Возвращает постраничный список пользователей. Необязательный q ищет по "
+              + "username, имени, фамилии и email без учёта регистра. "
+              + "Пагинация: page (с 0), size, sort.")
   @ApiResponses({
     @ApiResponse(
         responseCode = "200",
@@ -70,8 +73,12 @@ public class AdminUserReadController {
   })
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")
-  public Page<AdminUserResponse> getAllUsers(@PageableDefault(size = 20) Pageable pageable) {
-    return readService.getAllUsers(pageable);
+  public Page<AdminUserResponse> getAllUsers(
+      @PageableDefault(size = 20) Pageable pageable,
+      @Parameter(description = "Необязательный поиск по username, имени, фамилии и email.")
+          @RequestParam(name = "q", required = false)
+          String query) {
+    return readService.getAllUsers(pageable, query);
   }
 
   @Operation(
