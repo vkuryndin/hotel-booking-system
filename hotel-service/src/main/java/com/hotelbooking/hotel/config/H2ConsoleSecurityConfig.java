@@ -14,18 +14,15 @@ import org.springframework.security.web.SecurityFilterChain;
 @Profile("dev")
 public class H2ConsoleSecurityConfig {
 
-    @Bean
-    @Order(1)
-    SecurityFilterChain h2ConsoleSecurityFilterChain(HttpSecurity http)
-            throws Exception {
+  @Bean
+  @Order(1)
+  SecurityFilterChain h2ConsoleSecurityFilterChain(HttpSecurity http) throws Exception {
 
-        http.securityMatcher(PathRequest.toH2Console())
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-                .csrf(AbstractHttpConfigurer::disable)
-                .headers(headers -> headers.frameOptions(
-                        HeadersConfigurer.FrameOptionsConfig::sameOrigin
-                ));
+    http.securityMatcher(PathRequest.toH2Console())
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .csrf(AbstractHttpConfigurer::disable)
+        .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
 
-        return http.build();
-    }
+    return http.build();
+  }
 }

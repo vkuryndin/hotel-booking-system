@@ -5,86 +5,74 @@ import com.hotelbooking.hotel.entity.ReservationStatus;
 import com.hotelbooking.hotel.exception.HotelNotFoundException;
 import com.hotelbooking.hotel.repository.HotelRepository;
 import com.hotelbooking.hotel.repository.RoomRepository;
-import com.hotelbooking.hotel.repository.RoomReservationRepository;
 import com.hotelbooking.hotel.repository.RoomReservationNightRepository;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Isolation;
-
+import com.hotelbooking.hotel.repository.RoomReservationRepository;
 import java.time.LocalDate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class HotelStatisticsService {
 
-    private final HotelRepository hotelRepository;
-    private final RoomRepository roomRepository;
-    private final RoomReservationRepository reservationRepository;
-    private final RoomReservationNightRepository nightRepository;
+  private final HotelRepository hotelRepository;
+  private final RoomRepository roomRepository;
+  private final RoomReservationRepository reservationRepository;
+  private final RoomReservationNightRepository nightRepository;
 
-    public HotelStatisticsService(
-            HotelRepository hotelRepository,
-            RoomRepository roomRepository,
-            RoomReservationRepository reservationRepository,
-            RoomReservationNightRepository nightRepository
-    ) {
-        this.hotelRepository = hotelRepository;
-        this.roomRepository = roomRepository;
-        this.reservationRepository = reservationRepository;
-        this.nightRepository = nightRepository;
+  public HotelStatisticsService(
+      HotelRepository hotelRepository,
+      RoomRepository roomRepository,
+      RoomReservationRepository reservationRepository,
+      RoomReservationNightRepository nightRepository) {
+    this.hotelRepository = hotelRepository;
+    this.roomRepository = roomRepository;
+    this.reservationRepository = reservationRepository;
+    this.nightRepository = nightRepository;
+  }
+
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public HotelStatisticsResponse getStatistics(Long hotelId) {
+
+    if (!hotelRepository.existsById(hotelId)) {
+      throw new HotelNotFoundException(hotelId);
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public HotelStatisticsResponse getStatistics(Long hotelId) {
+    LocalDate today = LocalDate.now();
 
-        if (!hotelRepository.existsById(hotelId)) {
-            throw new HotelNotFoundException(hotelId);
-        }
+    long totalRooms = roomRepository.countByHotelId(hotelId);
 
-        LocalDate today = LocalDate.now();
+    long availableRooms = roomRepository.countByHotelIdAndAvailableTrue(hotelId);
 
-        long totalRooms = roomRepository.countByHotelId(hotelId);
+    long occupiedToday = nightRepository.countOccupiedRoomsOnDate(hotelId, today);
 
-        long availableRooms =
-                roomRepository.countByHotelIdAndAvailableTrue(hotelId);
+    long totalReservations = reservationRepository.countByRoom_Hotel_IdAndTombstoneFalse(hotelId);
 
-        long occupiedToday =
-                nightRepository.countOccupiedRoomsOnDate(hotelId, today);
+    long reservedReservations =
+        reservationRepository.countByRoom_Hotel_IdAndStatusAndTombstoneFalse(
+            hotelId, ReservationStatus.RESERVED);
 
-        long totalReservations =
-                reservationRepository.countByRoom_Hotel_IdAndTombstoneFalse(hotelId);
+    long releasedReservations =
+        reservationRepository.countByRoom_Hotel_IdAndStatusAndTombstoneFalse(
+            hotelId, ReservationStatus.RELEASED);
 
-        long reservedReservations =
-                reservationRepository.countByRoom_Hotel_IdAndStatusAndTombstoneFalse(
-                        hotelId,
-                        ReservationStatus.RESERVED
-                );
+    // Keep technical release-before-reserve markers out of business metrics.
+    long tombstoneReservations =
+        reservationRepository.countByRoom_Hotel_IdAndTombstoneTrue(hotelId);
 
-        long releasedReservations =
-                reservationRepository.countByRoom_Hotel_IdAndStatusAndTombstoneFalse(
-                        hotelId,
-                        ReservationStatus.RELEASED
-                );
+    Long totalTimesBooked = roomRepository.sumTimesBookedByHotelId(hotelId);
 
-        // Keep technical release-before-reserve markers out of business metrics.
-        long tombstoneReservations =
-                reservationRepository.countByRoom_Hotel_IdAndTombstoneTrue(hotelId);
-
-        Long totalTimesBooked =
-                roomRepository.sumTimesBookedByHotelId(hotelId);
-
-        return new HotelStatisticsResponse(
-                hotelId,
-                today,
-                totalRooms,
-                availableRooms,
-                totalRooms - availableRooms,
-                occupiedToday,
-                totalReservations,
-                reservedReservations,
-                releasedReservations,
-                totalTimesBooked == null ? 0L : totalTimesBooked,
-                tombstoneReservations
-        );
-    }
+    return new HotelStatisticsResponse(
+        hotelId,
+        today,
+        totalRooms,
+        availableRooms,
+        totalRooms - availableRooms,
+        occupiedToday,
+        totalReservations,
+        reservedReservations,
+        releasedReservations,
+        totalTimesBooked == null ? 0L : totalTimesBooked,
+        tombstoneReservations);
+  }
 }

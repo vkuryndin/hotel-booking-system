@@ -8,6 +8,6 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface RoomMapper {
 
-    @Mapping(target = "hotelId", source = "hotel.id")
-    RoomResponse toResponse(Room room);
+  @Mapping(target = "hotelId", source = "hotel.id")
+  RoomResponse toResponse(Room room);
 }
