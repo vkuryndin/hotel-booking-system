@@ -288,7 +288,7 @@ public class GlobalExceptionHandler {
       org.springframework.web.multipart.MaxUploadSizeExceededException ex,
       HttpServletRequest request) {
     return buildError(
-        HttpStatus.PAYLOAD_TOO_LARGE,
+        HttpStatus.CONTENT_TOO_LARGE,
         "PHOTO_TOO_LARGE",
         "Maximum photo upload size is 5 MB",
         request,

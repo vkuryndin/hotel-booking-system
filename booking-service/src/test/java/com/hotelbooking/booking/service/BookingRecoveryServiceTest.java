@@ -72,7 +72,8 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(List.of(candidate), List.of());
+        .thenReturn(List.of(candidate))
+        .thenReturn(List.of());
 
     when(state.prepareRecovery(eq(11L), any(Instant.class))).thenReturn(Optional.of(snapshot()));
 
@@ -101,7 +102,8 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(List.of(candidate), List.of());
+        .thenReturn(List.of(candidate))
+        .thenReturn(List.of());
 
     when(state.prepareRecovery(eq(11L), any(Instant.class))).thenReturn(Optional.of(snapshot()));
 
@@ -126,7 +128,8 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(List.of(candidate), List.of());
+        .thenReturn(List.of(candidate))
+        .thenReturn(List.of());
 
     when(state.prepareRecovery(eq(11L), any(Instant.class))).thenReturn(Optional.empty());
 
@@ -148,7 +151,8 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(List.of(candidate), List.of());
+        .thenReturn(List.of(candidate))
+        .thenReturn(List.of());
 
     when(state.prepareCancellationRecovery(eq(11L), any(Instant.class)))
         .thenReturn(Optional.of(snapshot()));
@@ -177,7 +181,8 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(List.of(candidate), List.of());
+        .thenReturn(List.of(candidate))
+        .thenReturn(List.of());
 
     when(state.prepareCancellationRecovery(eq(11L), any(Instant.class)))
         .thenReturn(Optional.of(snapshot()));
@@ -202,7 +207,8 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(List.of(candidate), List.of());
+        .thenReturn(List.of(candidate))
+        .thenReturn(List.of());
 
     when(state.prepareCancellationRecovery(eq(11L), any(Instant.class)))
         .thenReturn(Optional.empty());
@@ -231,7 +237,9 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(candidates.subList(0, 10), candidates.subList(10, 12), List.of());
+        .thenReturn(candidates.subList(0, 10))
+        .thenReturn(candidates.subList(10, 12))
+        .thenReturn(List.of());
 
     when(state.prepareRecovery(anyLong(), any(Instant.class))).thenReturn(Optional.empty());
 
@@ -275,7 +283,9 @@ class BookingRecoveryServiceTest {
             any(Instant.class),
             anyLong(),
             any(Pageable.class)))
-        .thenReturn(candidates.subList(0, 10), candidates.subList(10, 12), List.of());
+        .thenReturn(candidates.subList(0, 10))
+        .thenReturn(candidates.subList(10, 12))
+        .thenReturn(List.of());
 
     when(state.prepareCancellationRecovery(anyLong(), any(Instant.class)))
         .thenReturn(Optional.empty());

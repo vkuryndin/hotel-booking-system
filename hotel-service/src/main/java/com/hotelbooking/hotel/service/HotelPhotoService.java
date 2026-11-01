@@ -53,7 +53,7 @@ public class HotelPhotoService {
   @Transactional
   public HotelPhotoResponse upload(Long hotelId, MultipartFile file) {
     // №17: сериализуем изменения фотографий одного отеля.
-    Hotel hotel = lockHotel(hotelId);
+    final Hotel hotel = lockHotel(hotelId);
 
     if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024) {
       throw new IllegalArgumentException("Photo must be 1 byte to 5 MB");
@@ -185,7 +185,7 @@ public class HotelPhotoService {
 
     HotelPhoto photo = findPhoto(hotelId, photoId);
 
-    boolean wasPrimary = photo.isPrimaryPhoto();
+    final boolean wasPrimary = photo.isPrimaryPhoto();
 
     Path directory = hotelDirectory(hotelId);
     Path file = directory.resolve(photo.getFileName()).normalize();

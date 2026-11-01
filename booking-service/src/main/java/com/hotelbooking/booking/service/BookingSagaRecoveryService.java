@@ -94,8 +94,7 @@ public class BookingSagaRecoveryService {
         cursorTime = booking.getSagaUpdatedAt();
         cursorId = booking.getId();
 
-        try (MDC.MDCCloseable trace =
-            MDC.putCloseable("traceId", UUID.randomUUID().toString())) {
+        try (MDC.MDCCloseable trace = MDC.putCloseable("traceId", UUID.randomUUID().toString())) {
           try {
             var candidate = sagaStateService.prepareRecovery(booking.getId(), cutoff);
 
@@ -174,8 +173,7 @@ public class BookingSagaRecoveryService {
         cursorTime = booking.getCancellationRequestedAt();
         cursorId = booking.getId();
 
-        try (MDC.MDCCloseable trace =
-            MDC.putCloseable("traceId", UUID.randomUUID().toString())) {
+        try (MDC.MDCCloseable trace = MDC.putCloseable("traceId", UUID.randomUUID().toString())) {
           try {
             var candidate = sagaStateService.prepareCancellationRecovery(booking.getId(), cutoff);
 

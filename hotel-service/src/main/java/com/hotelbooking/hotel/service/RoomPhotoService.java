@@ -53,7 +53,7 @@ public class RoomPhotoService {
   @Transactional
   public RoomPhotoResponse upload(Long roomId, MultipartFile file) {
     // №17: сериализуем изменения фотографий одного номера.
-    Room room = lockRoom(roomId);
+    final Room room = lockRoom(roomId);
 
     if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024) {
       throw new IllegalArgumentException("Photo must be 1 byte to 5 MB");
@@ -185,7 +185,7 @@ public class RoomPhotoService {
 
     RoomPhoto photo = findPhoto(roomId, photoId);
 
-    boolean wasPrimary = photo.isPrimaryPhoto();
+    final boolean wasPrimary = photo.isPrimaryPhoto();
 
     Path directory = roomDirectory(roomId);
     Path file = directory.resolve(photo.getFileName()).normalize();

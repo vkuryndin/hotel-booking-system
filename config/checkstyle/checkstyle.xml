@@ -21,6 +21,34 @@
   <module name="SuppressionSingleFilter">
     <property name="checks" value="MissingJavadocType|MissingJavadocMethod"/>
   </module>
+  <!--
+    Spring Data JPA underscores disambiguate nested entity properties.
+    Suppress only underscore-based method names in these three repositories;
+    all other MethodName violations remain enabled.
+  -->
+  <module name="SuppressionSingleFilter">
+    <property name="checks" value="MethodName"/>
+    <property name="files" value="[/\\]hotel-service[/\\]src[/\\]main[/\\]java[/\\]com[/\\]hotelbooking[/\\]hotel[/\\]repository[/\\](?:HotelPhotoRepository|RoomPhotoRepository|RoomReservationRepository)\.java$"/>
+    <property name="message" value="Method name '[A-Za-z0-9]+_[A-Za-z0-9_]+' must match pattern"/>
+  </module>
+
+  <!--
+    google-java-format (Spotless) keeps JPQL text blocks readable but differs
+    from TextBlockGoogleStyleFormatting in these two repository classes.
+    Keep the queries unchanged and continue checking text blocks elsewhere.
+  -->
+  <module name="SuppressionSingleFilter">
+    <property name="checks" value="TextBlockGoogleStyleFormatting"/>
+    <property name="files" value="[/\\]hotel-service[/\\]src[/\\]main[/\\]java[/\\]com[/\\]hotelbooking[/\\]hotel[/\\]repository[/\\](?:RoomRepository|RoomReservationNightRepository)\.java$"/>
+  </module>
+
+  <!-- Only the closing JPQL text-block delimiter in this repository. -->
+  <module name="SuppressionSingleFilter">
+    <property name="checks" value="Indentation"/>
+    <property name="files" value="[/\\]hotel-service[/\\]src[/\\]main[/\\]java[/\\]com[/\\]hotelbooking[/\\]hotel[/\\]repository[/\\]RoomReservationNightRepository\.java$"/>
+    <property name="message" value="&quot;&quot;&quot;.*incorrect indentation level"/>
+  </module>
+
   <property name="charset" value="UTF-8"/>
 
   <property name="severity" value="${org.checkstyle.google.severity}" default="warning"/>

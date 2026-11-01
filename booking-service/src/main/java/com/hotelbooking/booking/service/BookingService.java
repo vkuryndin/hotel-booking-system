@@ -389,7 +389,7 @@ public class BookingService {
     try {
       var json = HOTEL_ERROR_MAPPER.readTree(httpError.getResponseBodyAsString());
 
-      return json == null ? null : json.path("code").asText(null);
+      return json == null ? null : json.path("code").asString(null);
 
     } catch (Exception ex) {
       log.warn("Cannot parse Hotel Service conflict response", ex);
