@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom'
-import { BedDouble, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleUserRound, CreditCard, Hotel, ImagePlus, LayoutDashboard, LogOut, MapPin, Menu, Search, Settings, Shield, Star, UserRound, X, Wifi, CircleAlert, LoaderCircle, ArrowRight, Home, CheckCircle2, SlidersHorizontal, ImageOff } from 'lucide-react'
+import { UsersRound, BedDouble, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleUserRound, CreditCard, Hotel, ImagePlus, LayoutDashboard, LogOut, MapPin, Menu, Search, Settings, Shield, Star, UserRound, X, Wifi, CircleAlert, LoaderCircle, ArrowRight, Home, CheckCircle2, SlidersHorizontal, ImageOff } from 'lucide-react'
 import { api, imageBlob } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { amenity, formatMoney, fullName, statusName, statusTone } from '../utils/format.js'
@@ -65,5 +65,5 @@ export function Layout() {
 }
 export function Protected({admin=false}){const {user,loading,isAdmin}=useAuth();const loc=useLocation();if(loading) return <Spinner/>;if(!user)return <Navigate to="/login" state={{from:loc}} replace/>;if(admin&&!isAdmin)return <Navigate to="/account" replace/>;return <Outlet/>}
 const accountLinks=[['/account',LayoutDashboard,'Обзор'],['/account/bookings',CalendarDays,'Мои бронирования'],['/account/profile',UserRound,'Мой профиль']]
-const adminLinks=[['/admin',LayoutDashboard,'Обзор'],['/admin/hotels',Hotel,'Отели'],['/admin/rooms',BedDouble,'Номера'],['/admin/bookings',CalendarDays,'Бронирования'],['/admin/statistics',ChartNoAxesColumn,'Статистика']]
+const adminLinks=[['/admin',LayoutDashboard,'Обзор'],['/admin/hotels',Hotel,'Отели'],['/admin/rooms',BedDouble,'Номера'],['/admin/users',UsersRound,'Пользователи'],['/admin/bookings',CalendarDays,'Бронирования'],['/admin/statistics',ChartNoAxesColumn,'Статистика']]
 export function DashboardLayout({admin=false}) {const {user,logout}=useAuth();const links=admin?adminLinks:accountLinks;return <div className="container dashboard"><aside className="dashboard-side"><div className="aside-heading"><span className="avatar"><UserRound size={22}/></span><div><strong>{admin?'Администрирование':'Личный кабинет'}</strong><small>{fullName(user)}</small></div></div><nav className="side-links">{links.map(([path,Icon,label])=><NavLink end key={path} to={path}><Icon size={19}/>{label}</NavLink>)}</nav><button className="side-logout" onClick={logout}><LogOut size={18}/>Выйти</button></aside><div className="dashboard-main"><Outlet/></div></div>}

@@ -60,6 +60,13 @@ const roomPhotoPath = roomId => `/rooms/${encodeURIComponent(roomId)}/photos`
 export const api = {
   login: data => request('/users/login', { method:'POST', body:data, auth:false }),
   register: data => request('/users/register', { method:'POST', body:data, auth:false }),
+  // ADMIN users: contracts verified against Booking Service controllers / DTOs.
+  adminUsers: query => request(`/users?${new URLSearchParams(query)}`),
+  adminUser: id => request(`/users/${encodeURIComponent(id)}`),
+  adminCreateUser: data => request('/users', {method:'POST', body:data}),
+  adminUpdateUser: (id,data) => request(`/users/${encodeURIComponent(id)}`, {method:'PATCH', body:data}),
+  adminDeleteUser: id => request(`/users/${encodeURIComponent(id)}`, {method:'DELETE'}),
+  adminResetPassword: (id,newPassword) => request(`/users/${encodeURIComponent(id)}/reset-password`, {method:'POST', body:{newPassword}}),
   me: () => request('/users/me'),
   editMe: data => request('/users/me', { method:'PATCH', body:data }),
   hotelsAll: () => fetchAll('/hotels'),
