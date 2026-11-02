@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { createElement, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UsersRound, BedDouble, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleUserRound, CreditCard, Hotel, ImagePlus, LayoutDashboard, LogOut, MapPin, Menu, Search, Settings, Shield, Star, UserRound, X, Wifi, CircleAlert, LoaderCircle, ArrowRight, Home, CheckCircle2, SlidersHorizontal, ImageOff, Eye, EyeOff } from 'lucide-react'
 import { api, imageBlob } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { amenity, formatMoney, fullName, statusName, statusTone } from '../utils/format.js'
+import { getPageWindow } from '../utils/paging.js'
 export { BedDouble, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleUserRound, CreditCard, Hotel, ImagePlus, LayoutDashboard, LogOut, MapPin, Menu, Search, Settings, Shield, Star, UserRound, X, Wifi, CircleAlert, LoaderCircle, ArrowRight, Home, CheckCircle2, SlidersHorizontal, ImageOff }
 
 export function Button({children,variant='primary',size='',className='',type='button',...props}) {return <button type={type} className={`btn btn-${variant} ${size ? `btn-${size}`:''} ${className}`} {...props}>{children}</button>}
@@ -25,7 +26,7 @@ export function PasswordInput({className='', ...props}) {
 }
 export function Alert({error,success,onClose}) {const value=error || success;if(!value) return null;return <div role="alert" className={`alert ${error?'alert-error':'alert-success'}`}><span>{error?<CircleAlert size={18}/>:<CheckCircle2 size={18}/>}</span><span>{typeof value==='string'?value:value?.message||'Ошибка'}</span>{onClose&&<button aria-label="Закрыть" onClick={onClose}><X size={16}/></button>}</div>}
 export function Spinner({label='Загружаем данные...'}) {return <div className="spinner" role="status"><LoaderCircle size={27} className="spin"/><span>{label}</span></div>}
-export function Empty({icon:Icon=BedDouble,title='Ничего не найдено',text,action}) {return <div className="empty"><div className="empty-icon"><Icon size={28}/></div><h3>{title}</h3>{text&&<p>{text}</p>}{action}</div>}
+export function Empty({icon:Icon=BedDouble,title='Ничего не найдено',text,action}) {return <div className="empty"><div className="empty-icon">{createElement(Icon, { size: 28 })}</div><h3>{title}</h3>{text&&<p>{text}</p>}{action}</div>}
 export function Stars({rating}) {if(rating===undefined || rating===null) return null;return <span className="stars"><Star size={15} fill="currentColor"/> <b>{Number(rating).toFixed(1)}</b></span>}
 export function Status({value}) {return <span className={`status status-${statusTone(value)}`}>{statusName(value)}</span>}
 export function Amenities({items=[],limit=5}) {return <div className="amenities">{(Array.isArray(items)?items:[]).slice(0,limit).map(i=><span key={i}><CheckCircle2 size={14}/>{amenity(i)}</span>)}</div>}
@@ -74,13 +75,10 @@ export function ImageBlock({hotelId,photoId,alt='',className='',fallback=0}) {
 }
 /** Shared numeric pagination; page and callback use zero-based indexes. */
 export function Pagination({page=0,totalPages=1,onChange,className=''}) {
-  const max=Math.max(1,Math.floor(Number(totalPages)||1))
-  const current=Math.min(Math.max(0,Number(page)||0),max-1)
+  const {current,max,start:from,pages}=getPageWindow(page,totalPages)
   const [jump,setJump]=useState(String(current+1))
   useEffect(()=>setJump(String(current+1)),[current])
   if(max<=1)return null
-  const from=Math.max(0,Math.min(max-5,current-2))
-  const pages=Array.from({length:Math.min(5,max)},(_,i)=>from+i)
   function go(i) {if(i!==current&&i>=0&&i<max)onChange(i)}
   function submit(e){e.preventDefault();if(!/^\d+$/.test(jump.trim()))return;const target=Number(jump)-1;if(Number.isSafeInteger(target))go(target)}
   return <nav className={`numbered-pagination ${className}`} aria-label="Перейти на страницу">
@@ -104,4 +102,4 @@ export function Layout() {
 export function Protected({admin=false}){const {user,loading,isAdmin,passwordChangeRequired}=useAuth();const loc=useLocation();if(loading) return <Spinner/>;if(!user)return <Navigate to="/login" state={{from:loc}} replace/>;if(passwordChangeRequired)return <Navigate to="/change-password" replace/>;if(admin&&!isAdmin)return <Navigate to="/account" replace/>;return <Outlet/>}
 const accountLinks=[['/account',LayoutDashboard,'Обзор'],['/account/bookings',CalendarDays,'Мои бронирования'],['/account/profile',UserRound,'Мой профиль']]
 const adminLinks=[['/admin',LayoutDashboard,'Обзор'],['/admin/hotels',Hotel,'Отели'],['/admin/rooms',BedDouble,'Номера'],['/admin/users',UsersRound,'Пользователи'],['/admin/bookings',CalendarDays,'Бронирования'],['/admin/statistics',ChartNoAxesColumn,'Статистика']]
-export function DashboardLayout({admin=false}) {const {user,logout}=useAuth();const links=admin?adminLinks:accountLinks;return <div className="container dashboard"><aside className="dashboard-side"><div className="aside-heading"><span className="avatar"><UserRound size={22}/></span><div><strong>{admin?'Администрирование':'Личный кабинет'}</strong><small>{fullName(user)}</small></div></div><nav className="side-links">{links.map(([path,Icon,label])=><NavLink end key={path} to={path}><Icon size={19}/>{label}</NavLink>)}</nav><button className="side-logout" onClick={logout}><LogOut size={18}/>Выйти</button></aside><div className="dashboard-main"><Outlet/></div></div>}
+export function DashboardLayout({admin=false}) {const {user,logout}=useAuth();const links=admin?adminLinks:accountLinks;return <div className="container dashboard"><aside className="dashboard-side"><div className="aside-heading"><span className="avatar"><UserRound size={22}/></span><div><strong>{admin?'Администрирование':'Личный кабинет'}</strong><small>{fullName(user)}</small></div></div><nav className="side-links">{links.map(([path,Icon,label])=><NavLink end key={path} to={path}>{createElement(Icon, { size: 19 })}{label}</NavLink>)}</nav><button className="side-logout" onClick={logout}><LogOut size={18}/>Выйти</button></aside><div className="dashboard-main"><Outlet/></div></div>}

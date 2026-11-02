@@ -1,3 +1,15 @@
+# Hotel Booking — Frontend v12.9 (02.11.2026)
+
+Полный React frontend с исправлениями всех 20 пунктов аудита v12.8 (пункт F08 частично: не удалось создать корректный `package-lock.json` без реестра npm и выполнить Vite/ESLint). Подробности: [`RELEASE_NOTES_v12_9.md`](RELEASE_NOTES_v12_9.md).
+
+**API-база:** `hotel-booking-backend-20261102-integrated-source.zip` с согласованными дополнительными фильтрами Booking/Hotel Service. Патч backend в этот архив не входит.
+
+Для запуска установите зависимости локально: `npm install`, затем `npm run dev`. Тесты: `npm test`. После установки: `npm run check` (тесты + ESLint + Vite production build). Если уже есть `package-lock.json`, используйте `npm ci`.
+
+**Важно:** при первой установке зафиксируйте реально созданный `package-lock.json` в Git. В архив он не включён: в среде сборки реестр пакетов недоступен, фиктивный lockfile нарушил бы `npm ci`.
+
+---
+
 # Hotel Booking — React frontend (v6, 31.10.2026)
 
 Полный frontend, основанный на v5. Backend не включён и не менялся.

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Images, X } from 'lucide-react'
 import { Button, HotelNoPhotos, ImageBlock } from './Shared.jsx'
+import { useModalFocus } from '../utils/useModalFocus.js'
 
 // Only four sidebar thumbnails and twelve lightbox thumbnails are mounted at a time.
 // The photo metadata may contain 50+ entries without loading all image files.
@@ -13,6 +14,7 @@ export function HotelGallery({ hotelId, hotelName, photos = [], error = '' }) {
   const [selected, setSelected] = useState(0)
   const [sideStart, setSideStart] = useState(1)
   const [open, setOpen] = useState(false)
+  const modalRef = useModalFocus(open,()=>setOpen(false))
   const [page, setPage] = useState(0)
 
   useEffect(() => { setSelected(0); setSideStart(1); setPage(0); setOpen(false) }, [hotelId])
@@ -83,7 +85,7 @@ export function HotelGallery({ hotelId, hotelName, photos = [], error = '' }) {
       <button type="button" className="hotel-gallery-open" onClick={() => setOpen(true)}><Images size={16}/> Все фотографии ({total})</button>
     </section>
     {open && createPortal(<div className="room-lightbox hotel-photo-lightbox" role="presentation" onClick={() => setOpen(false)}>
-      <section className="room-lightbox-dialog hotel-photo-lightbox-dialog" role="dialog" aria-modal="true" aria-label={`Галерея отеля ${hotelName}`} onClick={event => event.stopPropagation()}>
+      <section className="room-lightbox-dialog hotel-photo-lightbox-dialog" ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Галерея отеля ${hotelName}`} onClick={event => event.stopPropagation()}>
         <header className="room-lightbox-header"><strong>{hotelName} · фото {selected + 1} из {total}</strong><button type="button" aria-label="Закрыть галерею" onClick={() => setOpen(false)}><X size={23}/></button></header>
         <div className="room-lightbox-photo"><ImageBlock key={current?.id} hotelId={hotelId} photoId={current?.id} alt={`${hotelName}, фото ${selected + 1}`}/></div>
         <div className="room-lightbox-controls"><Button variant="outline" onClick={() => changeSelected(selected - 1)}><ChevronLeft size={18}/> Назад</Button><Button variant="outline" onClick={() => changeSelected(selected + 1)}>Вперёд <ChevronRight size={18}/></Button></div>

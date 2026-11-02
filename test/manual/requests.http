@@ -52,7 +52,7 @@ client.test('Регистрация тестового USER — HTTP 201', funct
 });
 %}
 
-### 01.002 — Вход пользователя USER и сохранение userToken — ожидаем HTTP 200
+### 01.002 — Вход пользователя USER и сохранение accessToken — ожидаем HTTP 200
 # Источник: requests.http, тест №4.
 POST {{baseUrl}}/api/users/login
 Content-Type: application/json
@@ -72,7 +72,6 @@ client.test('Вход USER и данные аккаунта — HTTP 200', funct
 });
 if (response.status === 200) {
   client.global.set("accessToken", response.body.accessToken);
-  client.global.set("userToken", response.body.accessToken);
 }
 %}
 
@@ -801,7 +800,7 @@ Authorization: Bearer {{temporaryToken}}
 
 ### 03.045 — 16 — Временный JWT отозван в Hotel: 401 — ожидаем HTTP 401
 # Источник: requests.http, тест №101.
-# Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
+# Токены данного блока служебные; основной accessToken/adminToken не перезаписывается.
 GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{temporaryToken}}
 
@@ -813,7 +812,7 @@ Authorization: Bearer {{temporaryToken}}
 
 ### 03.046 — 17 — Старый временный пароль больше не работает: 401 — ожидаем HTTP 401
 # Источник: requests.http, тест №102.
-# Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
+# Токены данного блока служебные; основной accessToken/adminToken не перезаписывается.
 POST {{baseUrl}}/api/users/login
 Content-Type: application/json
 
@@ -830,7 +829,7 @@ Content-Type: application/json
 
 ### 03.047 — 18 — Вход с новым постоянным паролем: 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №103.
-# Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
+# Токены данного блока служебные; основной accessToken/adminToken не перезаписывается.
 POST {{baseUrl}}/api/users/login
 Content-Type: application/json
 
@@ -850,7 +849,7 @@ Content-Type: application/json
 
 ### 03.048 — 19 — Новый JWT работает в Booking: 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №104.
-# Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
+# Токены данного блока служебные; основной accessToken/adminToken не перезаписывается.
 GET {{baseUrl}}/api/bookings/my
 Authorization: Bearer {{newUserToken}}
 
@@ -862,7 +861,7 @@ Authorization: Bearer {{newUserToken}}
 
 ### 03.049 — 20 — Новый JWT работает в Hotel: 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №105.
-# Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
+# Токены данного блока служебные; основной accessToken/adminToken не перезаписывается.
 GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{newUserToken}}
 
@@ -874,7 +873,7 @@ Authorization: Bearer {{newUserToken}}
 
 ### 03.050 — 21 — Смена пароля без JWT: 401 — ожидаем HTTP 401
 # Источник: requests.http, тест №106.
-# Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
+# Токены данного блока служебные; основной accessToken/adminToken не перезаписывается.
 POST {{baseUrl}}/api/users/me/change-password
 Content-Type: application/json
 
@@ -891,7 +890,7 @@ Content-Type: application/json
 
 ### 03.051 — 22 — USER не может сбрасывать пароль через ADMIN API: 403 — ожидаем HTTP 403
 # Источник: requests.http, тест №107.
-# Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
+# Токены данного блока служебные; основной accessToken/adminToken не перезаписывается.
 POST {{baseUrl}}/api/users/{{resetUserId}}/reset-password
 Authorization: Bearer {{newUserToken}}
 Content-Type: application/json

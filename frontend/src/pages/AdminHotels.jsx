@@ -63,23 +63,29 @@ function HotelPhotoEditor({ hotelId, hotelName, onPhotosChanged, onBusyChange })
   async function upload(event) {
     const files = Array.from(event.target.files || [])
     if (!files.length) return
-    // The backend accepts JPEG/PNG up to 5 MiB per file.
-    if (files.some(file => !['image/jpeg', 'image/png'].includes(file.type) || file.size > 5 * 1024 * 1024)) {
-      setError('Разрешены только JPEG и PNG размером до 5 МБ каждый.')
+    // The backend accepts JPEG, PNG and WebP, up to 5 MiB per file.
+    if (files.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+      setError('Разрешены только JPEG, PNG и WebP размером до 5 МБ каждый.')
       event.target.value = ''
+      return
+    }
+    if (photos.length + files.length > 10) {
+      setError(`Не более 10 фотографий на отель. Доступно мест: ${Math.max(0,10-photos.length)}.`)
+      event.target.value=''
       return
     }
     setBusy(true)
     onBusyChange?.(true)
     setError('')
     setSuccess('')
+    let uploaded=0
     try {
-      for (const file of files) await api.photoUpload(hotelId, file)
+      for (const file of files) {await api.photoUpload(hotelId, file);uploaded++}
       await reload()
       onPhotosChanged?.()
       setSuccess(files.length === 1 ? 'Фотография загружена.' : `Загружено фотографий: ${files.length}.`)
     } catch (err) {
-      setError(err.message)
+      setError(`${err.message} Загружено из выбранных: ${uploaded} из ${files.length}.`)
       try { await reload() } catch { /* Keep existing photos. */ }
     } finally {
       setBusy(false)
@@ -137,13 +143,13 @@ function HotelPhotoEditor({ hotelId, hotelName, onPhotosChanged, onBusyChange })
               }}><Trash2 size={16} /></Button>
           </div>
         </div>)}
-        <label className={`admin-photo-upload-tile ${busy ? 'is-disabled' : ''}`}>
+        {photos.length<10&&<label className={`admin-photo-upload-tile ${busy ? 'is-disabled' : ''}`}>
           <Upload size={26} aria-hidden="true" />
           <b>{busy ? 'Загружаем...' : 'Добавить фото'}</b>
-          <small>JPEG или PNG, до 5 МБ</small>
-          <input type="file" accept="image/jpeg,image/png" multiple disabled={busy}
+          <small>JPEG, PNG или WebP, до 5 МБ</small>
+          <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy}
             onChange={upload} aria-label="Загрузить фотографии отеля" />
-        </label>
+        </label>}
       </div>}
     {!loading && photos.length > visibleCount && <div className="gallery-more-actions"><Button type="button" variant="outline" disabled={busy} onClick={() => setVisibleCount(n => n + 12)}>Показать ещё ({photos.length - visibleCount})</Button><span>Показано {Math.min(photos.length, visibleCount)} из {photos.length}</span></div>}
   </section>
@@ -269,6 +275,10 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
   const [initializing, setInitializing] = useState(editingMode)
   const [loadFailure, setLoadFailure] = useState(false)
   const [rooms, setRooms] = useState([])
+  const [roomPage,setRoomPage] = useState(0)
+  const [roomPages,setRoomPages] = useState(1)
+  const [roomTotal,setRoomTotal] = useState(0)
+  const roomsRequestRef = useRef(0)
   const [roomWizard, setRoomWizard] = useState(null)
   const [photoCount, setPhotoCount] = useState(0)
   const [hotelPhotos, setHotelPhotos] = useState([])
@@ -280,10 +290,11 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
   const firstFieldRef = useRef(null)
 
   useEffect(() => {
+    const previousFocus = document.activeElement
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     firstFieldRef.current?.focus()
-    return () => { document.body.style.overflow = previousOverflow }
+    return () => { document.body.style.overflow = previousOverflow; if(previousFocus?.isConnected)previousFocus.focus() }
   }, [])
 
   useEffect(() => {
@@ -295,7 +306,7 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
       setError('')
       try {
         const id = hotelToEdit.id
-        const results = await Promise.allSettled([api.hotel(id), api.roomSelectionStrategy(id), api.roomsAll(id), api.photos(id)])
+        const results = await Promise.allSettled([api.hotel(id), api.roomSelectionStrategy(id), api.roomsPage({hotelId:id,page:0,size:20}), api.photos(id)])
         if (!active) return
         if (results[0].status !== 'fulfilled') throw results[0].reason
         const hotel = results[0].value
@@ -310,7 +321,7 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
           checkOutTime: String(hotel.checkOutTime || '12:00').slice(0,5),
           roomSelectionStrategy: strategy,
         })
-        if (results[2].status === 'fulfilled') setRooms(arrayOf(results[2].value).map(normalRoom))
+        if (results[2].status === 'fulfilled') {setRooms(arrayOf(results[2].value).map(normalRoom));setRoomTotal(Number(results[2].value.totalElements||0));setRoomPages(Math.max(1,Number(results[2].value.totalPages||1)))}
         if (results[3].status === 'fulfilled') { const existingPhotos = arrayOf(results[3].value).sort((a,b)=>Number(b.primary)-Number(a.primary)||Number(a.sortOrder??0)-Number(b.sortOrder??0)); setHotelPhotos(existingPhotos); setPhotoCount(existingPhotos.length) }
         const incomplete = results.slice(1).filter(result => result.status === 'rejected')
         if (incomplete.length) setError(`Не всё удалось загрузить: ${incomplete.map(result => result.reason?.message || 'Ошибка API').join('; ')}. Повторная загрузка произойдёт при переходе к разделу.`)
@@ -338,7 +349,7 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
         event.preventDefault()
         closeWizard()
       }
-      if (event.key === 'Tab' && dialogRef.current) {
+      if (event.key === 'Tab' && !roomWizard && dialogRef.current) {
         const focusable = [...dialogRef.current.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
           .filter(el => el.getClientRects().length > 0)
         if (!focusable.length) return
@@ -357,15 +368,21 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
     function warnBeforeUnload(event) { event.preventDefault(); event.returnValue = '' }
     window.addEventListener('beforeunload', warnBeforeUnload)
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
-  }, [createdHotel])
+  }, [createdHotel, editingMode])
 
   function changeDraft(field, value) {
     setError('')
     setDraft(previous => ({ ...previous, [field]: value }))
   }
 
-  async function loadRooms(hotelId) {
-    setRooms(arrayOf(await api.roomsAll(hotelId)).map(normalRoom))
+  async function loadRooms(hotelId, targetPage=roomPage) {
+    const requestId=++roomsRequestRef.current
+    const data=await api.roomsPage({hotelId,page:targetPage,size:20})
+    if(requestId!==roomsRequestRef.current)return
+    setRoomPage(targetPage)
+    setRoomTotal(Number(data.totalElements||0))
+    setRoomPages(Math.max(1,Number(data.totalPages||1)))
+    setRooms(arrayOf(data).map(normalRoom))
   }
 
   async function loadPhotos(hotelId) {
@@ -387,7 +404,7 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
       if (draft.name.trim().length > 150 || draft.address.trim().length > 255) {
         setError('Название отеля — до 150 символов, адрес — до 255.'); return
       }
-      if (editingMode && (draft.name.trim() !== originalIdentity.name || draft.address.trim() !== originalIdentity.address)) {
+      if (createdHotel?.id && (draft.name.trim() !== originalIdentity.name || draft.address.trim() !== originalIdentity.address)) {
         setBusy(true)
         try {
           const updated = await api.updateHotelIdentity(createdHotel.id, draft.name.trim(), draft.address.trim())
@@ -524,30 +541,31 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
         </>}
         {step === 2 && <>
           <div className="wizard-section-head"><h3>Шаг 3. Фотографии</h3><p>{editingMode ? 'Здесь отображаются все фотографии отеля из backend, включая демоизображения. Можно выбрать главное фото, удалить или добавить новое.' : 'Добавьте фотографии отеля и укажите главную. Этот шаг можно пропустить.'}</p></div>
-          {ready && <div className="wizard-photo-area admin-form"><HotelPhotoEditor key={createdHotel.id} hotelId={createdHotel.id} hotelName={draft.name} onBusyChange={setPhotoBusy} onPhotosChanged={() => { api.photos(createdHotel.id).then(result => { const values=arrayOf(result);setPhotoCount(values.length);setHotelPhotos(values) }).catch(() => {}) }} /></div>}
+          {ready && <div className="wizard-photo-area admin-form"><HotelPhotoEditor key={createdHotel.id} hotelId={createdHotel.id} hotelName={draft.name} onBusyChange={setPhotoBusy} onPhotosChanged={() => loadPhotos(createdHotel.id).catch(err => setError(`Не удалось обновить данные фотографий: ${err.message}`))} /></div>}
         </>}
         {step === 3 && <>
           <div className="wizard-section-head"><h3>Шаг 4. Номера</h3><p>{editingMode ? 'Все существующие номера отеля и их фото загружаются из backend. Редактируйте их здесь или добавляйте новые.' : 'Создайте номера и установите цены. Добавлять новые номера можно и после завершения.'}</p></div>
-          <div className="wizard-room-top"><strong>Номера отеля ({rooms.length})</strong><Button type="button" size="small" variant="outline" onClick={() => setRoomWizard({mode:'create'})}><Plus size={16}/> Добавить номер</Button></div>
+          <div className="wizard-room-top"><strong>Номера отеля ({roomTotal})</strong><Button type="button" size="small" variant="outline" onClick={() => setRoomWizard({mode:'create'})}><Plus size={16}/> Добавить номер</Button></div>
           {rooms.length > 0 && <div className="wizard-room-list">{rooms.map(room => <div className="wizard-room-card" key={room.id}>
             <span className="wizard-room-photo"><RoomPhotoImage roomId={room.id} hotelId={createdHotel?.id} alt={`Фото номера ${room.number}`} /></span>
             <div><b>Номер {room.number}</b><span>{room.category} · {room.capacity} гост. · {formatMoney(room.pricePerNight)} / ночь</span></div>
             <div className="wizard-room-actions"><Button type="button" size="small" variant="outline" onClick={() => setRoomWizard({mode:'edit', room, initialStep:1})}><ImagePlus size={14}/> Фотографии</Button><Button type="button" size="small" variant="outline" onClick={() => setRoomWizard({mode:'edit', room, initialStep:0})}><Pencil size={14}/> Редактировать</Button></div>
           </div>)}</div>}
-          {!rooms.length && <div className="wizard-empty"><BedDouble size={30}/><p>Номеров пока нет. Добавьте первый номер через мастер.</p></div>}
+          <Pagination page={roomPage} totalPages={roomPages} onChange={p=>loadRooms(createdHotel.id,p).catch(err=>setError(err.message))}/>
+          {!roomTotal && <div className="wizard-empty"><BedDouble size={30}/><p>Номеров пока нет. Добавьте первый номер через мастер.</p></div>}
         </>}
         {step === 4 && <>
           <div className="wizard-section-head"><h3>Шаг 5. Проверка</h3><p>{editingMode ? 'Проверьте сохранённые фотографии, номера и настройку стратегии.' : 'Проверьте информацию перед завершением работы мастера.'}</p></div>
           <div className="wizard-review">
             <div className="wizard-review-photo">{ready ? <HotelReviewGallery hotelId={previewId} hotelName={draft.name} photos={hotelPhotos} /> : <HotelNoPhotos/>}</div>
             <div className="wizard-review-details"><h3>{draft.name}</h3><p>{draft.address}</p>
-              <dl><div><dt>Автоподбор</dt><dd>{STRATEGIES.find(item => item.value === draft.roomSelectionStrategy)?.label}</dd></div><div><dt>Рейтинг</dt><dd>{draft.rating === '' ? 'Не задан' : `${draft.rating} / 5`}</dd></div><div><dt>Заезд / выезд</dt><dd>{draft.checkInTime} / {draft.checkOutTime}</dd></div><div><dt>Фотографии</dt><dd>{photoCount}</dd></div><div><dt>Номера</dt><dd>{rooms.length}</dd></div></dl>
+              <dl><div><dt>Автоподбор</dt><dd>{STRATEGIES.find(item => item.value === draft.roomSelectionStrategy)?.label}</dd></div><div><dt>Рейтинг</dt><dd>{draft.rating === '' ? 'Не задан' : `${draft.rating} / 5`}</dd></div><div><dt>Заезд / выезд</dt><dd>{draft.checkInTime} / {draft.checkOutTime}</dd></div><div><dt>Фотографии</dt><dd>{photoCount}</dd></div><div><dt>Номера</dt><dd>{roomTotal}</dd></div></dl>
               {draft.description && <p className="wizard-review-description">{draft.description}</p>}
               {allAmenities.length > 0 && <div className="wizard-review-amenities">{allAmenities.map(a => <span key={a}><CheckCircle2 size={14}/>{a}</span>)}</div>}
             </div>
           </div>
-          {rooms.length > 0 && <div className="wizard-review-roomlist">
-            <h4>{editingMode ? 'Номера отеля' : 'Добавленные номера'}</h4>
+          {roomTotal > 0 && <div className="wizard-review-roomlist">
+            <h4>{editingMode ? `Номера отеля (всего ${roomTotal})` : `Добавленные номера (всего ${roomTotal})`}</h4><p className="muted smaller">Отображаются номера текущей страницы. Остальные доступны через переключение страниц.</p>
             {rooms.map(room => <section className="wizard-review-room" key={room.id} aria-label={`Номер ${room.number}`}>
               <div className="wizard-review-room-info">
                 <strong>Номер {room.number}</strong>
@@ -557,20 +575,21 @@ function HotelWizard({ hotelToEdit = null, onClose, onComplete }) {
               <RoomPreviewSlider roomId={room.id} number={room.number} showAllThumbnails/>
             </section>)}
           </div>}
-          {rooms.length === 0 && <div className="wizard-warning"><Info size={18}/> В отеле пока нет номеров — бронирование станет доступно после их добавления.</div>}
+          <Pagination page={roomPage} totalPages={roomPages} onChange={p=>loadRooms(createdHotel.id,p).catch(err=>setError(err.message))}/>
+          {roomTotal === 0 && <div className="wizard-warning"><Info size={18}/> В отеле пока нет номеров — бронирование станет доступно после их добавления.</div>}
           <div className="wizard-done-info"><CheckCircle2 size={19}/><span>{editingMode ? 'Изменения сохранены в backend. Нажмите «Завершить», чтобы вернуться к каталогу.' : 'Отель и сохранённые данные находятся в backend. Кнопка «Завершить» закроет мастер.'}</span></div>
         </>}
         {(error || notice) && <div className="wizard-status"><Alert error={error} success={!error ? notice : undefined}/></div>}
         </>}
       </div>
       <footer className="hotel-wizard-footer">
-        <span>Шаг {step + 1} из {WIZARD_STEPS.length}{ready && <small> · Отель #{createdHotel.id} создан</small>}</span>
+        <span>Шаг {step + 1} из {WIZARD_STEPS.length}{ready && <small> · Отель #{createdHotel.id} сохранён</small>}</span>
         <div className="wizard-footer-actions">
           {step === 0 ? <Button variant="outline" type="button" disabled={initializing || busy || photoBusy} onClick={closeWizard}>{editingMode ? 'Закрыть' : 'Отмена'}</Button>
             : <Button variant="outline" type="button" disabled={initializing || busy || photoBusy} onClick={backStep}><ArrowLeft size={16}/> Назад</Button>}
           <Button type={step === 0 || step === 1 ? 'submit' : 'button'} form={step === 0 || step === 1 ? 'wizard-main-form' : undefined}
             disabled={initializing || loadFailure || busy || photoBusy} onClick={step > 1 ? nextStep : undefined}>
-            {busy ? 'Сохраняем...' : step === 4 ? 'Завершить' : editingMode && (step === 0 || step === 1) ? 'Сохранить и далее' : step === 1 ? 'Создать отель и далее' : 'Далее'}
+            {busy ? 'Сохраняем...' : step === 4 ? 'Завершить' : editingMode && (step === 0 || step === 1) ? 'Сохранить и далее' : step === 1 && !createdHotel ? 'Создать отель и далее' : 'Далее'}
             {step === 4 ? <Check size={17}/> : <ArrowRight size={17}/>}
           </Button>
         </div>
@@ -595,27 +614,28 @@ export function AdminHotels() {
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [message, setMessage] = useState('')
   const [listPage,setListPage] = useState(0)
+  const [listPages,setListPages] = useState(1)
   const HOTEL_LIST_PAGE_SIZE=20
 
-  async function reload() {
-    setLoading(true)
-    setLoadError('')
-    try { setHotels(arrayOf(await api.hotelsAll())) }
-    catch (error) { setLoadError(error.message) }
-    finally { setLoading(false) }
-  }
-  useEffect(() => { reload() }, [])
-  async function wizardDone(hotel) {
-    const edited = wizard?.mode === 'edit'
+  useEffect(()=>{
+    let active=true
+    setLoading(true);setLoadError('')
+    api.hotelsPage({page:listPage,size:HOTEL_LIST_PAGE_SIZE}).then(result=>{
+      if(!active)return
+      setHotels(arrayOf(result));setListPages(Math.max(1,Number(result.totalPages||1)))
+    }).catch(err=>{if(active){setHotels([]);setListPages(1);setLoadError(err.message)}})
+      .finally(()=>{if(active)setLoading(false)})
+    return()=>{active=false}
+  },[listPage,refreshVersion])
+  function wizardDone(hotel) {
+    const edited=wizard?.mode==='edit'
     setWizard(null)
-    setRefreshVersion(v => v + 1)
-    setMessage(edited ? `Отель «${hotel.name}» обновлён.` : `Отель «${hotel.name}» добавлен.`)
-    await reload()
+    setRefreshVersion(v=>v+1)
+    setMessage(edited?`Отель «${hotel.name}» обновлён.`:`Отель «${hotel.name}» добавлен.`)
   }
-  async function wizardClosed() {
+  function wizardClosed() {
     setWizard(null)
-    setRefreshVersion(v => v + 1)
-    await reload()
+    setRefreshVersion(v=>v+1)
   }
 
   return <>
@@ -631,7 +651,7 @@ export function AdminHotels() {
     />, document.body)}
 
     {loading ? <Spinner/> : <div className="admin-hotel-list">
-      {hotels.slice(listPage*HOTEL_LIST_PAGE_SIZE,(listPage+1)*HOTEL_LIST_PAGE_SIZE).map((hotel,index) => <div className="admin-hotel-row" key={hotel.id}>
+      {hotels.map((hotel,index) => <div className="admin-hotel-row" key={hotel.id}>
         <ImageBlock key={`${hotel.id}-${refreshVersion}`} hotelId={hotel.id} fallback={index} alt={hotel.name}/>
         <div><b>{hotel.name}</b><p>{hotel.address || hotel.city}</p>
           <small>ID: {hotel.id} · {hotel.rating != null ? `Рейтинг: ${hotel.rating}` : 'Без рейтинга'}</small>
@@ -641,7 +661,7 @@ export function AdminHotels() {
         </Button>
       </div>)}
       {hotels.length === 0 && <Empty icon={Hotel} title="Отелей пока нет" text="Для демоданных проверьте APP_DEMO_ENABLED=true в запуске Hotel Service." action={<Button type="button" onClick={() => setWizard({mode:'create'})}>Создать первый отель</Button>}/>}
-      <Pagination page={listPage} totalPages={Math.ceil(hotels.length/HOTEL_LIST_PAGE_SIZE)} onChange={setListPage}/>
+      <Pagination page={listPage} totalPages={listPages} onChange={setListPage}/>
     </div>}
   </>
 }

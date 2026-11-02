@@ -7,6 +7,7 @@ import {
 import { api } from '../api/client.js'
 import { Alert, Button, Empty, PageTitle, Spinner, PasswordInput, Pagination } from '../components/Shared.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useModalFocus } from '../utils/useModalFocus.js'
 
 const PAGE_SIZE = 20
 const emptyUser = {
@@ -29,16 +30,14 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const dialogRef = useModalFocus(true,onClose,!busy)
   const name = user ? fullUserName(user) : 'Новый пользователь'
 
   useEffect(() => {
-    const onKey = event => { if (event.key === 'Escape' && !busy) onClose() }
-    window.addEventListener('keydown', onKey)
     // Keep the page stationary while this modal is visible.
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
-      window.removeEventListener('keydown', onKey)
       document.body.style.overflow = previous
     }
   }, [busy, onClose])
@@ -123,7 +122,7 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
 
   return createPortal(
     <div className="hotel-wizard-overlay admin-users-overlay">
-      <section className="hotel-wizard admin-users-wizard" role="dialog" aria-modal="true" aria-label={title}>
+      <section ref={dialogRef} tabIndex={-1} className="hotel-wizard admin-users-wizard" role="dialog" aria-modal="true" aria-label={title}>
         <header className="hotel-wizard-header">
           <div><h2>{title}</h2><p>{isCreate || isEdit ? 'Управление пользователями Booking Service' : `ID ${user.id} · ${user.username}`}</p></div>
           <button className="wizard-close" onClick={onClose} disabled={busy} type="button">Закрыть <X size={17}/></button>
@@ -214,52 +213,28 @@ export function AdminUsers() {
   const [searchId, setSearchId] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [nameQuery, setNameQuery] = useState('')
-  const [matchedUsers, setMatchedUsers] = useState([])
-  const [searchLoading, setSearchLoading] = useState(false)
   useEffect(() => {
-    if (nameQuery) return
     let active = true
     setLoading(true)
     setError('')
-    api.adminUsers({page, size: PAGE_SIZE}).then(response => {
+    api.adminUsers({page, size: PAGE_SIZE, ...(nameQuery ? {q:nameQuery} : {})}).then(response => {
       if (!active) return
       const entries = Array.isArray(response?.content) ? response.content : []
       const maxPage = Math.max(1, Number(response?.totalPages ?? 1))
       setUsers(entries)
       setTotalPages(maxPage)
       setTotalElements(Number(response?.totalElements ?? entries.length))
-      if (page >= maxPage) setPage(maxPage - 1)
-    }).catch(err => { if (active) setError(err.message) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+      if(page >= maxPage) setPage(maxPage - 1)
+    }).catch(err => {if(active){setUsers([]);setTotalElements(0);setTotalPages(1);setError(err.message)}})
+      .finally(() => {if(active) setLoading(false)})
+    return () => {active = false}
   }, [page, revision, nameQuery])
 
-  // Booking Service currently exposes only GET /api/users?page&size, without a name filter.
-  // Load all pages through that ADMIN endpoint only while a name search is active.
-  useEffect(() => {
-    if (!nameQuery) return
-    let active = true
-    setSearchLoading(true)
-    setError('')
-    api.adminUsersAll().then(all => {
-      if (!active) return
-      const needle = nameQuery.toLocaleLowerCase('ru')
-      const matches = all.filter(person => [
-        person.firstName,person.lastName,person.username,person.email,
-        [person.firstName,person.lastName].filter(Boolean).join(' '),
-      ].some(value => String(value||'').toLocaleLowerCase('ru').includes(needle)))
-      setMatchedUsers(matches)
-      if (page >= Math.max(1, Math.ceil(matches.length/PAGE_SIZE))) setPage(0)
-    }).catch(err => {if (active) setError(err.message)})
-      .finally(() => {if (active) setSearchLoading(false)})
-    return () => { active = false }
-  }, [nameQuery, revision])
-
-  const isSearching = !!nameQuery
-  const visibleUsers = isSearching ? matchedUsers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : users
-  const displayTotal = isSearching ? matchedUsers.length : totalElements
-  const displayPages = isSearching ? Math.max(1,Math.ceil(matchedUsers.length / PAGE_SIZE)) : totalPages
-  const waiting = isSearching ? searchLoading : loading
+  const isSearching = Boolean(nameQuery)
+  const visibleUsers = users
+  const displayTotal = totalElements
+  const displayPages = totalPages
+  const waiting = loading
 
   async function openUser(id, mode) {
     setError('')
@@ -290,7 +265,6 @@ export function AdminUsers() {
   function clearNameSearch(){
     setSearchInput('')
     setNameQuery('')
-    setMatchedUsers([])
     setPage(0)
   }
   function findById(event) {
@@ -316,7 +290,7 @@ export function AdminUsers() {
         </div>
       </form>
       <form onSubmit={findByName} className="admin-users-name-search admin-users-search-form">
-        <label htmlFor="admin-user-name-search">Поиск по имени, фамилии или логину</label>
+        <label htmlFor="admin-user-name-search">Поиск по имени, фамилии, логину или email</label>
         <div className="admin-users-search-controls"><input id="admin-user-name-search" type="search" value={searchInput} onChange={e=>setSearchInput(e.target.value)} placeholder="Например: Анна Петрова"/>
           <Button type="submit" variant="outline">Найти</Button>
           {isSearching && <Button type="button" variant="outline" onClick={clearNameSearch}>Сбросить</Button>}

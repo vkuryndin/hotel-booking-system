@@ -16,7 +16,11 @@ function errorText(data, response) {
 export async function request(path, { method='GET', body, auth=true, headers={}, signal }={}) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 20000)
-  if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true })
+  const abortFromParent = () => controller.abort()
+  if (signal) {
+    if (signal.aborted) controller.abort()
+    else signal.addEventListener('abort', abortFromParent, { once: true })
+  }
   const token = tokenStorage.get()
   const h = { ...headers }
   if (auth && token) h.Authorization = `Bearer ${token}`
@@ -35,25 +39,35 @@ export async function request(path, { method='GET', body, auth=true, headers={},
     if (err.name === 'AbortError') throw new ApiError('Время ожидания истекло. Проверьте соединение.', 0)
     if (err instanceof TypeError) throw new ApiError('Не удалось подключиться к API Gateway. Проверьте, что backend запущен.', 0)
     throw err
-  } finally { clearTimeout(timer) }
+  } finally { clearTimeout(timer); signal?.removeEventListener('abort', abortFromParent) }
 }
 export async function imageBlob(path, signal) {
-  const token = tokenStorage.get()
-  const response = await fetch(`${BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal })
-  if (!response.ok) throw new ApiError('Фотография недоступна', response.status)
-  return response.blob()
-}
-async function fetchAll(path, query={}) {
-  const first = await request(`${path}?${new URLSearchParams({...query,page:0,size:100})}`)
-  if (Array.isArray(first)) return first
-  const result = Array.isArray(first?.content) ? [...first.content] : []
-  const pages = Math.min(Math.max(1,Number(first?.totalPages||1)),100)
-  for (let page=1; page<pages; page++) {
-    const data = await request(`${path}?${new URLSearchParams({...query,page,size:100})}`)
-    if (!Array.isArray(data?.content) || data.content.length===0) break
-    result.push(...data.content)
+  const controller = new AbortController()
+  const abortFromParent = () => controller.abort()
+  if (signal) {
+    if (signal.aborted) controller.abort()
+    else signal.addEventListener('abort', abortFromParent, { once: true })
   }
-  return result
+  const timeout = setTimeout(() => controller.abort(), 20000)
+  try {
+    const token = tokenStorage.get()
+    const response = await fetch(`${BASE}${path}`, {headers:token?{Authorization:`Bearer ${token}`}:{}, signal:controller.signal})
+    if (!response.ok) {
+      if (response.status===401 && token) window.dispatchEvent(new Event('hotel:auth-expired'))
+      const data = await response.json().catch(()=>null)
+      if (response.status===403 && data?.code==='PASSWORD_CHANGE_REQUIRED' && token)
+        window.dispatchEvent(new Event('hotel:password-change-required'))
+      throw new ApiError(errorText(data,response), response.status, data?.code)
+    }
+    return await response.blob()
+  } catch(err) {
+    if (err.name==='AbortError') {
+      if (signal?.aborted) throw err // An unmounted photo is not a network error.
+      throw new ApiError('Время загрузки фотографии истекло.',0,'IMAGE_TIMEOUT')
+    }
+    if (err instanceof TypeError) throw new ApiError('Не удалось загрузить фотографию. Проверьте соединение.',0)
+    throw err
+  } finally {clearTimeout(timeout);signal?.removeEventListener('abort',abortFromParent)}
 }
 // Verified against RoomPhotoController in the backend archive supplied 2026-10-31.
 const roomPhotoPath = roomId => `/rooms/${encodeURIComponent(roomId)}/photos`
@@ -63,19 +77,6 @@ export const api = {
   register: data => request('/users/register', { method:'POST', body:data, auth:false }),
   // ADMIN users: contracts verified against Booking Service controllers / DTOs.
   adminUsers: query => request(`/users?${new URLSearchParams(query)}`),
-  adminUsersAll: async () => {
-    // No server-side name filter. Do not pretend a truncated list is complete.
-    const first = await request('/users?page=0&size=100')
-    const rows = Array.isArray(first?.content) ? [...first.content] : []
-    const pages = Number(first?.totalPages || 1)
-    if (pages > 100) throw new ApiError('Поиск по имени для базы больше 10 000 пользователей требует серверного API-фильтра.', 0, 'SEARCH_LIMIT')
-    for (let page=1;page<pages;page++) {
-      const response = await request(`/users?page=${page}&size=100`)
-      if (!Array.isArray(response?.content)) throw new ApiError('Сервер вернул некорректную страницу пользователей.', 0, 'INVALID_PAGE')
-      rows.push(...response.content)
-    }
-    return rows
-  },
   adminUser: id => request(`/users/${encodeURIComponent(id)}`),
   adminCreateUser: data => request('/users', {method:'POST', body:data}),
   adminUpdateUser: (id,data) => request(`/users/${encodeURIComponent(id)}`, {method:'PATCH', body:data}),
@@ -84,15 +85,12 @@ export const api = {
   me: () => request('/users/me'),
   editMe: data => request('/users/me', { method:'PATCH', body:data }),
   changeMyPassword: data => request('/users/me/change-password', { method:'POST', body:data }),
-  hotelsAll: () => fetchAll('/hotels'),
-  roomsAll: id => fetchAll('/rooms',{hotelId:id}),
+  hotelsPage: query => request(`/hotels?${new URLSearchParams(query)}`),
+  roomsPage: query => request(`/rooms?${new URLSearchParams(query)}`),
   room: id => request(`/rooms/${encodeURIComponent(id)}`),
-  bookingsMyAll: () => fetchAll('/bookings/my'),
-  hotels: query => request(`/hotels${query ? '?'+new URLSearchParams(query) : ''}`),
   hotel: id => request(`/hotels/${id}`),
   createHotel: data => request('/hotels',{method:'POST',body:data}),
   editHotel: (id,data) => request(`/hotels/${id}/presentation`,{method:'PATCH',body:data}),
-  rooms: hotelId => request(`/rooms?hotelId=${encodeURIComponent(hotelId)}`),
   recommend: query => request(`/rooms/recommend?${new URLSearchParams(query)}`),
   createRoom: data => request('/rooms',{method:'POST',body:data}),
   editRoom: (id,data) => request(`/rooms/${id}/details`,{method:'PATCH',body:data}),
@@ -116,6 +114,5 @@ export const api = {
   photos: id => request(`/hotels/${id}/photos`),
   photoUpload: (id,file) => { const form=new FormData(); form.append('file',file); return request(`/hotels/${id}/photos`,{method:'POST',body:form}) },
   photoPrimary: (id,pid) => request(`/hotels/${id}/photos/${pid}/primary`,{method:'PATCH'}),
-  photoOrder: (id,pid,sortOrder) => request(`/hotels/${id}/photos/${pid}/order?sortOrder=${sortOrder}`,{method:'PATCH'}),
   photoDelete: (id,pid) => request(`/hotels/${id}/photos/${pid}`,{method:'DELETE'}),
 }

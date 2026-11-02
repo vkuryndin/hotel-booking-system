@@ -20,8 +20,8 @@ export const nights = (checkIn, checkOut) => {
 }
 export const validDates = (a,b) => a && b && a >= today() && nights(a,b) > 0 && nights(a,b) <= 365
 export const toQuery = obj => new URLSearchParams(Object.entries(obj).filter(([,v]) => v !== '' && v !== undefined && v !== null)).toString()
-export const statusName = value => ({ CONFIRMED: 'Подтверждено', CANCELLED: 'Отменено', PENDING: 'В обработке', FAILED: 'Ошибка', COMPLETED: 'Завершено', CANCEL_PENDING: 'Отмена выполняется', CANCELLATION_PENDING: 'Отмена выполняется', REJECTED: 'Отклонено' }[value] || value || 'Неизвестно')
-export const statusTone = value => value === 'CONFIRMED' || value === 'COMPLETED' ? 'success' : value === 'CANCELLED' || value === 'FAILED' || value === 'REJECTED' ? 'danger' : 'warning'
+export const statusName = value => ({ CONFIRMED: 'Подтверждено', CANCELLED: 'Отменено', PENDING: 'В обработке', CANCELLING: 'Отмена выполняется' }[value] || value || 'Неизвестно')
+export const statusTone = value => value === 'CONFIRMED' ? 'success' : value === 'CANCELLED' ? 'danger' : 'warning'
 export const amenityNames = AMENITY_LABEL
 export const amenity = name => amenityNames[name] || String(name).replaceAll('_',' ').toLowerCase()
 export const fullName = user => [user?.firstName,user?.lastName].filter(Boolean).join(' ') || user?.username || user?.email?.split('@')[0] || 'Пользователь'

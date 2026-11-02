@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, ChevronLeft, ChevronRight, ImageOff, ImagePlus, RefreshCcw, Trash2, Upload, X } from 'lucide-react'
 import { api, imageBlob } from '../api/client.js'
 import { Alert, Button, ImageBlock, Spinner } from './Shared.jsx'
 import { arrayOf } from '../utils/format.js'
+import { cachedRoomPhotos } from '../utils/detailCache.js'
+import { useModalFocus } from '../utils/useModalFocus.js'
 
 const LIMIT = 10
 const MAX_SIZE = 5 * 1024 * 1024
@@ -19,7 +21,19 @@ export function RoomNoPhotos({ compact = false, message = 'Нет фотогра
 
 export function RoomPhotoImage({ roomId, photoId, hotelId, className = '', alt = 'Фотография номера', fallback = 0, fallbackToHotel = false }) {
   const [state, setState] = useState({ status: 'loading', url: null })
+  const rootRef=useRef(null)
+  const [visible,setVisible]=useState(()=>typeof IntersectionObserver==='undefined')
+  useEffect(()=>{
+    if(typeof IntersectionObserver==='undefined'){setVisible(true);return}
+    const observer=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)){setVisible(true);observer.disconnect()}
+    },{rootMargin:'350px'})
+    if(rootRef.current)observer.observe(rootRef.current)
+    return()=>observer.disconnect()
+  },[])
   useEffect(() => {
+    if(!visible)return
+
     let active = true
     let objectUrl
     const controller = new AbortController()
@@ -29,7 +43,7 @@ export function RoomPhotoImage({ roomId, photoId, hotelId, className = '', alt =
       try {
         let id = photoId
         if (!id) {
-          const list = arrayOf(await api.roomPhotos(roomId))
+          const list = arrayOf(await cachedRoomPhotos(roomId))
           id = (list.find(item => item.primary) || list[0])?.id
         }
         if (!active) return
@@ -44,10 +58,10 @@ export function RoomPhotoImage({ roomId, photoId, hotelId, className = '', alt =
     }
     load()
     return () => { active = false; controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
-  }, [roomId, photoId])
-  if (state.url) return <div className={`photo-frame ${className}`}><img src={state.url} alt={alt}/></div>
+  }, [roomId, photoId, visible])
+  if (state.url) return <div ref={rootRef} className={`photo-frame ${className}`}><img src={state.url} alt={alt}/></div>
   if (fallbackToHotel && hotelId && state.status !== 'loading') return <ImageBlock hotelId={hotelId} className={className} alt={alt} fallback={fallback}/>
-  return <div className={`photo-frame room-empty-photo-frame ${className}`}>
+  return <div ref={rootRef} className={`photo-frame room-empty-photo-frame ${className}`}>
     <RoomNoPhotos compact={false} message={state.status === 'loading' ? 'Загружаем фото…' : state.status === 'error' ? 'Не удалось загрузить фото' : 'Нет фотографий номера'}/>
   </div>
 }
@@ -103,30 +117,29 @@ export function RoomGallery({ roomId, hotelId, number, compact = false }) {
   const [photos, setPhotos] = useState([])
   const [selected, setSelected] = useState(0)
   const [open, setOpen] = useState(false)
+  const [error,setError] = useState('')
+  const [retry,setRetry] = useState(0)
+  const modalRef = useModalFocus(open, () => setOpen(false))
   useEffect(() => {
     let active = true
+    setError('')
     setPhotos([])
     setSelected(0)
     if (!roomId) return () => { active = false }
     api.roomPhotos(roomId).then(data => {
       if (active) setPhotos(arrayOf(data).sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)))
-    }).catch(() => {})
+    }).catch(err => {if(active)setError(err.message)})
     return () => { active = false }
-  }, [roomId])
-  useEffect(() => {
-    if (!open) return
-    const close = event => { if (event.key === 'Escape') setOpen(false) }
-    document.addEventListener('keydown', close)
-    return () => document.removeEventListener('keydown', close)
-  }, [open])
+  }, [roomId,retry])
   const main = photos[selected] || photos[0]
   return <div className={`room-photo-gallery ${compact ? 'room-photo-gallery-compact' : ''}`}>
     <button className="room-gallery-main hover-photo-zoom" type="button" title={photos.length ? 'Посмотреть фотографии номера' : 'Фотографии номера пока отсутствуют'} onClick={() => photos.length && setOpen(true)}>
       <RoomPhotoImage roomId={roomId} hotelId={hotelId} photoId={main?.id} alt={`Номер ${number || ''}`} />
       {photos.length > 0 && <span className="room-gallery-count"><ImagePlus size={14} /> {photos.length} фото</span>}
     </button>
+    {error && <div className="photo-retry" role="alert">Не удалось загрузить фотографии: {error} <Button size="small" variant="outline" onClick={()=>setRetry(v=>v+1)}>Повторить</Button></div>}
     {!compact && photos.length > 1 && <div className="room-gallery-thumbs">{photos.slice(0, 5).map((photo, i) => <button type="button" key={photo.id} className={selected === i ? 'selected' : ''} onClick={() => setSelected(i)} aria-label={`Фотография ${i + 1}`}><RoomPhotoImage roomId={roomId} photoId={photo.id} /></button>)}</div>}
-    {open && createPortal(<div className="room-lightbox" role="presentation" onClick={() => setOpen(false)}><div role="dialog" aria-modal="true" aria-label={`Фотографии номера ${number || ''}`} className="room-lightbox-dialog" onClick={e => e.stopPropagation()}><div className="room-lightbox-header"><strong>Номер {number || roomId} · {selected + 1} из {photos.length}</strong><button type="button" onClick={() => setOpen(false)} aria-label="Закрыть"><X size={22}/></button></div><div className="room-lightbox-photo"><RoomPhotoImage roomId={roomId} photoId={main?.id}/></div>{photos.length > 1 && <div className="room-lightbox-controls"><Button type="button" variant="outline" onClick={() => setSelected(i => (i + photos.length - 1) % photos.length)}><ChevronLeft size={18}/> Назад</Button><Button type="button" variant="outline" onClick={() => setSelected(i => (i + 1) % photos.length)}>Вперёд <ChevronRight size={18}/></Button></div>}</div></div>, document.body)}
+    {open && createPortal(<div className="room-lightbox" role="presentation" onClick={() => setOpen(false)}><div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Фотографии номера ${number || ''}`} className="room-lightbox-dialog" onClick={e => e.stopPropagation()}><div className="room-lightbox-header"><strong>Номер {number || roomId} · {selected + 1} из {photos.length}</strong><button type="button" onClick={() => setOpen(false)} aria-label="Закрыть"><X size={22}/></button></div><div className="room-lightbox-photo"><RoomPhotoImage roomId={roomId} photoId={main?.id}/></div>{photos.length > 1 && <div className="room-lightbox-controls"><Button type="button" variant="outline" onClick={() => setSelected(i => (i + photos.length - 1) % photos.length)}><ChevronLeft size={18}/> Назад</Button><Button type="button" variant="outline" onClick={() => setSelected(i => (i + 1) % photos.length)}>Вперёд <ChevronRight size={18}/></Button></div>}</div></div>, document.body)}
   </div>
 }
 
@@ -173,7 +186,13 @@ export function RoomPhotoEditor({ roomId, hotelId, roomNumber, compact = false, 
     if (!files.length) return
     if (files.length + photos.length > LIMIT) { setError(`Не более ${LIMIT} фотографий на номер.`); input.value = ''; return }
     if (files.some(f => !TYPES.includes(f.type) || f.size > MAX_SIZE || f.size === 0)) { setError('Допустимы JPEG, PNG, WebP до 5 МБ на файл.'); input.value = ''; return }
-    await perform(async () => { for (const file of files) await api.roomPhotoUpload(roomId, file) }, `Загружено фотографий: ${files.length}.`)
+    let done=0
+    await perform(async () => {
+      for (const file of files) {
+        try {await api.roomPhotoUpload(roomId,file);done++}
+        catch(e){throw new Error(`${e.message} Загружено из выбранных: ${done} из ${files.length}.`)}
+      }
+    }, `Загружено фотографий: ${files.length}.`)
     input.value = ''
   }
   return <section className={`room-photo-editor ${compact ? 'compact' : ''}`}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, BedDouble, Check, CheckCircle2, ImagePlus, Info, Plus, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Info, Plus, X } from 'lucide-react'
 import { api } from '../api/client.js'
 import { Alert, Button } from './Shared.jsx'
 import { RoomPhotoEditor, RoomNoPhotos, RoomPreviewSlider } from './RoomPhotos.jsx'
@@ -45,10 +45,11 @@ export function RoomCreationWizard({ hotelId, hotelName, onClose, onSaved, roomT
   const firstRef=useRef(null)
 
   useEffect(()=>{
+    const oldFocus=document.activeElement
     const old=document.body.style.overflow
     document.body.style.overflow='hidden'
     firstRef.current?.focus()
-    return ()=>{document.body.style.overflow=old}
+    return ()=>{document.body.style.overflow=old;if(oldFocus?.isConnected)oldFocus.focus()}
   },[])
 
   function close() {
