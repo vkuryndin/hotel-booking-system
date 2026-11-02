@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -148,9 +149,15 @@ public class HotelController {
       @Parameter(description = "Направление сортировки: asc или desc.")
           @RequestParam(defaultValue = "asc")
           String direction,
-      @PageableDefault(size = 20) Pageable pageable) {
+      @PageableDefault(size = 20) Pageable pageable,
+      @Parameter(description = "Поиск по названию или адресу.") @RequestParam(required = false)
+          String q,
+      @Parameter(description = "Удобства, которые должны присутствовать одновременно.")
+          @RequestParam(required = false)
+          List<HotelAmenity> amenities) {
     return ResponseEntity.ok(
-        hotelService.searchHotels(name, address, minRating, amenity, sortBy, direction, pageable));
+        hotelService.searchHotels(
+            name, address, minRating, amenity, sortBy, direction, pageable, q, amenities));
   }
 
   @Operation(

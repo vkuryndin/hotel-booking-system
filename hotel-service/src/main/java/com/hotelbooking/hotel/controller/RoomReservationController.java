@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Hidden // Internal SERVICE-only Saga endpoints; not part of the public API specification.
+@Hidden // Internal Saga endpoints are intentionally omitted from public OpenAPI.
 @RestController
 @RequestMapping("/api/rooms")
 public class RoomReservationController {

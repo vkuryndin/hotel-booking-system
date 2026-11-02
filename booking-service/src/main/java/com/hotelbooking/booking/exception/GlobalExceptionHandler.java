@@ -31,7 +31,6 @@ public class GlobalExceptionHandler {
 
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-  // Every MVC error is built in one place, with the same JSON fields and traceId.
   private ResponseEntity<ErrorResponse> buildError(
       HttpStatusCode status,
       String code,
@@ -54,8 +53,6 @@ public class GlobalExceptionHandler {
       HttpStatus status, String code, String message, HttpServletRequest request) {
     return buildError(status, code, message, request, Map.of());
   }
-
-  // ---- Existing business contracts: statuses and error codes are unchanged ----
 
   @ExceptionHandler(RateLimitExceededException.class)
   public ResponseEntity<ErrorResponse> handleRateLimit(
@@ -199,8 +196,6 @@ public class GlobalExceptionHandler {
     return error(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", ex.getMessage(), request);
   }
 
-  // ---- Standard HTTP/MVC errors not previously handled consistently ----
-
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorResponse> handleMalformedBody(
       HttpMessageNotReadableException ex, HttpServletRequest request) {
@@ -270,8 +265,7 @@ public class GlobalExceptionHandler {
     return error(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found", request);
   }
 
-  // Some existing user/admin services throw ResponseStatusException.
-  // Preserve their HTTP statuses; do not accidentally turn them into 500.
+  // Preserve explicitly requested HTTP statuses instead of treating them as server errors.
   @ExceptionHandler(UserOperationException.class)
   public ResponseEntity<ErrorResponse> handleUserOperation(
       UserOperationException ex, HttpServletRequest request) {
@@ -319,7 +313,7 @@ public class GlobalExceptionHandler {
         request.getRequestURI(),
         MDC.get("traceId"),
         ex);
-    // Never expose stack traces, database details or secrets to API clients.
+    // Log the exception, but keep internal details out of the HTTP response.
     return error(
         HttpStatus.INTERNAL_SERVER_ERROR,
         "INTERNAL_ERROR",

@@ -7,11 +7,9 @@ import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-/** Live E2E: distinct real source-IP addresses keep the shared normal E2E login quota intact. */
+/** Uses distinct loopback source IPs to test authentication without exhausting the shared quota. */
 @EnabledIfSystemProperty(named = "hotel.e2e", matches = "true")
 @Tag("e2e-200-users")
-// Uses distinct genuine local source IPs, preventing interference with other E2E tests.
-
 class TwoHundredUserAuthenticationE2ETest extends ExtendedE2ESupport {
   @Test
   void twoHundredDistinctUsersLoginAtOnce() throws Exception {

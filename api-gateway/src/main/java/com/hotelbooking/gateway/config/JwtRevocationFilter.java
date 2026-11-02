@@ -19,7 +19,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @Component
-public class JwtRevocationFilter implements GlobalFilter, Ordered {
+public final class JwtRevocationFilter implements GlobalFilter, Ordered {
 
   private final WebClient webClient;
   private final String secret;
@@ -95,7 +95,7 @@ public class JwtRevocationFilter implements GlobalFilter, Ordered {
             });
   }
 
-  /** Coalesce concurrent checks for the same token; never cache decisions after completion. */
+  /** Share in-flight revocation checks without caching the result after completion. */
   private Mono<Integer> checkToken(String token, ServerWebExchange exchange) {
     if (inFlight.size() > 2048) {
       return fetchTokenStatus(token, exchange);

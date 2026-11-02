@@ -81,7 +81,6 @@ class DemoHotelsIdempotencyJpaTest {
   @Test
   void rollbackRemovesNewlyCopiedDemoFiles() throws Exception {
     var tx = new TransactionTemplate(transactions);
-    // ApplicationRunner already seeds demo hotels during Spring context startup.
     long hotelCountBefore = hotels.count();
     var hotel =
         hotels.findAll().stream()
@@ -92,8 +91,7 @@ class DemoHotelsIdempotencyJpaTest {
     long photoCountBefore = photos.count();
     Path target =
         BASE.resolve("hotels").resolve(hotel.getId().toString()).resolve(photo.getFileName());
-    // Simulate a missing demo image that the next seed invocation must restore.
-    // Commit the metadata removal so the initializer actually attempts a copy.
+    // Commit removal before rerunning the initializer; otherwise JPA still sees the photo.
     tx.executeWithoutResult(
         s -> {
           photos.deleteById(photo.getId());

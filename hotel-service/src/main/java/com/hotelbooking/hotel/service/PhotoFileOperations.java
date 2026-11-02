@@ -18,7 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
-/** Shared low-level photo validation and transaction-safe filesystem operations. */
+/** Image validation and filesystem operations coordinated with database transactions. */
 final class PhotoFileOperations {
   private PhotoFileOperations() {}
 
@@ -32,8 +32,7 @@ final class PhotoFileOperations {
                 return;
               }
 
-              // Без FOLLOW_LINKS: не выходим за пределы
-              // каталога через символические ссылки.
+              // Do not follow symlinks when recursively deleting stored image directories.
               Files.walkFileTree(
                   directory,
                   new SimpleFileVisitor<>() {
@@ -55,16 +54,14 @@ final class PhotoFileOperations {
                     }
                   });
             } catch (IOException ex) {
-              // COMMIT БД уже произошёл; фиксируем сбой,
-              // чтобы можно было очистить остатки позже.
+              // A post-commit failure cannot roll back the database; log the orphaned files.
               log.error("Cannot delete photo directory after commit: {}", directory, ex);
             }
           }
         });
   }
 
-  // №17: файл, созданный при неудачной транзакции,
-  // не должен остаться на диске.
+  // Remove files created by transactions that never commit.
   static void registerRollbackCleanup(Path file, Logger log) {
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
@@ -82,7 +79,7 @@ final class PhotoFileOperations {
         });
   }
 
-  // №17: не удаляем файл до фиксации удаления в БД.
+  // Avoid deleting files for a database change that may still roll back.
   static void registerDeleteAfterCommit(Path file, Logger log) {
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
@@ -92,8 +89,7 @@ final class PhotoFileOperations {
             try {
               Files.deleteIfExists(file);
             } catch (IOException ex) {
-              // COMMIT уже произошёл: откатить БД нельзя.
-              // Ошибку обязательно фиксируем в журнале.
+              // Surface post-commit deletion failures in the log for later cleanup.
               log.error("Cannot delete photo file after commit: {}", file, ex);
             }
           }

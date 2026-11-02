@@ -23,7 +23,7 @@ public class ManualBookingRecoveryService {
     this.bookings = bookings;
   }
 
-  /** A bounded list; never automatically requeues exhausted operations. */
+  /** Lists exhausted operations without scheduling another recovery attempt. */
   @Transactional(readOnly = true)
   public List<ExhaustedRecoveryResponse> exhausted() {
     return bookings

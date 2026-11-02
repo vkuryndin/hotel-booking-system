@@ -9,7 +9,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 @Component
-public class GatewaySecretFilter implements GlobalFilter, Ordered {
+public final class GatewaySecretFilter implements GlobalFilter, Ordered {
 
   public static final String HEADER = "X-Gateway-Internal-Secret";
 

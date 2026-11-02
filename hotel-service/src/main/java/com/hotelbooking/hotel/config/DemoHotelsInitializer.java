@@ -93,7 +93,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
                 .findFirst()
                 .orElse(null);
         if (room == null) {
-          // One-time migration of previously seeded rooms that lack the identity marker.
+          // Match legacy demo rooms once, before relying on the stable seed identifier.
           room =
               existingRooms.stream()
                   .filter(
@@ -111,7 +111,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
         }
         room.assignDemoSeedKey(key);
         room = rooms.saveAndFlush(room);
-        // Use original seed number; an admin may have renamed the room.
+        // Photo fixture paths use the seed number, not the editable display number.
         seedRoomPhotos(room, seed.photoPrefix(), roomSeed.number());
       }
 
@@ -121,7 +121,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
     log.info("Demo initialized: 3 hotels and 9 rooms; available photos synchronized");
   }
 
-  /** Existing demo files are imported once. Missing optional files do not block startup. */
+  /** Missing optional demo images must not prevent service startup. */
   private void seedHotelPhotos(Hotel hotel, List<PhotoSeed> seeds) throws Exception {
     List<HotelPhoto> existing = photos.findByHotel_IdOrderBySortOrderAscIdAsc(hotel.getId());
     Path directory = photoStorage.resolve(hotel.getId().toString()).normalize();
@@ -151,9 +151,7 @@ public class DemoHotelsInitializer implements ApplicationRunner {
     }
   }
 
-  /**
-   * Up to five demo room photos from HOTEL/ROOM/number/photo_1..5; stored with legacy unique names.
-   */
+  /** Import optional demo room images using their original fixture naming convention. */
   private void seedRoomPhotos(Room room, String prefix, String seedNumber) throws Exception {
     List<RoomPhoto> existing = roomPhotos.findByRoom_IdOrderBySortOrderAscIdAsc(room.getId());
     Path directory = roomPhotoStorage.resolve(room.getId().toString()).normalize();
@@ -164,7 +162,6 @@ public class DemoHotelsInitializer implements ApplicationRunner {
     boolean primary = existing.isEmpty();
     for (int i = 1; i <= 5; i++) {
       String stem = prefix + "-room-" + seedNumber + (i == 1 ? "" : "-" + i);
-      // Extension is determined by the actual classpath resource.
       String fileName = null;
       ClassPathResource resource = null;
       for (String extension : List.of(".jpg", ".jpeg", ".png")) {
@@ -196,8 +193,8 @@ public class DemoHotelsInitializer implements ApplicationRunner {
   }
 
   /**
-   * Writes demo images atomically; if the surrounding DB transaction rolls back, remove newly
-   * copied files to avoid unreferenced on-disk data.
+   * Register filesystem cleanup before copying so a transaction rollback also removes partial image
+   * files.
    */
   private void copyDemoPhoto(ClassPathResource resource, Path directory, Path target)
       throws IOException {

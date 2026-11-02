@@ -21,36 +21,26 @@ dependencyManagement {
 }
 
 dependencies {
-    // REST API
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
 
-    // Database
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("com.h2database:h2")
 
-    // Validation
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
-    // Security + JWT
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
 
-    // Service Discovery
     implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
 
-    // Circuit Breaker
     implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
 
-    // DTO Mapping
     implementation("org.mapstruct:mapstruct:1.6.3")
     annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
 
-    // Swagger
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
 
-    // H2 Console
     runtimeOnly("org.springframework.boot:spring-boot-h2console")
 
-    // Tests
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")

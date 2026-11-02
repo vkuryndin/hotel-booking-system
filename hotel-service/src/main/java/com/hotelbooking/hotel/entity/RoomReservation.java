@@ -26,7 +26,7 @@ public class RoomReservation {
   private LocalDate checkIn;
   private LocalDate checkOut;
 
-  // Nullable for RELEASED tombstones created before reserve().
+  // A release-before-reserve marker has no confirmed guest count.
   @Column(name = "guest_count")
   private Integer guestCount;
 
@@ -34,8 +34,7 @@ public class RoomReservation {
   @Column(nullable = false)
   private ReservationStatus status;
 
-  // A release request may arrive before reserve(). Such a row exists only
-  // to reject late arrivals using the same reservationId; it is not a booking.
+  // Keep release-before-reserve markers to reject delayed reserves for the same ID.
   @Column(name = "tombstone", nullable = false)
   private boolean tombstone;
 

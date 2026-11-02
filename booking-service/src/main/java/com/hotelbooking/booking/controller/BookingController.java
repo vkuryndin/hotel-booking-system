@@ -12,10 +12,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -171,10 +173,13 @@ public class BookingController {
   })
   @GetMapping("/my")
   public Page<BookingResponse> getMyBookings(
-      @AuthenticationPrincipal Jwt jwt, @PageableDefault(size = 20) Pageable pageable) {
+      @AuthenticationPrincipal Jwt jwt,
+      @PageableDefault(size = 20) Pageable pageable,
+      @RequestParam(required = false) BookingStatus status,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+          LocalDate checkOutFrom) {
     Long userId = Long.valueOf(jwt.getSubject());
-
-    return bookingService.getMyBookings(userId, pageable);
+    return bookingService.getMyBookings(userId, status, checkOutFrom, pageable);
   }
 
   @Operation(

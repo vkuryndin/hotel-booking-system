@@ -32,8 +32,7 @@ public class RestClientConfig {
         .baseUrl("http://hotel-service")
         .requestFactory(hotelRequestFactory())
 
-        // Перехватываем исключение внутри HTTP-транспорта,
-        // а не по тексту сообщения.
+        // Handle transport failures by exception type rather than parsing error messages.
         .requestInterceptors(
             interceptors ->
                 interceptors.add(

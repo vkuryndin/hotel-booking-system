@@ -27,7 +27,6 @@ public class PublicAuthRateLimitInterceptor implements HandlerInterceptor {
     this.gatewaySecret = gatewaySecret;
   }
 
-  // Retain compatibility with existing unit tests.
   public PublicAuthRateLimitInterceptor(
       LoginRegistrationRateLimiter limiter, int loginLimit, int registerLimit) {
     this.limiter = limiter;
@@ -48,7 +47,7 @@ public class PublicAuthRateLimitInterceptor implements HandlerInterceptor {
     if (!login && !register) {
       return true;
     }
-    // Only the actual TCP peer is trusted: forwarding headers may be supplied by clients.
+    // Only the internal Gateway secret permits use of a forwarded client IP.
     String ip = request.getRemoteAddr();
     String secret = request.getHeader("X-Gateway-Internal-Secret");
     String verifiedIp = request.getHeader("X-Verified-Client-IP");

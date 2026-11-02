@@ -21,14 +21,11 @@ public class BookingSagaRecoveryService {
 
   private static final Logger log = LoggerFactory.getLogger(BookingSagaRecoveryService.class);
 
-  // Размер одной выборки из БД.
   private static final int PAGE_SIZE = 10;
 
-  // Максимум кандидатов за один цикл каждого процесса.
   private static final int MAX_CANDIDATES_PER_CYCLE = 100;
 
-  // Мягкий лимит времени: уже начатый HTTP-вызов
-  // не прерываем.
+  // This deadline stops new work; it does not interrupt a running HTTP request.
   private static final Duration MAX_CYCLE_DURATION = Duration.ofSeconds(20);
 
   private final BookingRepository bookingRepository;
@@ -52,14 +49,11 @@ public class BookingSagaRecoveryService {
 
     long deadline = System.nanoTime() + MAX_CYCLE_DURATION.toNanos();
 
-    // Начальный курсор.
     Instant cursorTime = Instant.EPOCH;
     Long cursorId = 0L;
 
     int scanned = 0;
 
-    // Обходим несколько пакетов, но не более 100 записей
-    // и не более 20 секунд до начала следующей операции.
     recoveryLoop:
     while (scanned < MAX_CANDIDATES_PER_CYCLE && System.nanoTime() < deadline) {
 
@@ -88,9 +82,7 @@ public class BookingSagaRecoveryService {
 
         scanned++;
 
-        // Сдвигаем курсор независимо от результата.
-        // Это предотвращает повторное взятие одной
-        // проблемной записи в этом же цикле.
+        // Advance past failed candidates so one bad booking cannot monopolize a scan.
         cursorTime = booking.getSagaUpdatedAt();
         cursorId = booking.getId();
 

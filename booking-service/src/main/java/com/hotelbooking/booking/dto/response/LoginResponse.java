@@ -12,7 +12,6 @@ public record LoginResponse(
     @Schema(description = "Фамилия пользователя.") String lastName,
     @Schema(description = "Email пользователя.") String email) {
 
-  // Preserve existing Java callers using the original four-field constructor.
   public LoginResponse(
       String accessToken, String tokenType, long expiresIn, boolean passwordChangeRequired) {
     this(accessToken, tokenType, expiresIn, passwordChangeRequired, null, null, null, null);

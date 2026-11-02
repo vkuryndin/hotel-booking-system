@@ -10,7 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** Limits sensitive authenticated mutations, reusing the S1-S2 limiter and 429 handler. */
+/** Limits password changes and admin mutations per authenticated account. */
 @Component
 public class SensitiveActionRateLimitInterceptor implements HandlerInterceptor {
   private final LoginRegistrationRateLimiter limiter;
@@ -54,11 +54,10 @@ public class SensitiveActionRateLimitInterceptor implements HandlerInterceptor {
       return true;
     }
 
-    // Spring Security authentication is already populated before MVC interceptors.
-    // Do not trust unverified identity in request headers.
+    // Use the authenticated principal; request headers are not an identity source.
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
-      return true; // The existing security filter will reject unauthenticated requests.
+      return true; // Authorization remains the responsibility of Spring Security.
     }
     String identity = auth.getName();
     long retry = limiter.acquire("sensitive:" + operation + ":" + identity, max, window);

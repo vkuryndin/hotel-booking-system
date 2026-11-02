@@ -1,114 +1,98 @@
 <?xml version='1.0' encoding='utf-8'?>
 <FindBugsFilter>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
+  <!-- Spring-managed dependencies are intentionally retained by reference. -->
   <Match>
     <Class name="com.hotelbooking.hotel.config.SecurityExceptionHandler" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.service.RoomService" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.service.HotelService" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.service.HotelStatisticsService" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.service.RoomReservationService" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.controller.RoomController" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.controller.RoomPhotoController" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.controller.HotelController" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor must retain the injected singleton/service/repository reference; copying would break dependency injection. -->
   <Match>
     <Class name="com.hotelbooking.hotel.controller.HotelPhotoController" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Hibernate-managed relationship/collection: keep managed entity identity and dirty checking. -->
+  <!-- Hibernate-managed collections and associations retain persistence identity. -->
   <Match>
     <Class name="com.hotelbooking.hotel.entity.Room" />
     <Method name="getAmenities" />
     <Bug pattern="EI_EXPOSE_REP" />
   </Match>
-  <!-- Hibernate-managed relationship/collection: keep managed entity identity and dirty checking. -->
   <Match>
     <Class name="com.hotelbooking.hotel.entity.Hotel" />
     <Method name="getAmenities" />
     <Bug pattern="EI_EXPOSE_REP" />
   </Match>
-  <!-- Hibernate-managed relationship/collection: keep managed entity identity and dirty checking. -->
   <Match>
     <Class name="com.hotelbooking.hotel.entity.RoomReservation" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Hibernate-managed relationship/collection: keep managed entity identity and dirty checking. -->
   <Match>
     <Class name="com.hotelbooking.hotel.entity.RoomReservation" />
     <Method name="getRoom" />
     <Bug pattern="EI_EXPOSE_REP" />
   </Match>
-  <!-- Hibernate-managed relationship/collection: keep managed entity identity and dirty checking. -->
   <Match>
     <Class name="com.hotelbooking.hotel.entity.RoomPhoto" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Hibernate-managed relationship/collection: keep managed entity identity and dirty checking. -->
   <Match>
     <Class name="com.hotelbooking.hotel.entity.RoomPhoto" />
     <Method name="getRoom" />
     <Bug pattern="EI_EXPOSE_REP" />
   </Match>
-  <!-- Spring DI: constructor intentionally retains a shared Spring-managed dependency. -->
+  <!-- Booking Service uses the same constructor-injection pattern. -->
   <Match>
     <Class name="com.hotelbooking.booking.security.SecurityExceptionHandler" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: RestClient and resilience dependencies are shared and not copied. -->
   <Match>
     <Class name="com.hotelbooking.booking.client.HotelServiceClient" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor intentionally retains injected AdminUserService. -->
   <Match>
     <Class name="com.hotelbooking.booking.controller.AdminUserController" />
     <Method name="&lt;init&gt;" />
     <Bug pattern="EI_EXPOSE_REP2" />
   </Match>
-  <!-- Spring DI: constructor intentionally retains injected LoginService. -->
   <Match>
     <Class name="com.hotelbooking.booking.controller.LoginController" />
     <Method name="&lt;init&gt;" />

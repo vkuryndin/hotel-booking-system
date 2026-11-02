@@ -18,6 +18,7 @@ import com.hotelbooking.booking.exception.RoomUnavailableException;
 import com.hotelbooking.booking.mapper.BookingMapper;
 import com.hotelbooking.booking.repository.BookingRepository;
 import jakarta.validation.Validator;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -292,9 +293,33 @@ public class BookingService {
 
   @Transactional(readOnly = true)
   public Page<BookingResponse> getMyBookings(Long userId, Pageable pageable) {
-    return bookingRepository
-        .findByUserIdOrderByCreatedAtDesc(userId, bookingPageable(pageable))
-        .map(bookingMapper::toResponse);
+    return getMyBookings(userId, null, pageable);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<BookingResponse> getMyBookings(Long userId, BookingStatus status, Pageable pageable) {
+    return getMyBookings(userId, status, null, pageable);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<BookingResponse> getMyBookings(
+      Long userId, BookingStatus status, LocalDate checkOutFrom, Pageable pageable) {
+    if (checkOutFrom != null && status != BookingStatus.CONFIRMED) {
+      throw new IllegalArgumentException("checkOutFrom requires CONFIRMED status");
+    }
+    Pageable pageRequest = bookingPageable(pageable);
+    Page<Booking> bookings;
+    if (checkOutFrom != null) {
+      bookings =
+          bookingRepository.findByUserIdAndStatusAndCheckOutGreaterThanEqualOrderByCreatedAtDesc(
+              userId, status, checkOutFrom, pageRequest);
+    } else if (status != null) {
+      bookings =
+          bookingRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status, pageRequest);
+    } else {
+      bookings = bookingRepository.findByUserIdOrderByCreatedAtDesc(userId, pageRequest);
+    }
+    return bookings.map(bookingMapper::toResponse);
   }
 
   private BookingResponse responseForRepeatedRequest(

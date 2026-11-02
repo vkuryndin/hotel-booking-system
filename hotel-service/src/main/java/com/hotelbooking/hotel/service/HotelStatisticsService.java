@@ -56,7 +56,7 @@ public class HotelStatisticsService {
         reservationRepository.countByRoom_Hotel_IdAndStatusAndTombstoneFalse(
             hotelId, ReservationStatus.RELEASED);
 
-    // Keep technical release-before-reserve markers out of business metrics.
+    // A release-before-reserve marker is not a booking and must not affect statistics.
     long tombstoneReservations =
         reservationRepository.countByRoom_Hotel_IdAndTombstoneTrue(hotelId);
 

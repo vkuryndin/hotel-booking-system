@@ -85,13 +85,11 @@ public class RoomReservationService {
           "Reservation ID already used or released: " + reservationId);
     }
 
-    // Existing reservations are allowed to replay after their check-in
-    // date. Reject past dates only when creating a NEW reservation.
+    // Permit exact idempotent replay even after check-in; validate dates for new requests only.
     if (checkIn.isBefore(LocalDate.now())) {
       throw new IllegalArgumentException("checkIn must be today or later");
     }
 
-    // Проверяем вместимость номера.
     if (room.getCapacity() < guestCount) {
       throw new RoomReservationConflictException(
           "ROOM_UNAVAILABLE", "Room capacity is less than guestCount: " + roomId);
@@ -130,8 +128,7 @@ public class RoomReservationService {
     return reservation;
   }
 
-  // A new RoomReservation has one uniqueness rule: its reservationId PK.
-  // Used for both regular reservations and release-before-reserve tombstones.
+  // The reservation UUID also identifies a release-before-reserve tombstone.
   private RoomReservation saveNewReservation(RoomReservation reservation) {
     try {
       return reservationRepository.saveAndFlush(reservation);
@@ -145,8 +142,7 @@ public class RoomReservationService {
     }
   }
 
-  // SQLSTATE 23505 means unique-constraint violation in H2 and PostgreSQL.
-  // Do not convert FK/NOT NULL and other integrity errors into a 409.
+  // Map only unique-key collisions (SQLSTATE 23505) to conflict, not all integrity errors.
   private boolean isUniqueConstraintViolation(Throwable error) {
     for (Throwable cause = error; cause != null; cause = cause.getCause()) {
       if (cause instanceof SQLException sql && "23505".equals(sql.getSQLState())) {

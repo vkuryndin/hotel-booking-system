@@ -37,6 +37,7 @@ class AdminUserSearchJpaTest {
   void matchesUsernameFirstNameLastNameAndEmailCaseInsensitively() {
     assertEquals("special_1", find("%special_1%").getContent().get(0).getUsername());
     assertEquals("alpha", find("%irina%").getContent().get(0).getUsername());
+    assertEquals("alpha", find("%irina petrova%").getContent().get(0).getUsername());
     assertEquals("beta", find("%smirnov%").getContent().get(0).getUsername());
     assertEquals("delta", find("%domain.test%").getContent().get(0).getUsername());
     assertTrue(find("%nonexistent%").isEmpty());

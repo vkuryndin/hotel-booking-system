@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@SecurityRequirements // Public endpoint: no JWT required.
+@SecurityRequirements
 @Tag(name = "Регистрация", description = "Регистрация новых учётных записей.")
 @RestController
 @RequestMapping("/api/users")

@@ -17,7 +17,7 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-/** Gateway token-state HTTP response mapping, using an in-memory WebClient (no Eureka needed). */
+/** Exercises Gateway token-state checks without starting Eureka or a real HTTP server. */
 class JwtRevocationFilterTest {
   private static final String SECRET = "gateway-test-secret";
 

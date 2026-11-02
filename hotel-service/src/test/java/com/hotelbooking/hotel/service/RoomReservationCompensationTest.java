@@ -29,7 +29,6 @@ class RoomReservationCompensationTest {
   @Test
   void failedBookingCompensationRestoresCounter() {
 
-    // 1. Создаём тестовый отель и номер.
     Hotel hotel = hotelRepository.saveAndFlush(new Hotel("Compensation Test", "Test Address"));
 
     Room room = roomRepository.saveAndFlush(new Room(hotel, "T101"));
@@ -39,21 +38,17 @@ class RoomReservationCompensationTest {
 
     assertEquals(0L, counter(roomId));
 
-    // 2. Hotel Service резервирует номер.
     reservationService.reserve(
         reservationId, roomId, LocalDate.of(2055, 7, 10), LocalDate.of(2055, 7, 12), 1);
 
     assertEquals(1L, counter(roomId));
 
-    // 3. Имитируем ошибку подтверждения
-    // бронирования в Booking Service.
-    // Вызываем компенсацию.
+    // Model Booking Service failure by compensating the Hotel reservation.
     reservationService.release(reservationId, roomId, true);
 
     assertEquals(0L, counter(roomId));
 
-    // 4. Повторная компенсация
-    // не должна уменьшать счётчик ещё раз.
+    // Releasing twice must not decrement the booking counter twice.
     reservationService.release(reservationId, roomId, true);
 
     assertEquals(0L, counter(roomId));

@@ -32,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DataJpaTest(showSql = false)
 @Import({HotelService.class, HotelPhotoService.class})
-// Для проверки COMMIT/ROLLBACK нужна настоящая транзакция сервиса.
+// Let service transactions commit independently to verify disk cleanup boundaries.
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class HotelDeletionWithPhotosJpaTest {
 
@@ -51,8 +51,6 @@ class HotelDeletionWithPhotosJpaTest {
   @Autowired HotelService hotelService;
   @Autowired PlatformTransactionManager txManager;
 
-  // HotelMapper требуется для конструктора HotelService,
-  // однако удаление не использует этот mapper.
   @MockitoBean HotelMapper hotelMapper;
 
   private Long hotelId;
@@ -102,7 +100,7 @@ class HotelDeletionWithPhotosJpaTest {
             status -> {
               hotelService.deleteHotel(hotelId);
 
-              // Файл нельзя удалять до фиксации БД.
+              // The image must remain on disk until the transaction commits.
               assertTrue(Files.exists(directory));
               status.setRollbackOnly();
             });

@@ -50,7 +50,7 @@ public class Hotel {
   @Column(nullable = false)
   private String address;
 
-  // Нормализованные значения для уникального ограничения БД.
+  // Database uniqueness is enforced on normalized hotel identity as well as raw values.
   @Column(name = "normalized_name", nullable = false, length = 150)
   private String normalizedName;
 
@@ -95,8 +95,7 @@ public class Hotel {
     this.address = address;
   }
 
-  // JPA автоматически обновляет нормализованные поля
-  // перед INSERT и UPDATE.
+  // Keep normalized identity in sync for both inserts and updates.
   @PrePersist
   @PreUpdate
   private void updateNormalizedFields() {

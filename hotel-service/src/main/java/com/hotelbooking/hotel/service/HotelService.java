@@ -101,6 +101,20 @@ public class HotelService {
       String sortBy,
       String direction,
       Pageable pageable) {
+    return searchHotels(name, address, minRating, amenity, sortBy, direction, pageable, null, null);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<HotelResponse> searchHotels(
+      String name,
+      String address,
+      BigDecimal minRating,
+      HotelAmenity amenity,
+      String sortBy,
+      String direction,
+      Pageable pageable,
+      String textQuery,
+      List<HotelAmenity> selectedAmenities) {
     if (pageable.getPageSize() > 100) {
       throw new IllegalArgumentException("Page size must not exceed 100");
     }
@@ -147,12 +161,34 @@ public class HotelService {
                     "%" + address.trim().toLowerCase(Locale.ROOT) + "%"));
           }
 
+          if (textQuery != null && !textQuery.isBlank()) {
+            String escaped =
+                textQuery
+                    .trim()
+                    .toLowerCase(Locale.ROOT)
+                    .replace("!", "!!")
+                    .replace("%", "!%")
+                    .replace("_", "!_");
+            String needle = "%" + escaped + "%";
+            predicates.add(
+                cb.or(
+                    cb.like(cb.lower(root.get("name")), needle, '!'),
+                    cb.like(cb.lower(root.get("address")), needle, '!')));
+          }
+
           if (minRating != null) {
             predicates.add(cb.greaterThanOrEqualTo(root.get("rating"), minRating));
           }
 
           if (amenity != null) {
             predicates.add(cb.isMember(amenity, root.<Collection<HotelAmenity>>get("amenities")));
+          }
+
+          if (selectedAmenities != null) {
+            for (HotelAmenity selected : selectedAmenities) {
+              predicates.add(
+                  cb.isMember(selected, root.<Collection<HotelAmenity>>get("amenities")));
+            }
           }
 
           return cb.and(predicates.toArray(new Predicate[0]));
@@ -195,19 +231,16 @@ public class HotelService {
 
   @Transactional
   public void deleteHotel(Long id) {
-    // Та же блокировка, что используется в HotelPhotoService
-    // при upload/delete/setPrimary/setOrder.
+    // Share the photo-service lock to prevent deletion during concurrent photo updates.
     Hotel hotel =
         hotelRepository.findByIdForUpdate(id).orElseThrow(() -> new HotelNotFoundException(id));
 
-    // Прежнее бизнес-правило: отель с номерами не удаляем.
     if (roomRepository.existsByHotelId(id)) {
       throw new ResourceInUseException(
           "HOTEL_HAS_ROOMS", "Cannot delete hotel with existing rooms: " + id);
     }
 
-    // Удаляем метаданные фото В ТОЙ ЖЕ транзакции.
-    // Фото с диска удаляются только после общего COMMIT.
+    // Keep photo metadata deletion in this transaction; delete files only after commit.
     hotelPhotoService.removeAllForHotelDeletion(id);
 
     hotelRepository.delete(hotel);

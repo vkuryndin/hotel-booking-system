@@ -44,7 +44,6 @@ class BookingRecoveryPaginationJpaTest {
 
     Instant oldTime = Instant.now().minus(Duration.ofMinutes(5));
 
-    // Создаём 12 зависших PENDING.
     for (int i = 0; i < 12; i++) {
       Booking booking = newBooking();
 
@@ -89,7 +88,6 @@ class BookingRecoveryPaginationJpaTest {
 
     assertEquals(2, second.size());
 
-    // Ни одна бронь второго пакета не была в первом.
     assertTrue(
         second.stream()
             .noneMatch(
@@ -102,7 +100,6 @@ class BookingRecoveryPaginationJpaTest {
 
     Instant oldTime = Instant.now().minus(Duration.ofMinutes(5));
 
-    // Создаём 12 зависших CANCELLING.
     for (int i = 0; i < 12; i++) {
       Booking booking = newBooking();
 

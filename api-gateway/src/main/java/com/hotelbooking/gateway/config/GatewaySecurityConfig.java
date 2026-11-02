@@ -48,7 +48,6 @@ public class GatewaySecurityConfig {
     return decoder;
   }
 
-  /** Allowed browser origins for local Swagger UI and Vite dev server. */
   @Bean
   public UrlBasedCorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();

@@ -15,8 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
- * E2E: one real user journey through API Gateway, Booking Service, JWT authorization, Eureka and
- * Hotel Service. No mocks. The four applications must already be running.
+ * Full user journey through the running Gateway, Booking, and Hotel services. All four applications
+ * must be running before this test starts.
  */
 @EnabledIfSystemProperty(named = "hotel.e2e", matches = "true")
 class HotelBookingSmokeE2ETest {
@@ -32,7 +32,6 @@ class HotelBookingSmokeE2ETest {
     String email = "e2e-" + unique + "@example.com";
     String password = "E2ePassword123!";
 
-    // 1. Registration: Gateway -> Booking Service -> H2.
     HttpResponse<String> register =
         post(
             "/api/users/register",
@@ -49,7 +48,6 @@ class HotelBookingSmokeE2ETest {
                 "Test"));
     assertEquals(201, register.statusCode(), register.body());
 
-    // 2. Login: Booking Service issues a real JWT.
     HttpResponse<String> login =
         post(
             "/api/users/login",
@@ -60,12 +58,10 @@ class HotelBookingSmokeE2ETest {
     String token = json.readTree(login.body()).path("accessToken").asText();
     assertFalse(token.isBlank(), "JWT was not returned");
 
-    // 3. Authenticated call: JWT validation + Booking Service.
     HttpResponse<String> myBookings = get("/api/bookings/my", token);
     assertEquals(200, myBookings.statusCode(), myBookings.body());
     assertTrue(json.readTree(myBookings.body()).path("content").isArray());
 
-    // 4. Catalog: Gateway -> Eureka -> Hotel Service -> H2.
     HttpResponse<String> hotels = get("/api/hotels", token);
     assertEquals(200, hotels.statusCode(), hotels.body());
     JsonNode catalog = json.readTree(hotels.body());

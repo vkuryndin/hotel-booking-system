@@ -102,19 +102,14 @@ public class HotelServiceClient {
         });
   }
 
-  // Обычная отмена подтверждённого бронирования
-  // При освобождении активной брони timesBooked уменьшается ровно один раз
   public HotelReservationResponse releaseRoom(Long roomId, UUID reservationId) {
     return sendRelease(roomId, reservationId, false);
   }
 
-  // Компенсация неудачной Saga
-  // При компенсации активной резервации timesBooked также уменьшается ровно один раз
   public HotelReservationResponse compensateRoom(Long roomId, UUID reservationId) {
     return sendRelease(roomId, reservationId, true);
   }
 
-  // Общий метод освобождения номера
   private HotelReservationResponse sendRelease(
       Long roomId, UUID reservationId, boolean compensation) {
     return withCircuitBreaker(

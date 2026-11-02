@@ -52,14 +52,14 @@ public class RoomPhotoService {
 
   @Transactional
   public RoomPhotoResponse upload(Long roomId, MultipartFile file) {
-    // №17: сериализуем изменения фотографий одного номера.
+    // Lock the owner row to serialize changes to its photo list.
     final Room room = lockRoom(roomId);
 
     if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024) {
       throw new IllegalArgumentException("Photo must be 1 byte to 5 MB");
     }
 
-    // Проверяем лимит уже под блокировкой номера.
+    // Check the photo limit while holding the lock.
     List<RoomPhoto> existing = photoRepository.findByRoom_IdOrderBySortOrderAscIdAsc(roomId);
 
     if (existing.size() >= 10) {
@@ -78,8 +78,7 @@ public class RoomPhotoService {
       throw new IllegalArgumentException("Only valid JPEG, PNG, WebP photos are allowed");
     }
 
-    // A file with a valid signature may still be truncated or corrupted.
-    // Decode the complete image BEFORE writing it to storage or the database.
+    // A valid signature does not rule out truncated image data; decode before storing.
     PhotoFileOperations.validateDecodedImage(file, contentType);
 
     String extension =
@@ -94,9 +93,7 @@ public class RoomPhotoService {
     Path directory = roomDirectory(roomId);
     Path destination = directory.resolve(fileName);
 
-    // №17: если БД откатится, удаляем созданный файл.
-    // Регистрируем ДО копирования, чтобы убрать даже частично
-    // записанный файл при ошибке Files.copy().
+    // Register cleanup before copying so rollback also removes a partially written file.
     PhotoFileOperations.registerRollbackCleanup(destination, log);
 
     try {
@@ -109,7 +106,6 @@ public class RoomPhotoService {
       throw new IllegalStateException("Cannot store photo", ex);
     }
 
-    // Порядок и primary рассчитываются под блокировкой.
     int sortOrder = existing.stream().mapToInt(RoomPhoto::getSortOrder).max().orElse(-1) + 1;
 
     RoomPhoto photo = new RoomPhoto(room, fileName, contentType, existing.isEmpty(), sortOrder);
@@ -131,8 +127,7 @@ public class RoomPhotoService {
       throw new IllegalArgumentException("Invalid photo path");
     }
 
-    // Materialize the small (max 5 MB) photo before returning the resource.
-    // Streaming a filesystem resource would race with deletion after transaction end.
+    // Read the file now; a streaming resource could race with post-commit deletion.
     try {
       return new ByteArrayResource(Files.readAllBytes(file));
     } catch (java.nio.file.NoSuchFileException ex) {
@@ -149,8 +144,7 @@ public class RoomPhotoService {
 
   @Transactional
   public RoomPhotoResponse setPrimary(Long roomId, Long photoId) {
-    // №17: два параллельных PATCH не смогут назначить
-    // две главные фотографии одновременно.
+    // Selecting the primary photo must be serialized with other photo mutations.
     lockRoom(roomId);
 
     RoomPhoto selected = findPhoto(roomId, photoId);
@@ -170,7 +164,6 @@ public class RoomPhotoService {
       throw new IllegalArgumentException("sortOrder must be >= 0");
     }
 
-    // №17: изменение порядка также сериализуем.
     lockRoom(roomId);
 
     RoomPhoto photo = findPhoto(roomId, photoId);
@@ -181,7 +174,6 @@ public class RoomPhotoService {
 
   @Transactional
   public void delete(Long roomId, Long photoId) {
-    // №17: защищаем удаление и выбор новой primary.
     lockRoom(roomId);
 
     RoomPhoto photo = findPhoto(roomId, photoId);
@@ -195,7 +187,6 @@ public class RoomPhotoService {
       throw new IllegalArgumentException("Invalid photo path");
     }
 
-    // Сначала удаляем только метаданные в БД.
     photoRepository.delete(photo);
     photoRepository.flush();
 
@@ -207,14 +198,13 @@ public class RoomPhotoService {
       }
     }
 
-    // №17: физический файл удалится только после
-    // успешного COMMIT транзакции.
+    // Filesystem deletion follows the database commit, never precedes it.
     PhotoFileOperations.registerDeleteAfterCommit(file, log);
   }
 
   /**
-   * Вызывается только из RoomService.deleteRoom() внутри общей транзакции. Удаляем строки из БД;
-   * файлы останутся до COMMIT. Блокировка номера уже удерживается вызывающим методом.
+   * Called with the room row locked by the outer transaction. Photo metadata is deleted
+   * immediately; files are removed only after commit.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void removeAllForRoomDeletion(Long roomId) {
@@ -223,8 +213,7 @@ public class RoomPhotoService {
     photoRepository.deleteAll(photos);
     photoRepository.flush();
 
-    // Чистим весь каталог данного номера, включая файлы,
-    // оставшиеся от предыдущих неуспешных операций.
+    // Delete the full directory to remove files orphaned by earlier failures.
     PhotoFileOperations.registerDirectoryDeletionAfterCommit(roomDirectory(roomId), log);
   }
 
@@ -232,7 +221,6 @@ public class RoomPhotoService {
     return roomRepository.findById(roomId).orElseThrow(() -> new RoomNotFoundException(roomId));
   }
 
-  // №17: единая блокировка для всех операций изменения фото.
   private Room lockRoom(Long roomId) {
     return roomRepository
         .findByIdForUpdate(roomId)

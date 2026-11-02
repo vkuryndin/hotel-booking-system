@@ -52,14 +52,14 @@ public class HotelPhotoService {
 
   @Transactional
   public HotelPhotoResponse upload(Long hotelId, MultipartFile file) {
-    // №17: сериализуем изменения фотографий одного отеля.
+    // Lock the owner row to serialize changes to its photo list.
     final Hotel hotel = lockHotel(hotelId);
 
     if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024) {
       throw new IllegalArgumentException("Photo must be 1 byte to 5 MB");
     }
 
-    // Проверяем лимит уже под блокировкой отеля.
+    // Check the photo limit while holding the lock.
     List<HotelPhoto> existing = photoRepository.findByHotel_IdOrderBySortOrderAscIdAsc(hotelId);
 
     if (existing.size() >= 10) {
@@ -78,8 +78,7 @@ public class HotelPhotoService {
       throw new IllegalArgumentException("Only valid JPEG, PNG, WebP photos are allowed");
     }
 
-    // A file with a valid signature may still be truncated or corrupted.
-    // Decode the complete image BEFORE writing it to storage or the database.
+    // A valid signature does not rule out truncated image data; decode before storing.
     PhotoFileOperations.validateDecodedImage(file, contentType);
 
     String extension =
@@ -94,9 +93,7 @@ public class HotelPhotoService {
     Path directory = hotelDirectory(hotelId);
     Path destination = directory.resolve(fileName);
 
-    // №17: если БД откатится, удаляем созданный файл.
-    // Регистрируем ДО копирования, чтобы убрать даже частично
-    // записанный файл при ошибке Files.copy().
+    // Register cleanup before copying so rollback also removes a partially written file.
     PhotoFileOperations.registerRollbackCleanup(destination, log);
 
     try {
@@ -109,7 +106,6 @@ public class HotelPhotoService {
       throw new IllegalStateException("Cannot store photo", ex);
     }
 
-    // Порядок и primary рассчитываются под блокировкой.
     int sortOrder = existing.stream().mapToInt(HotelPhoto::getSortOrder).max().orElse(-1) + 1;
 
     HotelPhoto photo = new HotelPhoto(hotel, fileName, contentType, existing.isEmpty(), sortOrder);
@@ -131,8 +127,7 @@ public class HotelPhotoService {
       throw new IllegalArgumentException("Invalid photo path");
     }
 
-    // Materialize the small (max 5 MB) photo before returning the resource.
-    // Streaming a filesystem resource would race with deletion after transaction end.
+    // Read the file now; a streaming resource could race with post-commit deletion.
     try {
       return new ByteArrayResource(Files.readAllBytes(file));
     } catch (java.nio.file.NoSuchFileException ex) {
@@ -149,8 +144,7 @@ public class HotelPhotoService {
 
   @Transactional
   public HotelPhotoResponse setPrimary(Long hotelId, Long photoId) {
-    // №17: два параллельных PATCH не смогут назначить
-    // две главные фотографии одновременно.
+    // Selecting the primary photo must be serialized with other photo mutations.
     lockHotel(hotelId);
 
     HotelPhoto selected = findPhoto(hotelId, photoId);
@@ -170,7 +164,6 @@ public class HotelPhotoService {
       throw new IllegalArgumentException("sortOrder must be >= 0");
     }
 
-    // №17: изменение порядка также сериализуем.
     lockHotel(hotelId);
 
     HotelPhoto photo = findPhoto(hotelId, photoId);
@@ -181,7 +174,6 @@ public class HotelPhotoService {
 
   @Transactional
   public void delete(Long hotelId, Long photoId) {
-    // №17: защищаем удаление и выбор новой primary.
     lockHotel(hotelId);
 
     HotelPhoto photo = findPhoto(hotelId, photoId);
@@ -195,7 +187,6 @@ public class HotelPhotoService {
       throw new IllegalArgumentException("Invalid photo path");
     }
 
-    // Сначала удаляем только метаданные в БД.
     photoRepository.delete(photo);
     photoRepository.flush();
 
@@ -207,14 +198,13 @@ public class HotelPhotoService {
       }
     }
 
-    // №17: физический файл удалится только после
-    // успешного COMMIT транзакции.
+    // Filesystem deletion follows the database commit, never precedes it.
     PhotoFileOperations.registerDeleteAfterCommit(file, log);
   }
 
   /**
-   * Вызывается только из HotelService.deleteHotel() внутри общей транзакции. Удаляем строки из БД;
-   * файлы останутся до COMMIT. Блокировка отеля уже удерживается вызывающим методом.
+   * Called with the hotel row locked by the outer transaction. Photo metadata is deleted
+   * immediately; files are removed only after commit.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void removeAllForHotelDeletion(Long hotelId) {
@@ -223,8 +213,7 @@ public class HotelPhotoService {
     photoRepository.deleteAll(photos);
     photoRepository.flush();
 
-    // Чистим весь каталог данного отеля, включая файлы,
-    // оставшиеся от предыдущих неуспешных операций.
+    // Delete the full directory to remove files orphaned by earlier failures.
     PhotoFileOperations.registerDirectoryDeletionAfterCommit(hotelDirectory(hotelId), log);
   }
 
@@ -232,7 +221,6 @@ public class HotelPhotoService {
     return hotelRepository.findById(hotelId).orElseThrow(() -> new HotelNotFoundException(hotelId));
   }
 
-  // №17: единая блокировка для всех операций изменения фото.
   private Hotel lockHotel(Long hotelId) {
     return hotelRepository
         .findByIdForUpdate(hotelId)

@@ -24,7 +24,7 @@ public class LoginService {
     this.failedAccountLimiter = limiter;
   }
 
-  // Same BCrypt work for unknown email as for wrong password.
+  // Run BCrypt even for unknown accounts to reduce username-enumeration timing differences.
   private static final String DUMMY_PASSWORD_HASH =
       "$2a$12$As7ZNhOUfphTzrrNdISEpuLNRxDV8rdqgtXAF8WKN7kNzN6NaoOhC";
 

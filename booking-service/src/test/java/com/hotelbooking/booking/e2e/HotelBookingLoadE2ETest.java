@@ -19,9 +19,8 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
- * True HTTP E2E load / concurrency / consistency suite against the running Gateway (8080). Included
- * in ordinary Gradle clean test; deliberately no RUN_E2E flag or mocks. See README-LOAD-E2E.md for
- * fixture prerequisites and expected results.
+ * Exercises load, concurrency, and cross-service consistency through the running Gateway. See the
+ * test documentation for environment prerequisites.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -113,7 +112,7 @@ class HotelBookingLoadE2ETest {
           if (cancel.code() == 200) cleaned++;
         }
       } catch (Exception ignored) {
-        /* retain original test failure; log only */
+        /* Log cleanup failures without replacing the original assertion. */
       }
     }
     System.out.println("[E2E cleanup] cancellations=" + cleaned + " tracked=" + tracked.size());
@@ -524,8 +523,6 @@ class HotelBookingLoadE2ETest {
     for (Measured<String> r : results) assertEquals(digest, r.value(), "Image content mismatch");
   }
 
-  // ---------- Real HTTP + test data ----------
-
   private Identity registerAndLogin(String name) throws Exception {
     String email =
         "e2e-"
@@ -716,7 +713,7 @@ class HotelBookingLoadE2ETest {
           first.ms() + latest.ms(),
           "timeout reconciled by exact Idempotency-Key replay");
     }
-    return first; // explicit failure when no definite final answer
+    return first;
   }
 
   private JsonNode room(long id) {
@@ -820,7 +817,7 @@ class HotelBookingLoadE2ETest {
       } catch (Exception e) {
         last = e;
       }
-      pause(250); // polling, NOT fixed waiting instead of verifying the eventual state
+      pause(250);
     }
     fail("No eventual convergence for " + name + (last == null ? "" : ": " + last));
   }
@@ -910,7 +907,7 @@ class HotelBookingLoadE2ETest {
           "Unexpected HTTP status request " + i + ": " + snippet(results.get(i).value()));
   }
 
-  // Discard large JSON catalog bodies in 5000/2000-op batches to keep test JVM memory bounded.
+  // Discard catalog bodies between batches to avoid retaining large response payloads.
   private Result getCompact(String path, String token) {
     Result r = get(path, token);
     return new Result(r.code(), "", r.ms(), r.failure());

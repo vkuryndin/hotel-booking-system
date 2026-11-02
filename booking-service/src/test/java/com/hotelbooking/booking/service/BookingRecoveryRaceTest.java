@@ -156,7 +156,6 @@ class BookingRecoveryRaceTest {
 
     long id = createOldPendingBooking();
 
-    // Saga продолжила работу — выбрала другой номер
     state.switchPendingRoom(id, 2L);
 
     recovery.recoverPendingBookings();

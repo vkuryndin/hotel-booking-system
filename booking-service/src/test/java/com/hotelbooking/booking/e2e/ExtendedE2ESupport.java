@@ -13,7 +13,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Explicitly opt-in live-HTTP E2E support. No mocked applications. */
+/** Shared fixtures and HTTP helpers for tests against running services. */
 abstract class ExtendedE2ESupport {
   static final String BASE = System.getProperty("hotel.e2e.base", "http://localhost:8080");
   static final String PASSWORD = "E2eExtendedPassword123!";
@@ -62,9 +62,8 @@ abstract class ExtendedE2ESupport {
 
   /**
    * Opens a genuine TCP connection from a distinct loopback IP. The Gateway obtains the client IP
-   * from the socket, never from a client-supplied forwarding header. This keeps production IP rate
-   * limits intact and prevents a 200-login test from exhausting the shared 127.0.0.1 limit used by
-   * ordinary E2E tests. Requires local IPv4 loopback routing (Windows/Linux/macOS).
+   * from the socket, not untrusted forwarding headers. This avoids exhausting the shared 127.0.0.1
+   * login limit during multi-user tests. Requires local IPv4 loopback routing.
    */
   Response jsonFromLoopback(String path, Object value, int addressNumber) {
     try {
@@ -168,10 +167,7 @@ abstract class ExtendedE2ESupport {
     assertEquals(expected, r.status(), r.body());
   }
 
-  /**
-   * Reuse one ordinary USER identity across read-only/role checks to avoid exhausting the global
-   * login/IP quota when E2E All launches many JUnit classes.
-   */
+  /** Reuse a shared USER account for read-only checks to stay within the login/IP limit. */
   Account register(String prefix) {
     Account result = sharedUser;
     if (result != null) return result;
@@ -181,13 +177,12 @@ abstract class ExtendedE2ESupport {
     }
   }
 
-  /** Separate real account for tests that assert isolation or abuse one account. */
+  /** Isolated account for authorization and rate-limit tests. */
   Account registerDistinct(String prefix) {
     String email =
         prefix + "." + runId + "." + UUID.randomUUID().toString().substring(0, 7) + "@example.test";
     String username = ("ext" + UUID.randomUUID().toString().replace("-", "")).substring(0, 20);
-    // Test fixture creation uses the existing ADMIN API, not the public
-    // registration endpoint (5 requests/hour/IP in production).
+    // Provision users through the ADMIN API to avoid the public registration quota.
     Response reg =
         json(
             "POST",
@@ -213,8 +208,7 @@ abstract class ExtendedE2ESupport {
   String login(String email, String password) {
     Response r =
         json("POST", "/api/users/login", null, Map.of("email", email, "password", password));
-    // Only fixture logins retry. Negative-login/security assertions see the raw
-    // status; we never treat a rate-limited password check as proof of 401.
+    // Retry fixture logins only; security assertions must observe the original response.
     for (int retry = 0; r.status() == 429 && retry < 3; retry++) {
       long delay =
           r.headers()
@@ -304,10 +298,7 @@ abstract class ExtendedE2ESupport {
           .decode(
               "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGPUylvAAANMDEgANwcAPX4BQJVh6wIAAAAASUVORK5CYII=");
 
-  /**
-   * Read the existing demo admin fixture from requests.http; no credentials copied into test
-   * sources.
-   */
+  /** Read the demo administrator credentials from requests.http rather than test constants. */
   Account admin() {
     Account ready = cachedAdmin;
     if (ready != null) return ready;
@@ -338,7 +329,7 @@ abstract class ExtendedE2ESupport {
     }
   }
 
-  /** Auto-provision and cache exactly 200 USER accounts; no external TSV or manual preparation. */
+  /** Provision the accounts needed for the multi-user authentication scenario. */
   synchronized List<Account> suppliedUsers() throws IOException {
     Path file = Path.of("build", "e2e-fixtures", "two-hundred-users.tsv");
     if (Files.isRegularFile(file)) {
@@ -347,8 +338,7 @@ abstract class ExtendedE2ESupport {
         Files.delete(file);
       } else {
         String[] first = previous.get(0).split("\t", -1);
-        // H2 is volatile: a saved fixture file from an earlier service run
-        // must not be reused if its users no longer exist in the database.
+        // H2 resets on restart, so verify cached fixture identities against the live service.
         Response probe =
             jsonFromLoopback(
                 "/api/users/login", Map.of("email", first[0], "password", first[1]), 900);

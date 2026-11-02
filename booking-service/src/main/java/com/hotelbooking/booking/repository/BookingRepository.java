@@ -5,6 +5,7 @@ import com.hotelbooking.booking.entity.BookingCreationOutcome;
 import com.hotelbooking.booking.entity.BookingStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,12 @@ import org.springframework.data.repository.query.Param;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
   Page<Booking> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+
+  Page<Booking> findByUserIdAndStatusOrderByCreatedAtDesc(
+      Long userId, BookingStatus status, Pageable pageable);
+
+  Page<Booking> findByUserIdAndStatusAndCheckOutGreaterThanEqualOrderByCreatedAtDesc(
+      Long userId, BookingStatus status, LocalDate checkOutFrom, Pageable pageable);
 
   Page<Booking> findAllByOrderByCreatedAtDesc(Pageable pageable);
 

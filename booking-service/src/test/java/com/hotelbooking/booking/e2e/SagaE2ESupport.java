@@ -24,7 +24,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 
-/** Common real-HTTP harness, deliberately not a JUnit test class. No application mocks. */
+/** Shared HTTP harness for Saga E2E tests against running services. */
 abstract class SagaE2ESupport {
   static final String GATEWAY = "http://localhost:8080";
   static final String EUREKA = "http://localhost:8761";
@@ -77,8 +77,7 @@ abstract class SagaE2ESupport {
 
   @BeforeAll
   void sagaSetup() throws Exception {
-    // Gateway requires JWT for /api/hotels; never probe protected routes anonymously.
-    // Registration and login are public and establish the authenticated probe identity.
+    // Authenticate before probing protected routes through the Gateway.
     System.out.println("[SAGA HARNESS] Register -> login -> authenticated catalog precheck");
     owner = register("saga-owner");
     R health = get("/api/hotels?page=0&size=1", owner.token());
@@ -121,7 +120,7 @@ abstract class SagaE2ESupport {
         roomIds.add(js(room).path("id").asLong());
       }
     } else {
-      // Read-only discovery: no production hotel/room mutation other than far-future test bookings.
+      // Use an isolated date range to avoid affecting ordinary hotel availability.
       R hotels = get("/api/hotels?page=0&size=100", owner.token());
       assertEquals(200, hotels.status(), shortR(hotels));
       for (JsonNode h : js(hotels).path("content")) {
@@ -177,8 +176,7 @@ abstract class SagaE2ESupport {
   }
 
   User register(String label) {
-    // Share a single authenticated USER fixture with the rest of the E2E suite.
-    // Public register/login per Saga class exhausted 5/hour and 20/minute quotas.
+    // Share an account across Saga tests to stay within public registration/login limits.
     ExtendedE2ESupport.Account fixture = new ExtendedE2ESupport() {}.register("saga");
     return new User(fixture.email(), fixture.token());
   }
@@ -439,7 +437,7 @@ abstract class SagaE2ESupport {
       }
   }
 
-  // Eureka REST API: locate the exact instance ID and change ONLY that local instance.
+  // Target the exact local Eureka instance, not every registered Hotel Service instance.
   String eurekaInstanceId() {
     R res = send(EUREKA, "GET", "/eureka/apps/HOTEL-SERVICE", null, null, null, null);
     assertEquals(200, res.status(), "Eureka registry unavailable: " + shortR(res));
@@ -475,8 +473,7 @@ abstract class SagaE2ESupport {
 
   void restoreEureka(String id) {
     if (id == null) return;
-    // A JUnit timeout may interrupt the test thread; clear it long enough
-    // to perform the mandatory Eureka REST restoration, then propagate it.
+    // Restore Eureka state even if JUnit interrupted the test thread on timeout.
     boolean interrupted = Thread.interrupted();
     try {
       setEurekaStatus(id, "UP");

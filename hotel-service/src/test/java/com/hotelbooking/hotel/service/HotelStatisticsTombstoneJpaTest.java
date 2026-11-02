@@ -54,7 +54,7 @@ class HotelStatisticsTombstoneJpaTest {
     UUID id = UUID.randomUUID();
 
     reservationService.release(id, roomId, true);
-    reservationService.release(id, roomId, true); // idempotent
+    reservationService.release(id, roomId, true);
 
     var reservation = reservations.findById(id).orElseThrow();
     assertTrue(reservation.isTombstone());

@@ -11,9 +11,8 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
- * Disruptive LOCAL fault-injection, run only with the dedicated sagaFaultTest Gradle task. Uses
- * Eureka override, restores UP in finally and AfterAll. Only tests discovery unavailability, not
- * packet loss/slow responses.
+ * Fault injection changes Eureka registration state and must run separately. The test restores
+ * service availability on exit; it does not simulate packet loss or network latency.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -275,8 +274,7 @@ class HotelBookingSagaFaultE2ETest extends SagaE2ESupport {
       down();
       R cancellation = cancel(id, owner);
       if (cancellation.status() == 200) {
-        // Eureka cannot guarantee a failure of an already-routed request.
-        // This scenario did not actually enter recovery; don't fabricate it.
+        // Requests already routed before the Eureka change may still succeed.
         assertEquals("CANCELLED", js(booking(id, owner)).path("status").asText());
         org.junit.jupiter.api.Assumptions.abort(
             "Cancellation completed during Eureka transition; recovery exhaustion was not injected");

@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 Hotel Booking / Stage 10: manual Saga concurrency + autoSelect concurrency.
 Preserves original TEST 1-4 and adds AUTO TEST 5-6.
@@ -79,7 +79,7 @@ function New-AutoBookingJson {
         checkOut   = $CheckIn.AddDays(3).ToString('yyyy-MM-dd')
     }
     if ($IgnoredRoomId -ne 0) {
-        # Stage 10: request.roomId must be ignored in autoSelect mode.
+        # autoSelect ignores request.roomId, including for idempotency fingerprints.
         $payload.roomId = $IgnoredRoomId
     }
     return ($payload | ConvertTo-Json -Compress)
@@ -240,7 +240,7 @@ try {
     if ($HotelId -le 0) { throw 'HotelId is missing. Specify -HotelId <id>.' }
     Write-Host ('AUTO test HotelId: ' + $HotelId)
 
-    # TEST 1: original SAME key, two parallel manual requests + replay.
+    # TEST 1: same key, two parallel manual requests + replay.
     $date1 = $baseDate
     $json1 = New-ManualBookingJson -CheckIn $date1
     $key1 = [guid]::NewGuid().ToString()
@@ -250,7 +250,7 @@ try {
     $replay = @(Invoke-BookingBatch -Jsons @($json1) -Keys @($key1) -LabelPrefix 'Replay')[0]
     Write-TestResult 1 (Test-PairWithSameKey -Initial $first -Replay $replay) 'Manual idempotency, same booking ID and room.'
 
-    # TEST 2: original DIFFERENT keys, same manual room & dates.
+    # TEST 2: different keys, same manual room and dates.
     $date2 = $baseDate.AddDays(14)
     $json2 = New-ManualBookingJson -CheckIn $date2
     Write-Host "`n### TEST 2 - MANUAL: DIFFERENT keys, 2 parallel requests"
@@ -261,14 +261,14 @@ try {
     Write-TestResult 2 ($second.Count -eq 2 -and $winners.Count -eq 1 -and $losers.Count -eq 1) `
         'Exactly one reservation for the same manual room.'
 
-    # TEST 3: original NEW key on already occupied manual dates.
+    # TEST 3: new key on occupied dates.
     Write-Host "`n### TEST 3 - MANUAL: NEW key for occupied dates"
     $third = @(Invoke-BookingBatch -Jsons @($json2) `
         -Keys @([guid]::NewGuid().ToString()) -LabelPrefix 'Conflict')[0]
     Write-TestResult 3 ($third.Http -eq 409 -and $third.Code -eq 'ROOM_ALREADY_BOOKED') `
         'Occupied manual room must be rejected.'
 
-    # TEST 4: original STRESS test, N keys, same manual room and dates.
+    # TEST 4: concurrent requests with different keys for the same room.
     $date4 = $baseDate.AddDays(28)
     $json4 = New-ManualBookingJson -CheckIn $date4
     $keys4 = @((1..$StressCount) | ForEach-Object { [guid]::NewGuid().ToString() })

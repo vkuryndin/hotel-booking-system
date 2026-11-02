@@ -2,13 +2,13 @@
 # IntelliJ IDEA / HTTP Client. Весь сценарный набор находится в этом файле.
 # Запуск: Eureka (8761), Gateway (8080), Booking (8081), Hotel (8082).
 # Перед полным прогоном — новая H2 и готовность всех сервисов; демо-данные в зависимости от APP_DEMO_ENABLED.
-# НАЧАТЬ: выполнить 01.01 регистрацию USER, 01.02 вход USER, 01.03 вход ADMIN.
+# НАЧАТЬ: выполнить 01.001 регистрацию USER, 01.002 вход USER, 01.003 вход ADMIN.
 # ДАЛЕЕ: запускать тесты внутри каждой секции строго сверху вниз, без пропуска подготовительных запросов.
 # Успех/ошибка каждого запроса отображается в вкладке Tests IntelliJ HTTP Client (client.test).
-# Идентификаторы и токены сохраняются через client.global.set; не переносите их вручную.
+# Идентификаторы и токены сохраняются через client.global.set; выполнять зависящие запросы в рамках одного запуска сервисов.
 # Повторный прогон создающих запросов на той же H2 может закономерно дать 409; для полного прогона — чистая H2.
 # Даты/идемпотентность: не переиспользуйте ключ в новом сценарии с другим телом запроса.
-# Инфраструктурные эксперименты 14 выполняются ТОЛЬКО отдельно: они могут нарушить работу остальных секций.
+# Раздел 14 — отдельные инфраструктурные проверки: остановка сервисов, Eureka и повторный запуск нарушают последовательный прогон.
 # Если тест зависит от реального времени, ожидания Recovery или заранее созданной сущности — это указано комментарием.
 # Скрипт конкурентного тестирования: ./run-parallel-booking-test.cmd (Windows) или ./parallel-booking-test-fixed.ps1.
 # Фотографии лежат рядом с этим файлом; пути в multipart отсчитываются от test/manual/.
@@ -63,9 +63,17 @@ Content-Type: application/json
 }
 
 > {%
-client.test('Вход USER и сохранение JWT — HTTP 200', () => client.assert(response.status === 200, "Ожидали 200, получили " + response.status));
-    client.global.set("accessToken", response.body.accessToken);
-    client.global.set("userToken", response.body.accessToken);
+client.test('Вход USER и данные аккаунта — HTTP 200', function() {
+  client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
+  client.assert(response.body.username === "vova", "Неверный username в LoginResponse");
+  client.assert(response.body.firstName === "vova", "Неверное имя в LoginResponse");
+  client.assert(response.body.lastName === "vova", "Неверная фамилия в LoginResponse");
+  client.assert(response.body.email === "test@example.com", "Неверный email в LoginResponse");
+});
+if (response.status === 200) {
+  client.global.set("accessToken", response.body.accessToken);
+  client.global.set("userToken", response.body.accessToken);
+}
 %}
 
 ### 01.003 — Вход администратора ADMIN и сохранение adminToken — ожидаем HTTP 200
@@ -89,19 +97,21 @@ client.test('Вход ADMIN и сохранение JWT — HTTP 200', () => cli
 # =====================================================================================
 
 ### 02.001 — Повторная регистрация email — ожидаем HTTP 409
-# Источник: requests.http, тест №2.
 POST {{baseUrl}}/api/users/register
 Content-Type: application/json
 
 {
+  "username": "duplicate_email_test",
+  "firstName": "Test",
+  "lastName": "User",
   "email": "test@example.com",
   "password": "MyPassword123"
 }
 
 > {%
-client.test('Повторная регистрация email — HTTP 409', function() {
-  client.assert(response.status === 409, "Ожидали 409, получили " + response.status);
-});
+    client.test('Повторная регистрация email — HTTP 409', function() {
+        client.assert(response.status === 409, "Ожидали 409, получили " + response.status);
+    });
 %}
 
 ### 02.002 — Регистрация с неверным email — ожидаем HTTP 400
@@ -111,7 +121,10 @@ Content-Type: application/json
 
 {
   "email": "invalid-email",
-  "password": "MyPassword123"
+  "password": "MyPassword123",
+  "username": "invalidemailcheck",
+  "firstName": "Validation",
+  "lastName": "Check"
 }
 
 > {%
@@ -167,13 +180,18 @@ Content-Type: application/json
 {
   "email": "admin-check-03@example.com",
   "password": "Test12345!",
-  "role": "USER"
+  "role": "USER",
+  "username": "admincheck03",
+  "firstName": "Admin",
+  "lastName": "Check"
 }
 
 > {%
 client.test('TEST CREATE — Создание пользователя — HTTP 201', function() {
   client.assert(response.status === 201, "Ожидали 201, получили " + response.status);
+  client.assert(Number(response.body.id) > 0, 'ID пользователя отсутствует');
 });
+if (response.status === 201) client.global.set('section03UserId', response.body.id);
 %}
 
 ### 03.002 — TEST READ 1 — Список пользователей (200) — ожидаем HTTP 200
@@ -187,9 +205,22 @@ client.test('TEST READ 1 — Список пользователей (200) — H
 });
 %}
 
+### 03.002a — Поиск пользователей на сервере по username — ожидаем HTTP 200
+GET {{baseUrl}}/api/users?page=0&size=20&q=admincheck03
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test('Поиск ADMIN пользователей через q — HTTP 200', function() {
+  client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
+  client.assert(Array.isArray(response.body.content), "Ожидалась страница пользователей");
+  client.assert(response.body.content.some(u => Number(u.id) === Number(client.global.get('section03UserId'))),
+    "Не найден созданный пользователь");
+});
+%}
+
 ### 03.003 — TEST READ 2 — Пользователь по ID (200) — ожидаем HTTP 200
 # Источник: requests.http, тест №59.
-GET {{baseUrl}}/api/users/2
+GET {{baseUrl}}/api/users/{{section03UserId}}
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -222,7 +253,7 @@ client.test('TEST READ 4 — USER не может получить список 
 
 ### 03.006 — TEST READ 5 — USER не может получить пользователя (403) — ожидаем HTTP 403
 # Источник: requests.http, тест №62.
-GET {{baseUrl}}/api/users/2
+GET {{baseUrl}}/api/users/{{section03UserId}}
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -243,7 +274,7 @@ client.test('TEST READ 6 — Без JWT (401) — HTTP 401', function() {
 
 ### 03.008 — UPDATE 1 — ADMIN изменяет email и роль (200) — ожидаем HTTP 200
 # Источник: requests.http, тест №64.
-PATCH {{baseUrl}}/api/users/2
+PATCH {{baseUrl}}/api/users/{{section03UserId}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -260,7 +291,7 @@ client.test('UPDATE 1 — ADMIN изменяет email и роль (200) — HTT
 
 ### 03.009 — UPDATE 2 — Проверка изменений (200) — ожидаем HTTP 200
 # Источник: requests.http, тест №65.
-GET {{baseUrl}}/api/users/2
+GET {{baseUrl}}/api/users/{{section03UserId}}
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -269,9 +300,9 @@ client.test('UPDATE 2 — Проверка изменений (200) — HTTP 200
 });
 %}
 
-### 03.010 — UPDATE 3 — Сброс пароля администратором (204) — ожидаем HTTP 204
+### 03.010 — UPDATE 3 — Сброс пароля администратором (200) — ожидаем HTTP 200
 # Источник: requests.http, тест №66.
-POST {{baseUrl}}/api/users/2/reset-password
+POST {{baseUrl}}/api/users/{{section03UserId}}/reset-password
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -280,8 +311,8 @@ Content-Type: application/json
 }
 
 > {%
-client.test('UPDATE 3 — Сброс пароля администратором (204) — HTTP 204', function() {
-  client.assert(response.status === 204, "Ожидали 204, получили " + response.status);
+client.test('UPDATE 3 — Сброс пароля администратором (200) — HTTP 200', function() {
+  client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
 });
 %}
 
@@ -319,7 +350,7 @@ client.test('UPDATE 5 — Вход с новым паролем (200) — HTTP 2
 
 ### 03.013 — UPDATE 6 — USER не может изменять данные (403) — ожидаем HTTP 403
 # Источник: requests.http, тест №69.
-PATCH {{baseUrl}}/api/users/2
+PATCH {{baseUrl}}/api/users/{{section03UserId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -335,7 +366,7 @@ client.test('UPDATE 6 — USER не может изменять данные (40
 
 ### 03.014 — UPDATE 7 — USER не может сбрасывать пароль (403) — ожидаем HTTP 403
 # Источник: requests.http, тест №70.
-POST {{baseUrl}}/api/users/2/reset-password
+POST {{baseUrl}}/api/users/{{section03UserId}}/reset-password
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -351,7 +382,7 @@ client.test('UPDATE 7 — USER не может сбрасывать пароль
 
 ### 03.015 — UPDATE 8 — Некорректный email (400) — ожидаем HTTP 400
 # Источник: requests.http, тест №71.
-PATCH {{baseUrl}}/api/users/2
+PATCH {{baseUrl}}/api/users/{{section03UserId}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -367,7 +398,7 @@ client.test('UPDATE 8 — Некорректный email (400) — HTTP 400', fu
 
 ### 03.016 — UPDATE 9 — Пустой запрос (400) — ожидаем HTTP 400
 # Источник: requests.http, тест №72.
-PATCH {{baseUrl}}/api/users/2
+PATCH {{baseUrl}}/api/users/{{section03UserId}}
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -381,7 +412,7 @@ client.test('UPDATE 9 — Пустой запрос (400) — HTTP 400', functio
 
 ### 03.017 — UPDATE 10 — Слишком короткий пароль (400) — ожидаем HTTP 400
 # Источник: requests.http, тест №73.
-POST {{baseUrl}}/api/users/2/reset-password
+POST {{baseUrl}}/api/users/{{section03UserId}}/reset-password
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -429,7 +460,7 @@ client.test('UPDATE 12 — Сброс пароля несуществующег�
 
 ### 03.020 — UPDATE 13 — Изменение без JWT (401) — ожидаем HTTP 401
 # Источник: requests.http, тест №76.
-PATCH {{baseUrl}}/api/users/2
+PATCH {{baseUrl}}/api/users/{{section03UserId}}
 Content-Type: application/json
 
 {
@@ -444,7 +475,7 @@ client.test('UPDATE 13 — Изменение без JWT (401) — HTTP 401', fu
 
 ### 03.021 — UPDATE 14 — Сброс без JWT (401) — ожидаем HTTP 401
 # Источник: requests.http, тест №77.
-POST {{baseUrl}}/api/users/2/reset-password
+POST {{baseUrl}}/api/users/{{section03UserId}}/reset-password
 Content-Type: application/json
 
 {
@@ -466,7 +497,10 @@ Content-Type: application/json
 {
   "email": "delete-test-001@example.com",
   "password": "TestPassword123!",
-  "role": "USER"
+  "role": "USER",
+  "username": "deletecheck001",
+  "firstName": "Delete",
+  "lastName": "Check"
 }
 
 > {%
@@ -559,7 +593,10 @@ Content-Type: application/json
 {
   "email": "forced-change-test@example.com",
   "password": "OriginalPassword123!",
-  "role": "USER"
+  "role": "USER",
+  "username": "forcedchangecheck",
+  "firstName": "Forced",
+  "lastName": "Change"
 }
 
 > {%
@@ -595,7 +632,7 @@ client.test('3 — Старый токен работает в Booking (200) —
 
 ### 03.033 — 4 — Старый JWT работает в Hotel Service (200) — ожидаем HTTP 200
 # Источник: requests.http, тест №89.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{oldUserToken}}
 
 > {%
@@ -634,7 +671,7 @@ client.test('6 — Старый JWT отозван в Booking (401) — HTTP 401
 
 ### 03.036 — 7 — Старый JWT отозван в Hotel (401) — ожидаем HTTP 401
 # Источник: requests.http, тест №92.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{oldUserToken}}
 
 > {%
@@ -691,7 +728,7 @@ Authorization: Bearer {{temporaryToken}}
 
 ### 03.040 — 11 — Hotel API запрещён: 403 — ожидаем HTTP 403
 # Источник: requests.http, тест №96.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{temporaryToken}}
 
 > {%
@@ -765,7 +802,7 @@ Authorization: Bearer {{temporaryToken}}
 ### 03.045 — 16 — Временный JWT отозван в Hotel: 401 — ожидаем HTTP 401
 # Источник: requests.http, тест №101.
 # Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{temporaryToken}}
 
 > {%
@@ -826,7 +863,7 @@ Authorization: Bearer {{newUserToken}}
 ### 03.049 — 20 — Новый JWT работает в Hotel: 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №105.
 # Токены данного блока служебные; основной userToken/adminToken не перезаписывается.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{newUserToken}}
 
 > {%
@@ -952,7 +989,7 @@ client.test('25 — Старый JWT отозван в Booking (401) — HTTP 40
 
 ### 03.059 — 26 — Старый JWT отозван в Hotel (401) — ожидаем HTTP 401
 # Источник: requests.http, тест №115.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{newUserToken}}
 
 > {%
@@ -1053,7 +1090,7 @@ client.test('33 — JWT удалённого пользователя не ра�
 
 ### 03.067 — 34 — JWT удалённого пользователя не работает в Hotel (401) — ожидаем HTTP 401
 # Источник: requests.http, тест №123.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/hotels
 Authorization: Bearer {{beforeDeleteToken}}
 
 > {%
@@ -1078,14 +1115,15 @@ client.test('35 — Удалённый пользователь не может 
 });
 %}
 
-### 03.069 — 36 — Прямой запрос с отозванным JWT в Hotel (401) — ожидаем HTTP 401
+### 03.069 — 36 — Прямой обход Gateway запрещён даже с JWT — ожидаем HTTP 403
 # Источник: requests.http, тест №125.
-GET http://localhost:8082/api/rooms?hotelId=1
+GET http://localhost:8082/api/hotels
 Authorization: Bearer {{beforeDeleteToken}}
 
 > {%
-client.test('36 — Прямой запрос с отозванным JWT в Hotel (401) — HTTP 401', function() {
-  client.assert(response.status === 401, "Ожидали 401, получили " + response.status);
+client.test('36 — Прямой обход Gateway закрыт — HTTP 403', function() {
+  client.assert(response.status === 403, "Ожидали 403, получили " + response.status);
+  client.assert(response.body.code === "GATEWAY_REQUIRED", "Ожидался GATEWAY_REQUIRED");
 });
 %}
 
@@ -1093,6 +1131,33 @@ client.test('36 — Прямой запрос с отозванным JWT в Hot
 # =====================================================================================
 # РАЗДЕЛ 04. Отели, номера, CRUD и ограничения
 # =====================================================================================
+
+### 04.000 — CRUD-01 — ADMIN создаёт отель: 201 — ожидаем HTTP 201
+# Источник: requests.http, тест №144.
+POST {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "CRUD Test Hotel",
+  "address": "Yerevan, Test Street 10"
+}
+
+> {%
+client.test('CRUD-01 — ADMIN создаёт отель: 201 — HTTP 201', () => client.assert(response.status === 201, "Ожидали 201, получили " + response.status));
+    client.global.set("crudHotelId", response.body.id);
+%}
+
+### 04.000b — CRUD-02 — список отелей: 200 — ожидаем HTTP 200
+# Источник: requests.http, тест №145.
+GET {{baseUrl}}/api/hotels
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test('CRUD-02 — список отелей: 200 — HTTP 200', function() {
+  client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
+});
+%}
 
 ### 04.001 — CRUD-03 — отель по ID: 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №146.
@@ -1879,15 +1944,19 @@ client.test('S10-13 — Отменяем второе бронирование: 
 });
 %}
 
-### 05.014 — timesBooked=1 у обоих; порядок S101, S102 — ожидаем HTTP 200
+### 05.014 — После отмены timesBooked=0 у обоих, оба доступны — ожидаем HTTP 200
 # Источник: requests.http, тест №202.
 # S10-14 — После отмены доступны оба: 200
 GET {{baseUrl}}/api/rooms/recommend?hotelId={{s10Hotel}}&checkIn=2031-03-10&checkOut=2031-03-12
 Authorization: Bearer {{adminToken}}
 
 > {%
-client.test('timesBooked=1 у обоих; порядок S101, S102 — HTTP 200', function() {
+client.test('После отмены оба номера свободны, timesBooked=0 — HTTP 200', function() {
   client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
+  client.assert(Array.isArray(response.body), "Ожидался список рекомендуемых номеров");
+  client.assert(response.body.length === 2, "Ожидались оба номера");
+  client.assert(response.body.every(r => Number(r.timesBooked) === 0),
+    "Отменённые бронирования не должны учитываться в timesBooked");
 });
 %}
 
@@ -3878,6 +3947,8 @@ Authorization: Bearer {{adminToken}}
 # РАЗДЕЛ 09. Демо-данные: отдельные контрольные запросы
 # =====================================================================================
 
+# Для входа нужна APP_DEMO_ENABLED=true и пароль из DEMO_USER_1_PASSWORD.
+# Этот раздел не меняет accessToken основного USER из 01.002.
 ### 09.001 — Демо-пользователь 1 — ожидаем HTTP 200
 # Источник: requests.http, тест №337.
 POST {{baseUrl}}/api/users/login
@@ -3890,24 +3961,31 @@ Content-Type: application/json
 
 > {%
 client.test('Демо-пользователь 1 — HTTP 200', () => client.assert(response.status === 200, "Ожидали 200, получили " + response.status));
-    client.global.set("accessToken", response.body.accessToken);
+if (response.status === 200) {
+  client.global.set("demoUserToken", response.body.accessToken);
+}
 %}
 
-### 09.002 — Демо-пользователь 2 — ожидаем HTTP 200
+### 09.002 — Список отелей с JWT демо-пользователя — ожидаем HTTP 200
 # Источник: requests.http, тест №338.
 GET {{baseUrl}}/api/hotels
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{demoUserToken}}
 
 > {%
-client.test('Демо-пользователь 2 — HTTP 200', function() {
+client.test('Список отелей с JWT демо-пользователя — HTTP 200', function() {
   client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
+  client.assert(Array.isArray(response.body.content), "Ожидалась страница отелей");
+  client.assert(response.body.content.length > 0, "Нужен хотя бы один отель");
 });
+if (response.status === 200 && response.body.content && response.body.content.length > 0) {
+  client.global.set("demoBrowseHotelId", response.body.content[0].id);
+}
 %}
 
 ### 09.003 — Проверка фотографий — ожидаем HTTP 200
 # Источник: requests.http, тест №339.
-GET {{baseUrl}}/api/hotels/1/photos
-Authorization: Bearer {{accessToken}}
+GET {{baseUrl}}/api/hotels/{{demoBrowseHotelId}}/photos
+Authorization: Bearer {{demoUserToken}}
 
 > {%
 client.test('Проверка фотографий — HTTP 200', function() {
@@ -3928,7 +4006,7 @@ Idempotency-Key: 77000000-0000-4000-8000-000000000001
 Content-Type: application/json
 
 {
-  "roomId": 1,
+  "roomId": {{s10Room1}},
   "checkIn": "2053-10-10",
   "checkOut": "2054-10-11",
   "guestCount": 1
@@ -3943,7 +4021,7 @@ Content-Type: application/json
 
 ### 10.002 — ARCH-01 — USER не может получить статистику — ожидаем HTTP 403
 # Источник: requests.http, тест №362.
-GET {{baseUrl}}/api/hotels/1/statistics
+GET {{baseUrl}}/api/hotels/{{s10Hotel}}/statistics
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -3955,7 +4033,7 @@ Authorization: Bearer {{accessToken}}
 
 ### 10.003 — ARCH-02 — ADMIN получает статистику — ожидаем HTTP 200
 # Источник: requests.http, тест №363.
-GET {{baseUrl}}/api/hotels/1/statistics
+GET {{baseUrl}}/api/hotels/{{s10Hotel}}/statistics
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -3966,7 +4044,7 @@ Authorization: Bearer {{adminToken}}
 
 ### 10.004 — ARCH-03 — USER по-прежнему видит отель — ожидаем HTTP 200
 # Источник: requests.http, тест №364.
-GET {{baseUrl}}/api/hotels/1
+GET {{baseUrl}}/api/hotels/{{s10Hotel}}
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -4029,7 +4107,7 @@ Authorization: Bearer {{adminToken}}
 
 ### 10.009 — PAGE-05 — Фильтрация и сортировка — ожидаем HTTP 200
 # Источник: requests.http, тест №369.
-GET {{baseUrl}}/api/rooms?hotelId=1&page=0&size=2
+GET {{baseUrl}}/api/rooms?hotelId={{s10Hotel}}&page=0&size=2
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -4040,7 +4118,7 @@ client.test('PAGE-05 — Фильтрация и сортировка — HTTP 2
 
 ### 10.010 — PAGE-06 — Фильтрация и сортировка — ожидаем HTTP 200
 # Источник: requests.http, тест №370.
-GET {{baseUrl}}/api/rooms/available?hotelId=1&page=0&size=2
+GET {{baseUrl}}/api/rooms/available?hotelId={{s10Hotel}}&page=0&size=2
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -4073,7 +4151,7 @@ client.test('PAGINATION 2 — Hotels: вторая страница, ожида�
 
 ### 10.013 — PAGINATION 3 — Rooms: первая страница, ожидаем 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №373.
-GET {{baseUrl}}/api/rooms?hotelId=1&page=0&size=2
+GET {{baseUrl}}/api/rooms?hotelId={{s10Hotel}}&page=0&size=2
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -4084,7 +4162,7 @@ client.test('PAGINATION 3 — Rooms: первая страница, ожидае
 
 ### 10.014 — PAGINATION 4 — Rooms: вторая страница, ожидаем 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №374.
-GET {{baseUrl}}/api/rooms?hotelId=1&page=1&size=2
+GET {{baseUrl}}/api/rooms?hotelId={{s10Hotel}}&page=1&size=2
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -4095,7 +4173,7 @@ client.test('PAGINATION 4 — Rooms: вторая страница, ожидае
 
 ### 10.015 — PAGINATION 5 — Rooms: фильтрация + пагинация, ожидаем 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №375.
-GET {{baseUrl}}/api/rooms?hotelId=1&category=STANDARD&page=0&size=2
+GET {{baseUrl}}/api/rooms?hotelId={{s10Hotel}}&category=STANDARD&page=0&size=2
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -4106,7 +4184,7 @@ client.test('PAGINATION 5 — Rooms: фильтрация + пагинация, 
 
 ### 10.016 — PAGINATION 6 — Available rooms, ожидаем 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №376.
-GET {{baseUrl}}/api/rooms/available?hotelId=1&page=0&size=2
+GET {{baseUrl}}/api/rooms/available?hotelId={{s10Hotel}}&page=0&size=2
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -4183,7 +4261,7 @@ client.test('PAGINATION 12 — Users: вторая страница, ожида�
 
 ### 10.023 — NEGATIVE 1 — Rooms: size > 100, ожидаем 400 — ожидаем HTTP 400
 # Источник: requests.http, тест №383.
-GET {{baseUrl}}/api/rooms?hotelId=1&page=0&size=101
+GET {{baseUrl}}/api/rooms?hotelId={{s10Hotel}}&page=0&size=101
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -4542,7 +4620,7 @@ Authorization: Bearer {{adminToken}}
     client.test('1. QA-25 — Финальный счётчик — HTTP 200', function() {
         client.assert(response.status === 200);
         client.assert(Number(response.body.timesBooked) === 2,
-            "Expected 4, got " + response.body.timesBooked);
+            "Expected 2, got " + response.body.timesBooked);
     });
 %}
 
@@ -5661,8 +5739,6 @@ Authorization: Bearer {{adminToken}}
 
 ### 13.001 — Создание отеля администратором — ожидаем HTTP 201
 # Источник: requests.http, тест №8.
-# should be redone everytime i restart hotelservice
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/hotels
 Content-Type: application/json
 Authorization: Bearer {{adminToken}}
@@ -5676,17 +5752,17 @@ Authorization: Bearer {{adminToken}}
 client.test('Создание отеля администратором — HTTP 201', function() {
   client.assert(response.status === 201, "Ожидали 201, получили " + response.status);
 });
+if (response.status === 201) client.global.set('smokeHotelId', response.body.id);
 %}
 
 ### 13.002 — Создание номера администратором — ожидаем HTTP 201
 # Источник: requests.http, тест №9.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/rooms
 Content-Type: application/json
 Authorization: Bearer {{adminToken}}
 
 {
-  "hotelId": 1,
+  "hotelId": {{smokeHotelId}},
   "number": "102"
 }
 
@@ -5694,18 +5770,18 @@ Authorization: Bearer {{adminToken}}
 client.test('Создание номера администратором — HTTP 201', function() {
   client.assert(response.status === 201, "Ожидали 201, получили " + response.status);
 });
+if (response.status === 201) client.global.set('smokeRoomId', response.body.id);
 %}
 
 ### 13.003 — Повторное создание номера — ожидаем HTTP 409
 # Источник: requests.http, тест №10.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/rooms
 Content-Type: application/json
 Authorization: Bearer {{adminToken}}
 
 {
-  "hotelId": 1,
-  "number": "101"
+  "hotelId": {{smokeHotelId}},
+  "number": "102"
 }
 
 > {%
@@ -5732,21 +5808,20 @@ client.test('Создание номера в несуществующем от�
 });
 %}
 
-### 13.005 — Чтение номеров отеля без JWT — ожидаем HTTP 200
+### 13.005 — Чтение номеров отеля без JWT — ожидаем HTTP 401
 # Источник: requests.http, тест №12.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/rooms?hotelId={{smokeHotelId}}
 
 > {%
-client.test('Чтение номеров отеля без JWT — HTTP 200', function() {
-  client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
+client.test('Чтение номеров отеля без JWT — HTTP 401', function() {
+  client.assert(response.status === 401, "Ожидали 401, получили " + response.status);
 });
 %}
 
 ### 13.006 — Получить номер по ID — ожидаем 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №13.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-GET {{baseUrl}}/api/rooms/1
+GET {{baseUrl}}/api/rooms/{{smokeRoomId}}
+Authorization: Bearer {{adminToken}}
 
 > {%
 client.test('Получить номер по ID — ожидаем 200 — HTTP 200', function() {
@@ -5756,8 +5831,8 @@ client.test('Получить номер по ID — ожидаем 200 — HTTP
 
 ### 13.007 — Получить несуществующий номер — ожидаем 404 — ожидаем HTTP 404
 # Источник: requests.http, тест №14.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 GET {{baseUrl}}/api/rooms/999999
+Authorization: Bearer {{adminToken}}
 
 > {%
 client.test('Получить несуществующий номер — ожидаем 404 — HTTP 404', function() {
@@ -5767,8 +5842,7 @@ client.test('Получить несуществующий номер — ожи
 
 ### 13.008 — Отключить номер — ожидаем 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №15.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-PATCH {{baseUrl}}/api/rooms/1/availability
+PATCH {{baseUrl}}/api/rooms/{{smokeRoomId}}/availability
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -5784,8 +5858,8 @@ client.test('Отключить номер — ожидаем 200 — HTTP 200',
 
 ### 13.009 — Получить доступные номера — ожидаем 200 — ожидаем HTTP 200
 # Источник: requests.http, тест №16.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-GET {{baseUrl}}/api/rooms/available?hotelId=1
+GET {{baseUrl}}/api/rooms/available?hotelId={{smokeHotelId}}
+Authorization: Bearer {{adminToken}}
 
 > {%
 client.test('Получить доступные номера — ожидаем 200 — HTTP 200', function() {
@@ -5795,8 +5869,7 @@ client.test('Получить доступные номера — ожидаем
 
 ### 13.010 — возврат номера в available — ожидаем HTTP 200
 # Источник: requests.http, тест №17.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-PATCH {{baseUrl}}/api/rooms/1/availability
+PATCH {{baseUrl}}/api/rooms/{{smokeRoomId}}/availability
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -5822,10 +5895,28 @@ client.test('Мои бронирования — HTTP 200', function() {
 });
 %}
 
+### 13.011a — Подготовка бронирования для smoke-проверок — ожидаем HTTP 201
+POST {{baseUrl}}/api/bookings
+Authorization: Bearer {{adminToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "roomId": {{smokeRoomId}},
+  "checkIn": "2055-02-10",
+  "checkOut": "2055-02-12"
+}
+
+> {%
+client.test('Создание smoke-бронирования — HTTP 201', function() {
+  client.assert(response.status === 201, "Ожидали 201, получили " + response.status);
+});
+if (response.status === 201) client.global.set('smokeBookingId', response.body.id);
+%}
+
 ### 13.012 — Получить бронирование по ID — ожидаем HTTP 200
 # Источник: requests.http, тест №19.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-GET {{baseUrl}}/api/bookings/1
+GET {{baseUrl}}/api/bookings/{{smokeBookingId}}
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -5836,8 +5927,7 @@ client.test('Получить бронирование по ID — HTTP 200', fu
 
 ### 13.013 — Попытка получить чужое бронирование — ожидаем HTTP 403
 # Источник: requests.http, тест №20.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-GET {{baseUrl}}/api/bookings/1
+GET {{baseUrl}}/api/bookings/{{smokeBookingId}}
 Authorization: Bearer {{accessToken}}
 
 > {%
@@ -5859,8 +5949,7 @@ client.test('попытка получить бронирования без а�
 
 ### 13.015 — Отменить бронирование — ожидаем HTTP 200
 # Источник: requests.http, тест №22.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-PATCH {{baseUrl}}/api/bookings/1/cancel
+PATCH {{baseUrl}}/api/bookings/{{smokeBookingId}}/cancel
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -5907,8 +5996,7 @@ client.test('Только подтверждённые — HTTP 200', function()
 
 ### 13.019 — Резервирование номера — ожидаем HTTP 403
 # Источник: requests.http, тест №27.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-POST {{baseUrl}}/api/rooms/1/confirm-availability
+POST {{baseUrl}}/api/rooms/{{smokeRoomId}}/confirm-availability
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -5926,8 +6014,7 @@ client.test('Резервирование номера — HTTP 403', function()
 
 ### 13.020 — Освобождение резервирования — ожидаем HTTP 403
 # Источник: requests.http, тест №28.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-POST {{baseUrl}}/api/rooms/1/release
+POST {{baseUrl}}/api/rooms/{{smokeRoomId}}/release
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
@@ -5950,7 +6037,7 @@ Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001
 Content-Type: application/json
 
 {
-  "roomId": 1,
+  "roomId": {{smokeRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -5959,6 +6046,7 @@ Content-Type: application/json
 client.test('Тест 1 — новое бронирование — HTTP 201', function() {
   client.assert(response.status === 201, "Ожидали 201, получили " + response.status);
 });
+if (response.status === 201) client.global.set('smokeFirstBookingId', response.body.id);
 %}
 
 ### 13.022 — Тест 2 — повтор с тем же ключом — ожидаем HTTP 201
@@ -5970,7 +6058,7 @@ Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001
 Content-Type: application/json
 
 {
-  "roomId": 1,
+  "roomId": {{smokeRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -5990,7 +6078,7 @@ Idempotency-Key: 550e8400-e29b-41d4-a716-446655440001
 Content-Type: application/json
 
 {
-  "roomId": 1,
+  "roomId": {{smokeRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-14"
 }
@@ -6010,7 +6098,7 @@ Idempotency-Key: 550e8400-e29b-41d4-a716-446655440002
 Content-Type: application/json
 
 {
-  "roomId": 1,
+  "roomId": {{smokeRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -6030,7 +6118,7 @@ Idempotency-Key: 550e8400-e29b-41d4-a716-446655440099
 Content-Type: application/json
 
 {
-  "roomId": 1,
+  "roomId": {{smokeRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -6044,7 +6132,7 @@ client.test('Тест 4.1 — занятые даты — HTTP 409', function() 
 ### 13.026 — Первое бронирование — ожидаем HTTP 200
 # Источник: requests.http, тест №34.
 # Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-GET {{baseUrl}}/api/bookings/1
+GET {{baseUrl}}/api/bookings/{{smokeFirstBookingId}}
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -6056,7 +6144,7 @@ client.test('Первое бронирование — HTTP 200', function() {
 ### 13.027 — Второе бронирование — ожидаем HTTP 200
 # Источник: requests.http, тест №35.
 # Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
-GET {{baseUrl}}/api/bookings/2
+GET {{baseUrl}}/api/bookings/{{smokeBookingId}}
 Authorization: Bearer {{adminToken}}
 
 > {%
@@ -6065,16 +6153,32 @@ client.test('Второе бронирование — HTTP 200', function() {
 });
 %}
 
+### 13.027a — Создание второго номера для проверки независимых бронирований — ожидаем HTTP 201
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "hotelId": {{smokeHotelId}},
+  "number": "103"
+}
+
+> {%
+client.test('Второй номер для smoke-тестов — HTTP 201', function() {
+  client.assert(response.status === 201, "Ожидали 201, получили " + response.status);
+});
+if (response.status === 201) client.global.set('smokeSecondRoomId', response.body.id);
+%}
+
 ### 13.028 — Тест 1.1 — новое бронирование — ожидаем HTTP 201
 # Источник: requests.http, тест №36.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: 550e8400-e29b-41d4-a716-446655440888
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -6087,14 +6191,13 @@ client.test('Тест 1.1 — новое бронирование — HTTP 201',
 
 ### 13.029 — Тест 1.2 — повтор того же бронирования с тем же ключом — ожидаем HTTP 201
 # Источник: requests.http, тест №37.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: 550e8400-e29b-41d4-a716-446655440888
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -6107,14 +6210,13 @@ client.test('Тест 1.2 — повтор того же бронировани�
 
 ### 13.030 — Тест 2 — попытка повторно забронировать занятую комнату — ожидаем HTTP 409
 # Источник: requests.http, тест №38.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: 550e8400-e29b-41d4-a716-446655440889
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -6127,14 +6229,13 @@ client.test('Тест 2 — попытка повторно заброниров
 
 ### 13.031 — Тест 3 — повтор неудачного бронирования — ожидаем HTTP 409
 # Источник: requests.http, тест №39.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: 550e8400-e29b-41d4-a716-446655440889
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2027-01-10",
   "checkOut": "2027-01-13"
 }
@@ -6147,14 +6248,13 @@ client.test('Тест 3 — повтор неудачного бронирова
 
 ### 13.032 — Проверка Booking Service напрямую, без Gateway — ожидаем HTTP 403
 # Источник: requests.http, тест №45.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST http://localhost:8081/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: 8e52e7b8-1e67-41c6-a4d2-4c1ef9b12010
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2028-12-10",
   "checkOut": "2028-12-13"
 }
@@ -6165,36 +6265,34 @@ client.test('Проверка Booking Service напрямую, без Gateway �
 });
 %}
 
-### 13.033 — TEST 1 — Повтор запроса с тем же Idempotency-Key: ожидаем 201 и id=2 — ожидаем HTTP 201
+### 13.033 — TEST 1 — Создание брони для проверки пересечений: ожидаем 201 — ожидаем HTTP 201
 # Источник: requests.http, тест №49.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: 7e41f401-01c0-4d81-9a12-111111111111
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2029-10-15",
   "checkOut": "2029-10-18"
 }
 
 > {%
-client.test('TEST 1 — Повтор запроса с тем же Idempotency-Key: ожидаем 201 и id=2 — HTTP 201', function() {
+client.test('TEST 1 — Создание брони для проверки пересечений: ожидаем 201 — HTTP 201', function() {
   client.assert(response.status === 201, "Ожидали 201, получили " + response.status);
 });
 %}
 
 ### 13.034 — TEST 2 — Повторное бронирование тех же дат с новым ключом: ожидаем 409 — ожидаем HTTP 409
 # Источник: requests.http, тест №50.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: b1000000-0000-4000-8000-000000000002
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2029-10-15",
   "checkOut": "2029-10-18"
 }
@@ -6207,14 +6305,13 @@ client.test('TEST 2 — Повторное бронирование тех же 
 
 ### 13.035 — TEST 3 — Пересечение с началом существующей брони: ожидаем 409 — ожидаем HTTP 409
 # Источник: requests.http, тест №51.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: b1000000-0000-4000-8000-000000000003
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2029-10-14",
   "checkOut": "2029-10-16"
 }
@@ -6227,14 +6324,13 @@ client.test('TEST 3 — Пересечение с началом существ�
 
 ### 13.036 — TEST 4 — Пересечение с концом существующей брони: ожидаем 409 — ожидаем HTTP 409
 # Источник: requests.http, тест №52.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: b1000000-0000-4000-8000-000000000004
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2029-10-17",
   "checkOut": "2029-10-19"
 }
@@ -6247,14 +6343,13 @@ client.test('TEST 4 — Пересечение с концом существу�
 
 ### 13.037 — TEST 5 — Заезд в день выезда предыдущего гостя: ожидаем 201 — ожидаем HTTP 201
 # Источник: requests.http, тест №53.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: b1000000-0000-4000-8000-000000000005
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2029-10-18",
   "checkOut": "2029-10-20"
 }
@@ -6267,14 +6362,13 @@ client.test('TEST 5 — Заезд в день выезда предыдущег
 
 ### 13.038 — TEST 6 — Некорректные даты: ожидаем 400 — ожидаем HTTP 400
 # Источник: requests.http, тест №54.
-# Историческая smoke-проверка: фиксированные ID/данные в запросе могут требовать отдельного запуска на чистой H2.
 POST {{baseUrl}}/api/bookings
 Authorization: Bearer {{adminToken}}
 Idempotency-Key: b1000000-0000-4000-8000-000000000006
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2029-10-20",
   "checkOut": "2029-10-19"
 }
@@ -6294,7 +6388,7 @@ Idempotency-Key: c7400000-0000-4000-8000-000000000005
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2042-04-10",
   "checkOut": "2042-04-13"
 }
@@ -6314,7 +6408,7 @@ Idempotency-Key: e8500000-0000-4000-8000-000000000051
 Content-Type: application/json
 
 {
-  "roomId": 2,
+  "roomId": {{smokeSecondRoomId}},
   "checkIn": "2043-06-10",
   "checkOut": "2043-06-13"
 }
@@ -6343,13 +6437,18 @@ Accept: application/json
 > {%
 client.test('Информация о Hotel Service в Eureka — HTTP 200', function() {
   client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
+  const rawInstances = response.body.application && response.body.application.instance;
+  const instances = Array.isArray(rawInstances) ? rawInstances : [rawInstances];
+  const instance = instances.find(item => item && item.instanceId);
+  client.assert(!!instance, "Eureka не вернула instanceId для HOTEL-SERVICE");
+  if (instance) client.global.set("initialHotelInstanceId", instance.instanceId);
 });
 %}
 
 ### 14.002 — Исключить Hotel Service из маршрутизации Eureka — ожидаем HTTP 200
 # Источник: requests.http, тест №41.
 # ВНИМАНИЕ: проверка зависит от состояния Eureka/сервисов; выполняйте только после подготовки, описанной в сценарии.
-PUT http://localhost:8761/eureka/apps/HOTEL-SERVICE/ERV-W0013.infotecs-nt:hotel-service:8082/status?value=OUT_OF_SERVICE
+PUT http://localhost:8761/eureka/apps/HOTEL-SERVICE/{{initialHotelInstanceId}}/status?value=OUT_OF_SERVICE
 
 > {%
 client.test('Исключить Hotel Service из маршрутизации Eureka — HTTP 200', function() {
@@ -6372,7 +6471,7 @@ client.test('Проверить статус Hotel Service — HTTP 200', functi
 ### 14.004 — Вернуть Hotel Service в работу — ожидаем HTTP 200
 # Источник: requests.http, тест №43.
 # ВНИМАНИЕ: проверка зависит от состояния Eureka/сервисов; выполняйте только после подготовки, описанной в сценарии.
-DELETE http://localhost:8761/eureka/apps/HOTEL-SERVICE/ERV-W0013.infotecs-nt:hotel-service:8082/status?value=UP
+DELETE http://localhost:8761/eureka/apps/HOTEL-SERVICE/{{initialHotelInstanceId}}/status?value=UP
 
 > {%
 client.test('Вернуть Hotel Service в работу — HTTP 200', function() {
@@ -6380,6 +6479,9 @@ client.test('Вернуть Hotel Service в работу — HTTP 200', functio
 });
 %}
 
+# Перед 14.005 нужно отдельно создать отказ Hotel Service и дождаться,
+# пока Gateway перестанет маршрутизировать вызовы; после 14.004 сервис снова UP.
+# Сам по себе предыдущий запрос 14.004 НЕ создаёт условий для HTTP 503.
 ### 14.005 — Проверка отказа Hotel Service — ожидаем HTTP 503
 # Источник: requests.http, тест №44.
 # ВНИМАНИЕ: проверка зависит от состояния Eureka/сервисов; выполняйте только после подготовки, описанной в сценарии.
@@ -6662,39 +6764,12 @@ client.test('Затем проверяем новый токен: 200 — HTTP 2
 # FINAL-15 — Booking недоступен: 503
 # Остановите ТОЛЬКО Booking Service.
 # ВНИМАНИЕ: проверка зависит от состояния Eureka/сервисов; выполняйте только после подготовки, описанной в сценарии.
-GET {{baseUrl}}/api/rooms?hotelId=1
+GET {{baseUrl}}/api/bookings/my
 Authorization: Bearer {{adminToken}}
 
 > {%
 client.test('Не перезапускайте Gateway и Hotel. — HTTP 503', function() {
   client.assert(response.status === 503, "Ожидали 503, получили " + response.status);
-});
-%}
-
-### 14.027 — CRUD-01 — ADMIN создаёт отель: 201 — ожидаем HTTP 201
-# Источник: requests.http, тест №144.
-POST {{baseUrl}}/api/hotels
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{
-  "name": "CRUD Test Hotel",
-  "address": "Yerevan, Test Street 10"
-}
-
-> {%
-client.test('CRUD-01 — ADMIN создаёт отель: 201 — HTTP 201', () => client.assert(response.status === 201, "Ожидали 201, получили " + response.status));
-    client.global.set("crudHotelId", response.body.id);
-%}
-
-### 14.028 — CRUD-02 — список отелей: 200 — ожидаем HTTP 200
-# Источник: requests.http, тест №145.
-GET {{baseUrl}}/api/hotels
-Authorization: Bearer {{adminToken}}
-
-> {%
-client.test('CRUD-02 — список отелей: 200 — HTTP 200', function() {
-  client.assert(response.status === 200, "Ожидали 200, получили " + response.status);
 });
 %}
 

@@ -39,7 +39,7 @@ public class Room {
   @Column(nullable = false, length = 20)
   private String number;
 
-  // Immutable identity for automatically seeded demo rooms; null for ordinary rooms.
+  // Stable key avoids reseeding duplicate demo rooms after an administrator renames one.
   @Column(name = "demo_seed_key", length = 100, unique = true)
   private String demoSeedKey;
 

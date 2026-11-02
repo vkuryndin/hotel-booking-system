@@ -49,7 +49,7 @@ public class BookingSagaStateService {
   @Transactional
   public SagaBooking createPending(
       Long userId, BookingRequest request, Long resolvedRoomId, UUID idempotencyKey) {
-    // Synchronize with AdminUserService.deleteUser before inserting a booking.
+    // Use the same user-row lock as account deletion to prevent bookings for deleted users.
     userRepository
         .findByIdForUpdate(userId)
         .orElseThrow(

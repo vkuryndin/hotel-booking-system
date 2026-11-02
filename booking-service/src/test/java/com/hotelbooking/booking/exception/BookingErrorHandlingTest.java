@@ -35,7 +35,6 @@ class BookingErrorHandlingTest {
 
   @BeforeEach
   void setUp() {
-    // No running services, Eureka, real network or real JWT required.
     mvc =
         standaloneSetup(new ProbeController())
             .setControllerAdvice(new GlobalExceptionHandler())

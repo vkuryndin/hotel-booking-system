@@ -68,7 +68,7 @@ public class RoomService {
   @Transactional
   public RoomResponse createRoom(RoomRequest request) {
 
-    // Coordinate room creation with HotelService.deleteHotel(): both lock the hotel row.
+    // Use the hotel-row lock to prevent creating rooms during hotel deletion.
     Hotel hotel =
         hotelRepository
             .findByIdForUpdate(request.hotelId())

@@ -32,8 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @DataJpaTest(showSql = false)
 @Import(HotelPhotoService.class)
-// Отключаем автоматическую тестовую транзакцию,
-// чтобы реально проверять COMMIT и ROLLBACK.
+// A test-wide transaction would hide service commit/rollback behavior.
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class HotelPhotoServiceConcurrencyJpaTest {
 
@@ -61,7 +60,6 @@ class HotelPhotoServiceConcurrencyJpaTest {
         hotels.saveAndFlush(new Hotel("Photo Test " + UUID.randomUUID(), "Test Address")).getId();
   }
 
-  // Небольшая корректная PNG-картинка для теста.
   private MockMultipartFile photo() {
     byte[] png =
         Base64.getDecoder()
@@ -92,7 +90,6 @@ class HotelPhotoServiceConcurrencyJpaTest {
 
           assertTrue(Files.exists(savedFile.get()));
 
-          // Принудительно откатываем транзакцию БД.
           status.setRollbackOnly();
         });
 
@@ -111,7 +108,7 @@ class HotelPhotoServiceConcurrencyJpaTest {
         status -> {
           service.delete(hotelId, uploaded.id());
 
-          // До COMMIT файл ещё существует.
+          // The physical image stays available until commit.
           assertTrue(Files.exists(file));
 
           status.setRollbackOnly();
@@ -136,7 +133,6 @@ class HotelPhotoServiceConcurrencyJpaTest {
 
   @Test
   void concurrentUploadsCannotExceedTenPhotos() throws Exception {
-    // Заполняем отель девятью фотографиями.
     for (int i = 0; i < 9; i++) {
       service.upload(hotelId, photo());
     }
@@ -158,8 +154,6 @@ class HotelPhotoServiceConcurrencyJpaTest {
             service.upload(hotelId, photo());
             return true;
           } catch (IllegalArgumentException ex) {
-            // Один из запросов должен получить ошибку
-            // превышения лимита.
             return false;
           }
         };
@@ -177,7 +171,6 @@ class HotelPhotoServiceConcurrencyJpaTest {
 
       boolean secondSucceeded = second.get(20, TimeUnit.SECONDS);
 
-      // Ровно один из двух запросов принят.
       assertTrue(firstSucceeded ^ secondSucceeded);
 
     } finally {
@@ -186,7 +179,6 @@ class HotelPhotoServiceConcurrencyJpaTest {
 
     assertEquals(10L, photos.countByHotel_Id(hotelId));
 
-    // При десяти фотографиях главная ровно одна.
     long primaryCount =
         photos.findByHotel_IdOrderBySortOrderAscIdAsc(hotelId).stream()
             .filter(p -> p.isPrimaryPhoto())
