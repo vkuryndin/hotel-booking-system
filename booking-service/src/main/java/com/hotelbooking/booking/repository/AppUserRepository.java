@@ -29,7 +29,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
           + "WHERE LOWER(u.username) LIKE :pattern ESCAPE '!' "
           + "OR LOWER(u.firstName) LIKE :pattern ESCAPE '!' "
           + "OR LOWER(u.lastName) LIKE :pattern ESCAPE '!' "
-          + "OR LOWER(u.email) LIKE :pattern ESCAPE '!'")
+          + "OR LOWER(u.email) LIKE :pattern ESCAPE '!' "
+          + "OR LOWER(CONCAT(CONCAT(u.firstName, ' '), u.lastName)) LIKE :pattern ESCAPE '!'")
   Page<AppUser> findByAdminSearchPattern(@Param("pattern") String pattern, Pageable pageable);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -298,33 +298,71 @@ abstract class ExtendedE2ESupport {
           .decode(
               "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGPUylvAAANMDEgANwcAPX4BQJVh6wIAAAAASUVORK5CYII=");
 
-  /** Read the demo administrator credentials from requests.http rather than test constants. */
+  /** Find the manual HTTP fixture from either the project root or a module working directory. */
+  static Path locateRequestsHttp(Path workingDirectory) {
+    Path directory = workingDirectory.toAbsolutePath().normalize();
+    for (int i = 0; i < 5 && directory != null; i++, directory = directory.getParent()) {
+      Path manual = directory.resolve("test/manual/requests.http");
+      if (Files.isRegularFile(manual)) {
+        return manual;
+      }
+      Path legacy = directory.resolve("requests.http");
+      if (Files.isRegularFile(legacy)) {
+        return legacy;
+      }
+    }
+    throw new AssertionError(
+        "Cannot find test/manual/requests.http from " + workingDirectory.toAbsolutePath());
+  }
+
+  /** Read the ADMIN login request without depending on its section number or language. */
+  static Account parseAdminCredentials(String requests) throws IOException {
+    String[] sections = requests.split("(?m)^###\\s*");
+    java.util.regex.Pattern login =
+        java.util.regex.Pattern.compile("(?m)^POST\\s+[^\\r\\n]*/api/users/login\\s*$");
+    java.util.regex.Pattern body = java.util.regex.Pattern.compile("(?s)\\{[^{}]*\\}");
+    ObjectMapper mapper = new ObjectMapper();
+    for (String section : sections) {
+      int end = section.indexOf('\n');
+      if (end < 0 || !section.substring(0, end).toUpperCase(Locale.ROOT).contains("ADMIN")) {
+        continue;
+      }
+      java.util.regex.Matcher request = login.matcher(section);
+      if (!request.find()) {
+        continue;
+      }
+      java.util.regex.Matcher payload = body.matcher(section.substring(request.end()));
+      if (!payload.find()) {
+        continue;
+      }
+      JsonNode credentials = mapper.readTree(payload.group());
+      String email = credentials.path("email").asText();
+      String password = credentials.path("password").asText();
+      if (email.isBlank() || password.isBlank()) {
+        throw new AssertionError("ADMIN login request is missing email or password");
+      }
+      return new Account(email, password, null);
+    }
+    throw new AssertionError("Cannot find an ADMIN /api/users/login request in requests.http");
+  }
+
   Account admin() {
     Account ready = cachedAdmin;
     if (ready != null) return ready;
     synchronized (ExtendedE2ESupport.class) {
       if (cachedAdmin != null) return cachedAdmin;
       try {
-        Path requests =
-            Files.isRegularFile(Path.of("requests.http"))
-                ? Path.of("requests.http")
-                : Path.of("..", "requests.http");
-        String txt = Files.readString(requests);
-        java.util.regex.Matcher section =
-            java.util.regex.Pattern.compile(
-                    "(?s)### Login as ADMIN\\s*POST[^\\r\\n]*\\R[^\\r\\n]*\\R\\s*(\\{.*?\\})")
-                .matcher(txt);
-        if (!section.find())
-          throw new AssertionError("Admin login block not found in requests.http");
-        JsonNode creds = om.readTree(section.group(1));
-        String email = creds.path("email").asText();
-        String password = creds.path("password").asText();
-        if (email.isBlank() || password.isBlank())
-          throw new AssertionError("Empty demo admin credentials");
-        cachedAdmin = new Account(email, password, login(email, password));
+        Path requests = locateRequestsHttp(Path.of(""));
+        Account credentials = parseAdminCredentials(Files.readString(requests));
+        cachedAdmin =
+            new Account(
+                credentials.email(),
+                credentials.password(),
+                login(credentials.email(), credentials.password()));
         return cachedAdmin;
       } catch (IOException ex) {
-        throw new AssertionError("Cannot load requests.http demo admin account", ex);
+        throw new AssertionError(
+            "Cannot read ADMIN login request from test/manual/requests.http", ex);
       }
     }
   }
