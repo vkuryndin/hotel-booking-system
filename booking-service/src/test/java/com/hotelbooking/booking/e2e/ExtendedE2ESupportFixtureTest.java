@@ -39,8 +39,7 @@ class ExtendedE2ESupportFixtureTest {
         {"email": "admin@example.test", "password": "admin-password"}
         """;
 
-    ExtendedE2ESupport.Account credentials =
-        ExtendedE2ESupport.parseAdminCredentials(requests);
+    ExtendedE2ESupport.Account credentials = ExtendedE2ESupport.parseAdminCredentials(requests);
     assertEquals("admin@example.test", credentials.email());
     assertEquals("admin-password", credentials.password());
     assertNull(credentials.token());

@@ -6,7 +6,6 @@ import com.hotelbooking.booking.dto.response.AdminUserResponse;
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.entity.Role;
 import com.hotelbooking.booking.exception.UserOperationException;
-import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
 import com.hotelbooking.booking.repository.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -83,26 +82,13 @@ public class AdminUserUpdateService {
         || request.firstName() != null
         || request.lastName() != null) {
 
-      String username =
-          request.username() == null
-              ? user.getUsername()
-              : request.username().toLowerCase(Locale.ROOT);
-
-      if (!username.equals(user.getUsername()) && userRepository.existsByUsername(username)) {
-        throw new UsernameAlreadyRegisteredException();
-      }
-
-      String phone =
-          request.phone() == null
-              ? user.getPhone()
-              : (request.phone().isEmpty() ? null : request.phone());
-
-      String firstName =
-          request.firstName() == null ? user.getFirstName() : request.firstName().trim();
-
-      String lastName = request.lastName() == null ? user.getLastName() : request.lastName().trim();
-
-      user.changeProfile(username, phone, firstName, lastName);
+      ProfileFields.apply(
+          user,
+          userRepository,
+          request.username(),
+          request.phone(),
+          request.firstName(),
+          request.lastName());
     }
 
     try {

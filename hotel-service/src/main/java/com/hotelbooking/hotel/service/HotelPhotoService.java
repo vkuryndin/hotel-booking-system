@@ -7,16 +7,11 @@ import com.hotelbooking.hotel.exception.HotelNotFoundException;
 import com.hotelbooking.hotel.exception.PhotoNotFoundException;
 import com.hotelbooking.hotel.repository.HotelPhotoRepository;
 import com.hotelbooking.hotel.repository.HotelRepository;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -66,49 +61,14 @@ public class HotelPhotoService {
       throw new IllegalArgumentException("Maximum 10 photos per hotel");
     }
 
-    String contentType;
-
-    try (InputStream input = file.getInputStream()) {
-      contentType = PhotoFileOperations.detectType(input.readNBytes(12));
-    } catch (IOException ex) {
-      throw new IllegalStateException("Cannot read photo", ex);
-    }
-
-    if (contentType == null) {
-      throw new IllegalArgumentException("Only valid JPEG, PNG, WebP photos are allowed");
-    }
-
-    // A valid signature does not rule out truncated image data; decode before storing.
-    PhotoFileOperations.validateDecodedImage(file, contentType);
-
-    String extension =
-        switch (contentType) {
-          case "image/jpeg" -> ".jpg";
-          case "image/png" -> ".png";
-          default -> ".webp";
-        };
-
-    String fileName = UUID.randomUUID() + extension;
-
-    Path directory = hotelDirectory(hotelId);
-    Path destination = directory.resolve(fileName);
-
-    // Register cleanup before copying so rollback also removes a partially written file.
-    PhotoFileOperations.registerRollbackCleanup(destination, log);
-
-    try {
-      Files.createDirectories(directory);
-
-      try (InputStream input = file.getInputStream()) {
-        Files.copy(input, destination);
-      }
-    } catch (IOException ex) {
-      throw new IllegalStateException("Cannot store photo", ex);
-    }
+    PhotoFileOperations.StoredPhoto stored =
+        PhotoFileOperations.store(file, hotelDirectory(hotelId), log);
 
     int sortOrder = existing.stream().mapToInt(HotelPhoto::getSortOrder).max().orElse(-1) + 1;
 
-    HotelPhoto photo = new HotelPhoto(hotel, fileName, contentType, existing.isEmpty(), sortOrder);
+    HotelPhoto photo =
+        new HotelPhoto(
+            hotel, stored.fileName(), stored.contentType(), existing.isEmpty(), sortOrder);
 
     HotelPhoto saved = photoRepository.saveAndFlush(photo);
 
@@ -119,22 +79,7 @@ public class HotelPhotoService {
   public Resource getFile(Long hotelId, Long photoId) {
     HotelPhoto photo = findPhoto(hotelId, photoId);
 
-    Path directory = hotelDirectory(hotelId);
-
-    Path file = directory.resolve(photo.getFileName()).normalize();
-
-    if (!file.startsWith(directory)) {
-      throw new IllegalArgumentException("Invalid photo path");
-    }
-
-    // Read the file now; a streaming resource could race with post-commit deletion.
-    try {
-      return new ByteArrayResource(Files.readAllBytes(file));
-    } catch (java.nio.file.NoSuchFileException ex) {
-      throw new PhotoNotFoundException("Photo file not found");
-    } catch (IOException ex) {
-      throw new IllegalStateException("Cannot read photo file", ex);
-    }
+    return PhotoFileOperations.readPhoto(hotelDirectory(hotelId), photo.getFileName());
   }
 
   @Transactional(readOnly = true)
@@ -180,12 +125,8 @@ public class HotelPhotoService {
 
     final boolean wasPrimary = photo.isPrimaryPhoto();
 
-    Path directory = hotelDirectory(hotelId);
-    Path file = directory.resolve(photo.getFileName()).normalize();
-
-    if (!file.startsWith(directory)) {
-      throw new IllegalArgumentException("Invalid photo path");
-    }
+    Path file =
+        PhotoFileOperations.resolveStoredPhoto(hotelDirectory(hotelId), photo.getFileName());
 
     photoRepository.delete(photo);
     photoRepository.flush();

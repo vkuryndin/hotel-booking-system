@@ -4,8 +4,6 @@ import com.hotelbooking.booking.dto.request.UpdateMyProfileRequest;
 import com.hotelbooking.booking.dto.response.UserResponse;
 import com.hotelbooking.booking.service.UserProfileService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,24 +36,8 @@ public class UserProfileController {
         responseCode = "200",
         description = "Данные текущего пользователя.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403")
   })
   @GetMapping
   @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
@@ -73,42 +55,10 @@ public class UserProfileController {
         responseCode = "200",
         description = "Обновлённые данные профиля.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "409",
-        description = "Конфликт состояния, данных или уникальности; операция не выполнена.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "409")
   })
   @PatchMapping
   @PreAuthorize("hasAnyRole('USER', 'ADMIN')")

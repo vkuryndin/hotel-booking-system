@@ -6,8 +6,6 @@ import com.hotelbooking.booking.entity.BookingStatus;
 import com.hotelbooking.booking.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,62 +58,16 @@ public class BookingController {
         responseCode = "201",
         description = "Бронирование создано; статус CONFIRMED, адрес в Location.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Запрошенный пользователь, бронирование, отель или номер не найден.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "404"),
     @ApiResponse(
         responseCode = "409",
         description =
             "Номер уже занят (ROOM_ALREADY_BOOKED), нет свободных "
-                + "номеров, конфликт Idempotency-Key или параллельный запрос.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "503",
-        description = "Hotel Service недоступен или операция Saga временно не может завершиться.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+                + "номеров, конфликт Idempotency-Key или параллельный запрос."),
+    @ApiResponse(responseCode = "503")
   })
   @PostMapping
   public ResponseEntity<BookingResponse> createBooking(
@@ -143,33 +95,9 @@ public class BookingController {
         responseCode = "200",
         description = "Страница собственных бронирований.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403")
   })
   @GetMapping("/my")
   public Page<BookingResponse> getMyBookings(
@@ -192,42 +120,10 @@ public class BookingController {
         responseCode = "200",
         description = "Данные бронирования.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Запрошенный пользователь, бронирование, отель или номер не найден.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "404")
   })
   @GetMapping("/{id}")
   public BookingResponse getBookingById(
@@ -251,60 +147,12 @@ public class BookingController {
         responseCode = "200",
         description = "Бронирование отменено.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Запрошенный пользователь, бронирование, отель или номер не найден.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "409",
-        description = "Конфликт состояния, данных или уникальности; операция не выполнена.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "503",
-        description = "Hotel Service недоступен или операция Saga временно не может завершиться.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "404"),
+    @ApiResponse(responseCode = "409"),
+    @ApiResponse(responseCode = "503")
   })
   @PatchMapping("/{id}/cancel")
   public BookingResponse cancelBooking(
@@ -327,33 +175,9 @@ public class BookingController {
         responseCode = "200",
         description = "Страница бронирований.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403")
   })
   @GetMapping
   @PreAuthorize("hasRole('ADMIN')")

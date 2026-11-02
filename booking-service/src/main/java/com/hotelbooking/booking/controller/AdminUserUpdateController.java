@@ -7,8 +7,6 @@ import com.hotelbooking.booking.dto.response.ResetAdminPasswordResponse;
 import com.hotelbooking.booking.service.AdminUserUpdateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,60 +47,14 @@ public class AdminUserUpdateController {
         responseCode = "200",
         description = "Обновлённые данные пользователя.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Запрошенный пользователь, бронирование, отель или номер не найден.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "404"),
     @ApiResponse(
         responseCode = "409",
-        description = "Конфликт учётной записи или запрет изменения последнего администратора.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "429",
-        description = "Превышен лимит запросов; повторите после Retry-After.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+        description = "Конфликт учётной записи или запрет изменения последнего администратора."),
+    @ApiResponse(responseCode = "429")
   })
   @PatchMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
@@ -125,51 +77,11 @@ public class AdminUserUpdateController {
         responseCode = "200",
         description = "Пароль пользователя изменён.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Запрошенный пользователь, бронирование, отель или номер не найден.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "429",
-        description = "Превышен лимит запросов; повторите после Retry-After.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "404"),
+    @ApiResponse(responseCode = "429")
   })
   @PostMapping("/{id}/reset-password")
   @PreAuthorize("hasRole('ADMIN')")

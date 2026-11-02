@@ -5,8 +5,6 @@ import com.hotelbooking.booking.dto.response.AdminUserResponse;
 import com.hotelbooking.booking.service.AdminUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -47,43 +45,13 @@ public class AdminUserController {
         responseCode = "201",
         description = "Пользователь создан; заголовок Location содержит его адрес.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
     @ApiResponse(
         responseCode = "409",
         description =
-            "Конфликт уникального email/username или ограничение на удаление администратора.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+            "Конфликт уникального email/username или ограничение на удаление администратора.")
   })
   @PostMapping
   @PreAuthorize("hasRole('ADMIN')")
@@ -104,52 +72,14 @@ public class AdminUserController {
         responseCode = "200",
         description = "Учётная запись удалена.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Запрошенный пользователь, бронирование, отель или номер не найден.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "404"),
     @ApiResponse(
         responseCode = "409",
         description =
-            "Конфликт уникального email/username или ограничение на удаление администратора.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+            "Конфликт уникального email/username или ограничение на удаление администратора.")
   })
   @DeleteMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")

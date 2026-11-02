@@ -7,16 +7,11 @@ import com.hotelbooking.hotel.exception.PhotoNotFoundException;
 import com.hotelbooking.hotel.exception.RoomNotFoundException;
 import com.hotelbooking.hotel.repository.RoomPhotoRepository;
 import com.hotelbooking.hotel.repository.RoomRepository;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -55,9 +50,7 @@ public class RoomPhotoService {
     // Lock the owner row to serialize changes to its photo list.
     final Room room = lockRoom(roomId);
 
-    if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024) {
-      throw new IllegalArgumentException("Photo must be 1 byte to 5 MB");
-    }
+    PhotoFileOperations.validateSize(file);
 
     // Check the photo limit while holding the lock.
     List<RoomPhoto> existing = photoRepository.findByRoom_IdOrderBySortOrderAscIdAsc(roomId);
@@ -66,49 +59,13 @@ public class RoomPhotoService {
       throw new IllegalArgumentException("Maximum 10 photos per room");
     }
 
-    String contentType;
-
-    try (InputStream input = file.getInputStream()) {
-      contentType = PhotoFileOperations.detectType(input.readNBytes(12));
-    } catch (IOException ex) {
-      throw new IllegalStateException("Cannot read photo", ex);
-    }
-
-    if (contentType == null) {
-      throw new IllegalArgumentException("Only valid JPEG, PNG, WebP photos are allowed");
-    }
-
-    // A valid signature does not rule out truncated image data; decode before storing.
-    PhotoFileOperations.validateDecodedImage(file, contentType);
-
-    String extension =
-        switch (contentType) {
-          case "image/jpeg" -> ".jpg";
-          case "image/png" -> ".png";
-          default -> ".webp";
-        };
-
-    String fileName = UUID.randomUUID() + extension;
-
-    Path directory = roomDirectory(roomId);
-    Path destination = directory.resolve(fileName);
-
-    // Register cleanup before copying so rollback also removes a partially written file.
-    PhotoFileOperations.registerRollbackCleanup(destination, log);
-
-    try {
-      Files.createDirectories(directory);
-
-      try (InputStream input = file.getInputStream()) {
-        Files.copy(input, destination);
-      }
-    } catch (IOException ex) {
-      throw new IllegalStateException("Cannot store photo", ex);
-    }
+    PhotoFileOperations.StoredPhoto stored =
+        PhotoFileOperations.store(file, roomDirectory(roomId), log);
 
     int sortOrder = existing.stream().mapToInt(RoomPhoto::getSortOrder).max().orElse(-1) + 1;
 
-    RoomPhoto photo = new RoomPhoto(room, fileName, contentType, existing.isEmpty(), sortOrder);
+    RoomPhoto photo =
+        new RoomPhoto(room, stored.fileName(), stored.contentType(), existing.isEmpty(), sortOrder);
 
     RoomPhoto saved = photoRepository.saveAndFlush(photo);
 
@@ -119,22 +76,7 @@ public class RoomPhotoService {
   public Resource getFile(Long roomId, Long photoId) {
     RoomPhoto photo = findPhoto(roomId, photoId);
 
-    Path directory = roomDirectory(roomId);
-
-    Path file = directory.resolve(photo.getFileName()).normalize();
-
-    if (!file.startsWith(directory)) {
-      throw new IllegalArgumentException("Invalid photo path");
-    }
-
-    // Read the file now; a streaming resource could race with post-commit deletion.
-    try {
-      return new ByteArrayResource(Files.readAllBytes(file));
-    } catch (java.nio.file.NoSuchFileException ex) {
-      throw new PhotoNotFoundException("Photo file not found");
-    } catch (IOException ex) {
-      throw new IllegalStateException("Cannot read photo file", ex);
-    }
+    return PhotoFileOperations.readPhoto(roomDirectory(roomId), photo.getFileName());
   }
 
   @Transactional(readOnly = true)
@@ -180,12 +122,7 @@ public class RoomPhotoService {
 
     final boolean wasPrimary = photo.isPrimaryPhoto();
 
-    Path directory = roomDirectory(roomId);
-    Path file = directory.resolve(photo.getFileName()).normalize();
-
-    if (!file.startsWith(directory)) {
-      throw new IllegalArgumentException("Invalid photo path");
-    }
+    Path file = PhotoFileOperations.resolveStoredPhoto(roomDirectory(roomId), photo.getFileName());
 
     photoRepository.delete(photo);
     photoRepository.flush();

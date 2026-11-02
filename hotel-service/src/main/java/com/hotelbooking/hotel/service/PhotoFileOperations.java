@@ -1,5 +1,6 @@
 package com.hotelbooking.hotel.service;
 
+import com.hotelbooking.hotel.exception.PhotoNotFoundException;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,10 +11,13 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
+import java.util.UUID;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import org.slf4j.Logger;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +25,70 @@ import org.springframework.web.multipart.MultipartFile;
 /** Image validation and filesystem operations coordinated with database transactions. */
 final class PhotoFileOperations {
   private PhotoFileOperations() {}
+
+  record StoredPhoto(String fileName, String contentType) {}
+
+  static void validateSize(MultipartFile file) {
+    if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024) {
+      throw new IllegalArgumentException("Photo must be 1 byte to 5 MB");
+    }
+  }
+
+  /** Validates and copies a photo, with rollback cleanup registered before writing. */
+  static StoredPhoto store(MultipartFile file, Path directory, Logger log) {
+    validateSize(file);
+
+    String contentType;
+    try (InputStream input = file.getInputStream()) {
+      contentType = detectType(input.readNBytes(12));
+    } catch (IOException ex) {
+      throw new IllegalStateException("Cannot read photo", ex);
+    }
+    if (contentType == null) {
+      throw new IllegalArgumentException("Only valid JPEG, PNG, WebP photos are allowed");
+    }
+
+    // Signatures alone cannot rule out truncated or oversized decoded images.
+    validateDecodedImage(file, contentType);
+    String extension =
+        switch (contentType) {
+          case "image/jpeg" -> ".jpg";
+          case "image/png" -> ".png";
+          default -> ".webp";
+        };
+    String fileName = UUID.randomUUID() + extension;
+    Path destination = directory.resolve(fileName);
+    registerRollbackCleanup(destination, log);
+    try {
+      Files.createDirectories(directory);
+      try (InputStream input = file.getInputStream()) {
+        Files.copy(input, destination);
+      }
+    } catch (IOException ex) {
+      throw new IllegalStateException("Cannot store photo", ex);
+    }
+    return new StoredPhoto(fileName, contentType);
+  }
+
+  static Path resolveStoredPhoto(Path directory, String fileName) {
+    Path file = directory.resolve(fileName).normalize();
+    if (!file.startsWith(directory)) {
+      throw new IllegalArgumentException("Invalid photo path");
+    }
+    return file;
+  }
+
+  // Read eagerly: streaming could race with a post-commit file deletion.
+  static Resource readPhoto(Path directory, String fileName) {
+    Path file = resolveStoredPhoto(directory, fileName);
+    try {
+      return new ByteArrayResource(Files.readAllBytes(file));
+    } catch (java.nio.file.NoSuchFileException ex) {
+      throw new PhotoNotFoundException("Photo file not found");
+    } catch (IOException ex) {
+      throw new IllegalStateException("Cannot read photo file", ex);
+    }
+  }
 
   static void registerDirectoryDeletionAfterCommit(Path directory, Logger log) {
     TransactionSynchronizationManager.registerSynchronization(

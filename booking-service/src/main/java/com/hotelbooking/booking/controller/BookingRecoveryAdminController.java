@@ -4,8 +4,6 @@ import com.hotelbooking.booking.dto.response.ExhaustedRecoveryResponse;
 import com.hotelbooking.booking.service.ManualBookingRecoveryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,24 +40,8 @@ public class BookingRecoveryAdminController {
         responseCode = "200",
         description = "Список проблемных восстановлений.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403")
   })
   @GetMapping("/recovery/exhausted")
   public List<ExhaustedRecoveryResponse> exhausted() {
@@ -77,51 +59,11 @@ public class BookingRecoveryAdminController {
         responseCode = "202",
         description = "Повторная обработка запланирована.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "401",
-        description = "Отсутствует, истёк или недействителен JWT.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "403",
-        description = "Недостаточно прав или запрещён доступ к чужим данным.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "404",
-        description = "Запрошенный пользователь, бронирование, отель или номер не найден.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "409",
-        description = "Конфликт состояния, данных или уникальности; операция не выполнена.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+    @ApiResponse(responseCode = "400"),
+    @ApiResponse(responseCode = "401"),
+    @ApiResponse(responseCode = "403"),
+    @ApiResponse(responseCode = "404"),
+    @ApiResponse(responseCode = "409")
   })
   @PostMapping("/{id}/recovery/retry")
   public ResponseEntity<ExhaustedRecoveryResponse> retry(

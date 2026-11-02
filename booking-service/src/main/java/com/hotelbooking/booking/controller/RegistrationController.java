@@ -4,8 +4,6 @@ import com.hotelbooking.booking.dto.request.RegisterRequest;
 import com.hotelbooking.booking.dto.response.UserResponse;
 import com.hotelbooking.booking.service.RegistrationService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -40,33 +38,11 @@ public class RegistrationController {
         responseCode = "201",
         description = "Учётная запись создана.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+    @ApiResponse(responseCode = "400"),
     @ApiResponse(
         responseCode = "409",
-        description = "Email или имя пользователя уже зарегистрированы.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "429",
-        description = "Превышен лимит запросов; повторите после Retry-After.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+        description = "Email или имя пользователя уже зарегистрированы."),
+    @ApiResponse(responseCode = "429")
   })
   @PostMapping("/register")
   public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {

@@ -4,8 +4,6 @@ import com.hotelbooking.booking.dto.request.LoginRequest;
 import com.hotelbooking.booking.dto.response.LoginResponse;
 import com.hotelbooking.booking.service.LoginService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -39,33 +37,11 @@ public class LoginController {
         responseCode = "200",
         description = "JWT и данные входа.",
         useReturnTypeSchema = true),
-    @ApiResponse(
-        responseCode = "400",
-        description = "Некорректные данные, параметры или формат запроса.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
+    @ApiResponse(responseCode = "400"),
     @ApiResponse(
         responseCode = "401",
-        description = "Неверный email или пароль (INVALID_CREDENTIALS).",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class))),
-    @ApiResponse(
-        responseCode = "429",
-        description = "Превышен лимит запросов; повторите после Retry-After.",
-        content =
-            @Content(
-                schema =
-                    @Schema(
-                        implementation =
-                            com.hotelbooking.booking.dto.response.ErrorResponse.class)))
+        description = "Неверный email или пароль (INVALID_CREDENTIALS)."),
+    @ApiResponse(responseCode = "429")
   })
   @PostMapping("/login")
   public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
