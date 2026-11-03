@@ -1,13 +1,15 @@
 package com.hotelbooking.hotel.config;
 
-import com.hotelbooking.hotel.dto.response.ErrorResponse;
-import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.IntegerSchema;
+import io.swagger.v3.oas.models.media.MapSchema;
 import io.swagger.v3.oas.models.media.MediaType;
+import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
@@ -33,15 +35,13 @@ public class OpenApiConfig {
                 .description(
                     "Все вызовы выполняются через API Gateway (порт 8080). Для "
                         + "защищённых операций нажмите Authorize и введите JWT. "
-                        + "Административные методы требуют роли ADMIN; регистрация и вход "
-                        + "доступны без JWT. Внутренние вызовы Saga между сервисами "
+                        + "Административные методы требуют роли ADMIN. "
+                        + "Внутренние вызовы Saga между сервисами "
                         + "скрыты из публичной спецификации. Коды ошибок и ограничения "
                         + "перечислены для каждой операции."))
         .components(
             new Components()
-                .addSchemas(
-                    "ErrorResponse",
-                    ModelConverters.getInstance().readAll(ErrorResponse.class).get("ErrorResponse"))
+                .addSchemas("ErrorResponse", errorResponseSchema())
                 .addSecuritySchemes(
                     "bearerAuth",
                     new SecurityScheme()
@@ -64,6 +64,11 @@ public class OpenApiConfig {
             Map.entry("409", "Конфликт ресурса."));
 
     return openApi -> {
+      // Схема должна присутствовать в итоговой спецификации, а не только в OpenAPI bean.
+      if (openApi.getComponents() == null) {
+        openApi.setComponents(new Components());
+      }
+      openApi.getComponents().addSchemas("ErrorResponse", errorResponseSchema());
       if (openApi.getPaths() == null) {
         return;
       }
@@ -92,17 +97,33 @@ public class OpenApiConfig {
                                               || response.getDescription().isBlank())) {
                                         response.setDescription(description);
                                       }
+                                      Schema<?> errorRef =
+                                          new Schema<>().$ref("#/components/schemas/ErrorResponse");
                                       response.setContent(
                                           new Content()
                                               .addMediaType(
                                                   "application/json",
-                                                  new MediaType()
-                                                      .schema(
-                                                          new Schema<>()
-                                                              .$ref(
-                                                                  "#/components/schemas/ErrorResponse"))));
+                                                  new MediaType().schema(errorRef)));
                                     });
                           }));
     };
+  }
+
+  private static Schema<?> errorResponseSchema() {
+    ObjectSchema schema = new ObjectSchema();
+    schema.addProperty(
+        "timestamp", new StringSchema().format("date-time").description("Время ошибки в UTC."));
+    schema.addProperty(
+        "status", new IntegerSchema().format("int32").description("HTTP-код ответа."));
+    schema.addProperty("code", new StringSchema().description("Машинно-читаемый код ошибки."));
+    schema.addProperty("message", new StringSchema().description("Описание ошибки."));
+    schema.addProperty("path", new StringSchema().description("Путь вызванного API."));
+    schema.addProperty("traceId", new StringSchema().description("Идентификатор трассировки."));
+    schema.addProperty(
+        "fieldErrors",
+        new MapSchema()
+            .additionalProperties(new StringSchema())
+            .description("Ошибки валидации по именам полей, если они есть."));
+    return schema;
   }
 }

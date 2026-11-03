@@ -2,6 +2,7 @@ package com.hotelbooking.booking.controller;
 
 import com.hotelbooking.booking.dto.request.ChangePasswordRequest;
 import com.hotelbooking.booking.service.UserPasswordService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -19,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Профиль и пароль", description = "Управление собственным паролем и проверка JWT.")
+@Tag(name = "Профиль и пароль", description = "Управление собственным паролем.")
 @RestController
 @RequestMapping("/api/users")
 public class UserPasswordController {
@@ -63,6 +64,7 @@ public class UserPasswordController {
             "path", "/api/users/me/change-password"));
   }
 
+  @Hidden
   @Operation(
       summary = "Проверить актуальность JWT",
       description =
