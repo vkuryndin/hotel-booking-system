@@ -52,3 +52,7 @@ bin/
 
 /storage/
 **/storage/
+
+# EC2 deployment secrets (never commit)
+/.env
+/.secrets/

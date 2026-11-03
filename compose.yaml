@@ -1,0 +1,143 @@
+name: hotel-booking
+
+services:
+  discovery-server:
+    build:
+      context: .
+      dockerfile: discovery-server/Dockerfile
+    image: hotel-booking-discovery:local
+    restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m
+    expose:
+      - "8761"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "echo > /dev/tcp/127.0.0.1/8761"]
+      interval: 10s
+      timeout: 3s
+      retries: 18
+      start_period: 60s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    image: hotel-booking-gateway:local
+    restart: unless-stopped
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    command:
+      - --eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka/
+    environment:
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET:?Specify GATEWAY_INTERNAL_SECRET in .env}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m
+    expose:
+      - "8080"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "echo > /dev/tcp/127.0.0.1/8080"]
+      interval: 15s
+      timeout: 3s
+      retries: 12
+      start_period: 75s
+
+  hotel-service:
+    build:
+      context: .
+      dockerfile: hotel-service/Dockerfile
+    image: hotel-booking-hotel:local
+    restart: unless-stopped
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    command:
+      - --eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka/
+    environment:
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET:?Specify GATEWAY_INTERNAL_SECRET in .env}
+      APP_DEMO_ENABLED: ${APP_DEMO_ENABLED:-true}
+      HOTEL_PHOTOS_DIR: /app/storage/hotels
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
+    volumes:
+      - hotel-photos:/app/storage/hotels
+      - room-photos:/app/storage/rooms
+    expose:
+      - "8082"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "echo > /dev/tcp/127.0.0.1/8082"]
+      interval: 15s
+      timeout: 3s
+      retries: 12
+      start_period: 75s
+
+  booking-service:
+    build:
+      context: .
+      dockerfile: booking-service/Dockerfile
+    image: hotel-booking-booking:local
+    restart: unless-stopped
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    command:
+      - --eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka/
+    environment:
+      GATEWAY_INTERNAL_SECRET: ${GATEWAY_INTERNAL_SECRET:?Specify GATEWAY_INTERNAL_SECRET in .env}
+      JWT_KEYSTORE_PATH: /run/booking-secrets/jwt-signing.p12
+      JWT_KEYSTORE_PASSWORD: ${JWT_KEYSTORE_PASSWORD:?Required in .env}
+      SERVICE_JWT_KEYSTORE_PATH: /run/booking-secrets/service-jwt-signing.p12
+      SERVICE_JWT_KEYSTORE_PASSWORD: ${SERVICE_JWT_KEYSTORE_PASSWORD:?Required in .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Required in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Required in .env}
+      DEMO_USER_1_PASSWORD: ${DEMO_USER_1_PASSWORD:?Required in .env}
+      DEMO_USER_2_PASSWORD: ${DEMO_USER_2_PASSWORD:?Required in .env}
+      APP_DEMO_ENABLED: ${APP_DEMO_ENABLED:-true}
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx768m
+    volumes:
+      - type: bind
+        source: ./.secrets
+        target: /run/booking-secrets
+        read_only: true
+    expose:
+      - "8081"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "echo > /dev/tcp/127.0.0.1/8081"]
+      interval: 15s
+      timeout: 3s
+      retries: 12
+      start_period: 75s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: hotel-booking-frontend:local
+    restart: unless-stopped
+    depends_on:
+      api-gateway:
+        condition: service_started
+    ports:
+      - "8080:80"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  hotel-photos:
+  room-photos:
