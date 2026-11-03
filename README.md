@@ -35,7 +35,7 @@
 | Безопасность | Spring Security Resource Server, JWT, `@PreAuthorize` |
 | Надёжность | Spring Framework Retry (`@Retryable`), Resilience4j Circuit Breaker |
 | Логирование и трассировка | SLF4J, Logback, Logstash JSON Encoder, `traceId` |
-| Проверка | JUnit, Spring Test, MockMvc и E2E |
+| Тестирование и покрытие кода | JUnit, Spring Test, MockMvc, E2E, JaCoCo |
 | Статический анализ и форматирование | Checkstyle, SpotBugs, Spotless |
 
 ## Архитектура

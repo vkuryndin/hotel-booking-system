@@ -22,7 +22,9 @@
 .\gradlew.bat clean test
 ```
 
-На macOS/Linux: `./gradlew clean test`. Результаты: `<module>/build/reports/tests/test/index.html` и JaCoCo в `<module>/build/reports/jacoco/test/html/index.html` после генерации соответствующего отчёта.
+На macOS/Linux: `./gradlew clean test`. Результаты JUnit доступны по пути `<module>/build/reports/tests/test/index.html`.
+
+**Покрытие кода (JaCoCo).** Для оценки покрытия Java-кода модульными и интеграционными тестами используется JaCoCo. Во всех четырёх backend-модулях задача `test` запускает генерацию отчёта `jacocoTestReport`. HTML-отчёт каждого модуля находится в `<module>/build/reports/jacoco/test/html/index.html`, XML-отчёт — в `<module>/build/reports/jacoco/test/jacocoTestReport.xml`. При стандартном запуске `clean test` E2E-сценарии пропускаются и не участвуют в таком отчёте.
 
 Набор проверяет создание и отмену бронирования, валидацию дат, права USER/ADMIN, обработку ошибок, ограничение частоты запросов, правила выбора номера, JPA-ограничения, блокировки, сценарии компенсации и восстановления, а также маршруты и OpenAPI. Проверки формата Java-кода выполняются отдельно:
 
