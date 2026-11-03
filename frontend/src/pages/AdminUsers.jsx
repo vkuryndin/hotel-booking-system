@@ -281,6 +281,7 @@ export function AdminUsers() {
     <PageTitle eyebrow="ПОЛЬЗОВАТЕЛИ" title="Управление пользователями"
       subtitle="Просмотр, создание, изменение ролей и сброс паролей пользователей Booking Service."
       action={<Button onClick={() => {setError('');setSuccess('');setDialog({mode:'create',user:null})}}><Plus size={17}/> Добавить пользователя</Button>}/>
+    <div className="admin-users-toolbar-container">
     <div className="admin-users-toolbar">
       <form onSubmit={findById} className="admin-users-id-search admin-users-search-form">
         <label htmlFor="admin-user-id-search">Поиск по ID</label>
@@ -297,6 +298,7 @@ export function AdminUsers() {
         </div>
       </form>
       <Button className="admin-users-refresh" variant="outline" onClick={() => setRevision(current => current + 1)}><RefreshCcw size={16}/> Обновить</Button>
+    </div>
     </div>
     <Alert error={error} success={success} onClose={() => {setError('');setSuccess('')}}/>
     {!waiting && <p className="admin-users-count">{isSearching ? 'Найдено пользователей' : 'Всего пользователей'}: <b>{displayTotal}</b></p>}

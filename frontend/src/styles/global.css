@@ -633,9 +633,6 @@
 
 /* v12.3 — ADMIN user management. Existing Hotel / Room wizard styles are reused. */
 
-.admin-users-id-search { display:flex; flex-wrap:wrap; align-items:end; gap:9px; }
-.admin-users-id-search label { width:150px; font-size:13px; font-weight:750; color:#5d708a; }
-.admin-users-id-search input { display:block; width:100%; height:43px; margin-top:6px; border:1px solid #dce5f1; border-radius:9px; padding:10px; background:white; color:#172c4b; }
 .admin-users-count { margin:9px 0 15px; color:#7689a4; font-size:14px; }
 .admin-users-count b { color:#183452; }
 .admin-users-table { min-width:910px; }
@@ -683,9 +680,6 @@
   .admin-users-dialog-body { padding:10px 17px 18px; }
   .admin-users-steps { gap:12px; font-size:12px; padding-inline:10px; }
   .admin-users-form-grid,.admin-users-review dl { grid-template-columns:1fr; gap:12px; }
-  .admin-users-id-search { width:100%; }
-  .admin-users-id-search label { flex:1; min-width:135px; }
-  .admin-users-id-search .btn { align-self:end; }
   .admin-users-dialog-footer { align-items:stretch; }
 }
 
@@ -737,12 +731,6 @@
 .page-jump label { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 13px; }
 .page-jump input { width: 68px; height: 37px; border: 1px solid #d9e3f1; border-radius: 9px; padding: 6px; font: inherit; }
 .page-jump > button { height: 37px; border: 1px solid #2563eb; border-radius: 9px; background: #fff; color: #2563eb; font: inherit; font-weight: 600; padding: 0 12px; cursor: pointer; }
-.admin-users-name-search { display: flex; flex-direction: column; gap: 6px; min-width: min(100%, 350px); flex: 1 1 350px; }
-.admin-users-name-search > label { font-size: 13px; font-weight: 600; }
-.admin-users-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.admin-users-name-row > input { min-width: 160px; flex: 1 1 170px; height: 40px; }
-
-.admin-users-name-row .btn { white-space: nowrap; }
 .forced-password-page { min-height: 60vh; padding-top: 52px; padding-bottom: 60px; display: flex; align-items: flex-start; justify-content: center; }
 .forced-password-card { width: min(100%, 640px); padding: 32px; }
 .forced-password-card .profile-password-heading { margin-bottom: 22px; }
@@ -752,35 +740,95 @@
 @media (max-width: 620px) {
   .forced-password-card { padding: 20px; }
   .page-jump { margin: 8px 0 0; }
-  .admin-users-name-search { flex-basis: 100%; }
 }
 
 
-/* v12.7 — responsive admin user searches and explicit forced-password account identity. */
-.admin-users-toolbar {display:flex; align-items:end; justify-content:space-between; flex-wrap:wrap; gap:14px; margin-bottom:15px; flex-wrap: wrap; align-items: flex-end; gap: 15px; display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1.4fr) auto;
-  align-items:end; column-gap:14px; row-gap:12px; width:100%; min-width:0;}
+/* v12.9.2 — stable, one-row ADMIN user search toolbar at desktop widths.
+   Container queries depend on available content width (including sidebar), not viewport width. */
+.admin-users-toolbar-container { container: admin-user-search / inline-size; width:100%; min-width:0; }
+.admin-users-toolbar {
+  display:grid;
+  grid-template-columns: minmax(0,295px) minmax(0,1fr) auto;
+  align-items:end;
+  column-gap:12px;
+  row-gap:12px;
+  margin-bottom:15px;
+  width:100%;
+  min-width:0;
+}
 .admin-users-toolbar .admin-users-search-form {
-  display:flex; flex-direction:column; align-items:stretch;
-  gap:8px; min-width:0; width:100%; max-width:100%; margin:0;
-  flex:none;
+  display:grid;
+  grid-template-rows: auto 43px;
+  align-items:end;
+  gap:8px;
+  margin:0;
+  padding:0;
+  width:100%;
+  min-width:0;
 }
-.admin-users-search-form > label {
-  display:block; width:auto; max-width:100%; margin:0;
-  font-size:13px; font-weight:750; color:#526783;
+.admin-users-toolbar .admin-users-search-form > label {
+  display:block;
+  margin:0;
+  width:auto;
+  min-width:0;
+  font-size:13px;
+  font-weight:750;
+  line-height:18px;
+  color:#526783;
 }
-.admin-users-search-controls {
-  display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; min-width:0;
+.admin-users-toolbar .admin-users-search-controls {
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  height:43px;
+  min-width:0;
 }
-.admin-users-search-controls > input,
-.admin-users-id-search .admin-users-search-controls > input,
-.admin-users-name-search .admin-users-search-controls > input {
-  display:block; box-sizing:border-box; flex:1 1 145px;
-  min-width:0; width:0; max-width:100%; height:43px; min-height:43px;
-  margin:0; padding:10px 12px; border:1px solid #dce5f1;
-  border-radius:9px; background:#fff; color:#172c4b; font:inherit; font-size:14px;
+.admin-users-toolbar .admin-users-search-controls > input {
+  display:block;
+  box-sizing:border-box;
+  flex:1 1 0%;
+  width:0;
+  min-width:0;
+  height:43px;
+  margin:0;
+  padding:10px 12px;
+  border:1px solid #dce5f1;
+  border-radius:9px;
+  background:#fff;
+  color:#172c4b;
+  font:inherit;
+  font-size:14px;
 }
-.admin-users-search-controls > .btn { flex:0 0 auto; min-height:43px; white-space:nowrap; }
-.admin-users-toolbar > .admin-users-refresh { align-self:end; justify-self:end; min-height:43px; white-space:nowrap; }
+.admin-users-toolbar .admin-users-search-controls > .btn,
+.admin-users-toolbar > .admin-users-refresh {
+  flex:0 0 auto;
+  align-self:center;
+  min-height:43px;
+  height:43px;
+  padding:9px 14px;
+  white-space:nowrap;
+}
+.admin-users-toolbar > .admin-users-refresh { align-self:end; justify-self:end; }
+@container admin-user-search (max-width:840px) {
+  .admin-users-toolbar { grid-template-columns: minmax(0,1fr) minmax(0,1.25fr); }
+  .admin-users-toolbar > .admin-users-refresh { grid-column:1/-1; justify-self:end; }
+}
+@container admin-user-search (max-width:590px) {
+  .admin-users-toolbar { grid-template-columns:minmax(0,1fr); }
+  .admin-users-toolbar > .admin-users-refresh { grid-column:auto; justify-self:start; }
+}
+@container admin-user-search (max-width:420px) {
+  .admin-users-name-search .admin-users-search-controls {
+    display:grid; grid-template-columns:minmax(0,1fr) auto auto; height:auto;
+  }
+  .admin-users-name-search .admin-users-search-controls > input {
+    grid-column:1/-1; width:100%;
+  }
+  .admin-users-name-search .admin-users-search-controls > .btn { justify-self:start; }
+}
+/* Context shown during forced-password change. */
 .forced-account-identity {
   display:flex; align-items:center; gap:10px; padding:12px 15px;
   border:1px solid #cbdcf8; background:#f4f8ff;
@@ -790,15 +838,6 @@
 .forced-account-identity > div { display:flex; flex-direction:column; min-width:0; gap:3px; }
 .forced-account-identity span { font-size:12px; color:#6e819c; }
 .forced-account-identity strong { font-size:15px; color:#14315b; overflow-wrap:anywhere; }
-@media (max-width:1200px) {
-  .admin-users-toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .admin-users-toolbar > .admin-users-refresh { grid-column:1/-1; justify-self:end; }
-}
-@media (max-width:760px) {
-  .admin-users-toolbar { grid-template-columns:minmax(0,1fr); }
-  .admin-users-toolbar > .admin-users-refresh { grid-column:auto; justify-self:start; }
-  .admin-users-search-controls > input { flex-basis:155px; }
-}
 
 /* v12.9 — responsive ADMIN hotel selector, accessible recovery, and photo errors. */
 .hotel-picker { width:100%; min-width:0; margin:0 0 19px; padding:17px; border:1px solid #e0e9f5; border-radius:12px; background:#fff; }

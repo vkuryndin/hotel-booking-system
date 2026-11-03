@@ -10,15 +10,15 @@ Spring Cloud Gateway Server WebFlux: маршрут `Path=/api/hotels/**,/api/ro
 
 ## booking-service (:8081)
 
-Spring MVC + Data JPA + Security: регистрация и логин, выдача JWT, администрирование пользователей, бронирования. `BookingService` координирует создание/отмену бронирований и Saga; `BookingQueryService` выполняет чтение, фильтрацию и пагинацию (с проверкой прав доступа); `BookingSagaStateService` — состоянием, `HotelServiceClient` — HTTP-вызовами в Hotel Service, `BookingSagaRecoveryService`, `ManualBookingRecoveryService` и `ExhaustedSagaMonitor` — восстановлением зависших операций. Хранилище — `jdbc:h2:mem:bookingdb`.
+Spring MVC + Data JPA + Security: регистрация и логин, выдача JWT, администрирование пользователей, бронирования. `BookingService` координирует создание/отмену бронирований и Saga; `BookingQueryService` выполняет чтение, фильтрацию и пагинацию (с проверкой прав доступа); `BookingSagaStateService` управляет переходами состояний в локальных транзакциях, `HotelServiceClient` — HTTP-вызовами в Hotel Service, `BookingSagaRecoveryService`, `ManualBookingRecoveryService` и `ExhaustedSagaMonitor` — восстановлением зависших операций. Хранилище — `jdbc:h2:mem:bookingdb`.
 
 ## hotel-service (:8082)
 
-Хранит отели, номера, резервирование по датам и фотографии; выполняет статистику, фильтры и алгоритмы рекомендации. `HotelService` отвечает за CRUD отелей и настройку стратегии подбора, `HotelSearchService` — за чтение, фильтрацию, сортировку и пагинацию отелей. `RoomService` отвечает за CRUD и рекомендации; `RoomSearchService` — за чтение, фильтрацию, сортировку и пагинацию номеров. `RoomReservationController` открывает внутренний контракт подтверждения/освобождения, `RoomSelectionStrategy` с реализациями `LeastBookedStrategy` и `MostExpensiveStrategy` обеспечивает подбор. Хранилище — `jdbc:h2:mem:hoteldb`; фото — локальные файлы (`HOTEL_PHOTOS_DIR`).
+Хранит отели, номера, резервирование по датам и фотографии; выполняет статистику, фильтры и алгоритмы рекомендации. `HotelService` отвечает за CRUD отелей и настройку стратегии подбора, `HotelSearchService` — за чтение, фильтрацию, сортировку и пагинацию отелей. `RoomService` отвечает за CRUD и рекомендации; `RoomSearchService` — за чтение, фильтрацию, сортировку и пагинацию номеров. `RoomReservationController` открывает внутренний контракт подтверждения/освобождения, `RoomSelectionStrategy` с реализациями `LeastBookedStrategy` и `MostExpensiveStrategy` обеспечивает подбор. При отсутствии явно переданной стратегии используется настройка отеля (`LEAST_BOOKED` по умолчанию). Хранилище — `jdbc:h2:mem:hoteldb`; фото — локальные файлы (`HOTEL_PHOTOS_DIR`).
 
 ## Межсервисные границы
 
 - Booking Service — источник истины о пользовательских бронированиях и их жизненном цикле.
 - Hotel Service — источник истины о доступности слота номера на интервал дат; собственные резервирования и защита от гонок.
 - Глобальных транзакций XA/2PC нет: Saga координирует последовательность локальных операций, с повтором, компенсацией и восстановлением.
-- При изменении контракта сначала проверяйте DTO и тесты обеих сторон, затем API Gateway и документацию.
+- Контракты REST и служебных операций приведены в `docs/api.md`; транзакционная согласованность и восстановление описаны в ADR-003 и ADR-006.

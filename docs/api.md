@@ -1,84 +1,171 @@
-# REST API — карта контроллеров
+# REST API
 
-Основной адрес для клиентских запросов — `http://localhost:8080` (API Gateway). Методы ниже соответствуют REST-контроллерам Booking Service и Hotel Service. Таблица включает также служебные маршруты, которые **не являются публичным клиентским API** и недоступны через Gateway.
+Клиентский API доступен через API Gateway по адресу `http://localhost:8080`. Пользовательские маршруты обрабатывает Booking Service, маршруты отелей и номеров — Hotel Service. Оба сервиса самостоятельно валидируют JWT; права `ADMIN` дополнительно защищены на уровне методов. В таблицах ниже `?` обозначает необязательное поле или параметр.
 
-Для защищённых операций используйте заголовок `Authorization: Bearer <JWT>`. Для создания бронирования дополнительно обязателен `Idempotency-Key` (UUID). Административные методы защищены ролью `ADMIN`, внутренние Saga-методы — служебной авторизацией и блокируются внешним Gateway.
+## Авторизация и общие соглашения
 
-| Сервис | Метод | Путь | Контроллер |
-|---|---|---|---|
-| `booking-service` | `POST` | `/api/users` | `AdminUserController` |
-| `booking-service` | `GET` | `/api/users` | `AdminUserReadController` |
-| `booking-service` | `GET` | `/api/users/me` | `UserProfileController` |
-| `booking-service` | `PATCH` | `/api/users/me` | `UserProfileController` |
-| `booking-service` | `POST` | `/api/bookings` | `BookingController` |
-| `booking-service` | `GET` | `/api/bookings` | `BookingController` |
-| `booking-service` | `DELETE` | `/api/users/{id}` | `AdminUserController` |
-| `booking-service` | `GET` | `/api/users/{id}` | `AdminUserReadController` |
-| `booking-service` | `PATCH` | `/api/users/{id}` | `AdminUserUpdateController` |
-| `booking-service` | `POST` | `/api/users/{id}/reset-password` | `AdminUserUpdateController` |
-| `booking-service` | `GET` | `/api/bookings/my` | `BookingController` |
-| `booking-service` | `GET` | `/api/bookings/{id}` | `BookingController` |
-| `booking-service` | `PATCH` | `/api/bookings/{id}/cancel` | `BookingController` |
-| `booking-service` | `GET` | `/api/bookings/recovery/exhausted` | `BookingRecoveryAdminController` |
-| `booking-service` | `POST` | `/api/bookings/{id}/recovery/retry` | `BookingRecoveryAdminController` |
-| `booking-service` | `POST` | `/api/users/login` | `LoginController` |
-| `booking-service` | `POST` | `/api/users/register` | `RegistrationController` |
-| `booking-service` | `POST` | `/api/users/me/change-password` | `UserPasswordController` |
-| `booking-service` | `GET` | `/api/users/token-status` | `UserPasswordController` (**внутренний; через Gateway запрещён**) |
-| `hotel-service` | `POST` | `/api/hotels` | `HotelController` |
-| `hotel-service` | `GET` | `/api/hotels` | `HotelController` |
-| `hotel-service` | `POST` | `/api/rooms` | `RoomController` |
-| `hotel-service` | `GET` | `/api/rooms` | `RoomController` |
-| `hotel-service` | `GET` | `/api/hotels/{hotelId}/photos` | `HotelPhotoController` |
-| `hotel-service` | `GET` | `/api/rooms/{roomId}/photos` | `RoomPhotoController` |
-| `hotel-service` | `GET` | `/api/hotels/{id}` | `HotelController` |
-| `hotel-service` | `PUT` | `/api/hotels/{id}` | `HotelController` |
-| `hotel-service` | `GET` | `/api/hotels/{id}/room-selection-strategy` | `HotelController` |
-| `hotel-service` | `PUT` | `/api/hotels/{id}/room-selection-strategy` | `HotelController` |
-| `hotel-service` | `DELETE` | `/api/hotels/{id}` | `HotelController` |
-| `hotel-service` | `GET` | `/api/hotels/{hotelId}/photos/{photoId}/file` | `HotelPhotoController` |
-| `hotel-service` | `POST` | `/api/hotels/{hotelId}/photos` | `HotelPhotoController` |
-| `hotel-service` | `PATCH` | `/api/hotels/{hotelId}/photos/{photoId}/primary` | `HotelPhotoController` |
-| `hotel-service` | `PATCH` | `/api/hotels/{hotelId}/photos/{photoId}/order` | `HotelPhotoController` |
-| `hotel-service` | `DELETE` | `/api/hotels/{hotelId}/photos/{photoId}` | `HotelPhotoController` |
-| `hotel-service` | `PATCH` | `/api/hotels/{hotelId}/presentation` | `HotelPresentationController` |
-| `hotel-service` | `GET` | `/api/hotels/{hotelId}/statistics` | `HotelStatisticsController` |
-| `hotel-service` | `GET` | `/api/rooms/{id}` | `RoomController` |
-| `hotel-service` | `PATCH` | `/api/rooms/{id}/availability` | `RoomController` |
-| `hotel-service` | `GET` | `/api/rooms/available` | `RoomController` |
-| `hotel-service` | `PUT` | `/api/rooms/{id}` | `RoomController` |
-| `hotel-service` | `DELETE` | `/api/rooms/{id}` | `RoomController` |
-| `hotel-service` | `GET` | `/api/rooms/recommend` | `RoomController` |
-| `hotel-service` | `PATCH` | `/api/rooms/{roomId}/details` | `RoomDetailsController` |
-| `hotel-service` | `GET` | `/api/rooms/{roomId}/photos/{photoId}/file` | `RoomPhotoController` |
-| `hotel-service` | `POST` | `/api/rooms/{roomId}/photos` | `RoomPhotoController` |
-| `hotel-service` | `PATCH` | `/api/rooms/{roomId}/photos/{photoId}/primary` | `RoomPhotoController` |
-| `hotel-service` | `PATCH` | `/api/rooms/{roomId}/photos/{photoId}/order` | `RoomPhotoController` |
-| `hotel-service` | `DELETE` | `/api/rooms/{roomId}/photos/{photoId}` | `RoomPhotoController` |
-| `hotel-service` | `POST` | `/api/rooms/{id}/confirm-availability` | `RoomReservationController` |
-| `hotel-service` | `POST` | `/api/rooms/{id}/release` | `RoomReservationController` |
+- Для защищённых операций используется `Authorization: Bearer <JWT>`, срок действия пользовательского токена — 1 час. Регистрация и вход открыты без JWT.
+- При создании бронирования обязателен заголовок `Idempotency-Key` со значением UUID. Повтор с тем же ключом и теми же данными не должен создавать вторую бронь.
+- Даты `checkIn` и `checkOut` передаются в формате `YYYY-MM-DD`; интервал ночей — `[checkIn, checkOut)`, дата выезда не включается.
+- Все `page` имеют нумерацию с нуля. Параметры `size` и `sort` используются с правилами `Pageable` Spring Data; размер страницы по умолчанию — 20 там, где указан `@PageableDefault(size=20)`.
+- `available` — административный признак номера. Реальная занятость дат определяется по резервированиям.
+- Служебные маршруты подтверждения/освобождения слота и проверки статуса JWT не предназначены для внешних клиентов и блокируются Gateway.
 
-## Параметры и примеры
+## Карта операций
 
-- `GET /api/rooms`: обязателен `hotelId`; есть фильтры `category`, `minCapacity`, `minPrice`, `maxPrice`, `available`, `amenity`, `sortBy`, `direction` и параметры `page/size`.
-- `GET /api/rooms/recommend`: обязательны `hotelId`, `checkIn`, `checkOut`; дополнительный `strategy`.
-- `POST /api/bookings`: тело `BookingRequest(roomId, hotelId, autoSelect, checkIn, checkOut, guestCount, strategy)`; даты в `yyyy-MM-dd`. При автоотборе `roomId` игнорируется.
-- `GET /api/bookings/my` и `GET /api/bookings` возвращают страницы (`Page`) с настройками пагинации; второй метод только для ADMIN.
-- `PATCH /api/bookings/{id}/cancel` отменяет бронирование; `DELETE` для данной операции **не используется**.
-- `GET /api/users/token-status` — **внутренняя проверка действительности пользовательского JWT**, вызываемая Gateway напрямую в Booking Service с JWT и `X-Gateway-Internal-Secret`. В `GatewaySecurityConfig` внешние запросы к этому пути явно запрещены (`denyAll`), даже если операция видна в Swagger Booking Service. Клиентам вызывать её не нужно.
-- `POST /api/rooms/{id}/confirm-availability` и `/release` — **внутренние операции** Booking→Hotel, не выполнять через Gateway как пользователь.
+Таблицы приводят объявленные контроллерами операции. Столбец «Ответы» содержит документированные коды операции; дополнительные сетевые ошибки Gateway возможны до попадания запроса в сервис.
 
-## HTTP-ошибки
+### Booking Service
 
-Предусмотрены проверки `400` (валидация), `401` (нет/недействительный JWT), `403` (нет полномочий), `404`, `409` (конфликт бронирования, идемпотентности или ресурсов), `429` (лимит) и `503` (зависимый сервис недоступен). Точные коды/поля error JSON зависят от конкретного обработчика; для интеграции следует ориентироваться на исходный `ControllerAdvice` и тесты.
+| Метод | Путь | Доступ | Параметры / тело | Ответы HTTP |
+|---|---|---|---|---|
+| `POST` | `/api/users` | ADMIN | JSON: `email`, `username`, `password`, `role`, `firstName`, `lastName`; `phone?` | 201, 400, 401, 403, 409 |
+| `GET` | `/api/users` | ADMIN | `q?`, `page?`, `size?`, `sort?` | 200, 400, 401, 403 |
+| `GET` | `/api/users/me` | USER / ADMIN | — | 200, 401, 403 |
+| `PATCH` | `/api/users/me` | USER / ADMIN | JSON: `username?`, `phone?`, `firstName?`, `lastName?` | 200, 400, 401, 403, 409 |
+| `POST` | `/api/bookings` | USER / ADMIN | JSON: `autoSelect`, `roomId?`, `hotelId?`, `checkIn`, `checkOut`, `guestCount?`, `strategy?`; заголовок `Idempotency-Key` (UUID) | 201, 400, 401, 403, 404, 409, 503 |
+| `GET` | `/api/bookings` | ADMIN | `status?`, `page?`, `size?`, `sort?` | 200, 400, 401, 403 |
+| `DELETE` | `/api/users/{id}` | ADMIN | `id` | 200, 400, 401, 403, 404, 409 |
+| `GET` | `/api/users/{id}` | ADMIN | `id` | 200, 400, 401, 403, 404 |
+| `PATCH` | `/api/users/{id}` | ADMIN | `id`; JSON: `email?`, `username?`, `role?`, `phone?`, `firstName?`, `lastName?` | 200, 400, 401, 403, 404, 409, 429 |
+| `POST` | `/api/users/{id}/reset-password` | ADMIN | `id`; JSON: `newPassword` | 200, 400, 401, 403, 404, 429 |
+| `GET` | `/api/bookings/my` | USER / ADMIN | `status?`, `checkOutFrom?` (ISO), `page?`, `size?`, `sort?` | 200, 400, 401, 403 |
+| `GET` | `/api/bookings/{id}` | USER — своё / ADMIN — любое | `id` | 200, 400, 401, 403, 404 |
+| `PATCH` | `/api/bookings/{id}/cancel` | USER — своё / ADMIN — любое | `id` | 200, 400, 401, 403, 404, 409, 503 |
+| `GET` | `/api/bookings/recovery/exhausted` | ADMIN | Без параметров; список исчерпанных восстановлений | 200, 401, 403 |
+| `POST` | `/api/bookings/{id}/recovery/retry` | ADMIN | `id` | 202, 400, 401, 403, 404, 409 |
+| `POST` | `/api/users/login` | Публичный | JSON: `email`, `password` | 200, 400, 401, 429 |
+| `POST` | `/api/users/register` | Публичный | JSON: `email`, `password`, `username`, `firstName`, `lastName`; `phone?` | 201, 400, 409, 429 |
+| `POST` | `/api/users/me/change-password` | USER / ADMIN | JSON: `currentPassword`, `newPassword` | 200, 400, 401, 403, 429 |
+| `GET` | `/api/users/token-status` | Внутренний Gateway → Booking | JWT + `X-Gateway-Internal-Secret`; через Gateway запрещён | 204, 401, 403 |
 
-## Swagger/OpenAPI
+### Hotel Service
 
-Booking Service и Hotel Service используют `springdoc-openapi-starter-webmvc-ui:3.1.1` и собственные `OpenApiConfig` с описанием API и схемой `bearerAuth` (HTTP Bearer JWT). Контроллеры распределены по группам через `@Tag`; регистрация и вход отмечены как операции без JWT. Служебный `RoomReservationController` исключён из спецификации через `@Hidden`.
+| Метод | Путь | Доступ | Параметры / тело | Ответы HTTP |
+|---|---|---|---|---|
+| `POST` | `/api/hotels` | ADMIN | JSON: `name`, `address` | 201, 400, 401, 403, 409 |
+| `GET` | `/api/hotels` | USER / ADMIN | `name?`, `address?`, `minRating?`, `amenity?`, `q?`, `amenities?`, `sortBy?`, `direction?`, `page?`, `size?` | 200, 400, 401, 403 |
+| `POST` | `/api/rooms` | ADMIN | JSON: `hotelId`, `number`; `category?`, `capacity?`, `pricePerNight?`, `amenities?` | 201, 400, 401, 403, 404, 409 |
+| `GET` | `/api/rooms` | USER / ADMIN | `hotelId`, `category?`, `minCapacity?`, `minPrice?`, `maxPrice?`, `available?`, `amenity?`, `sortBy?`, `direction?`, `page?`, `size?` | 200, 400, 401, 403, 404 |
+| `GET` | `/api/hotels/{hotelId}/photos` | USER / ADMIN | `hotelId` | 200, 400, 401, 403, 404 |
+| `GET` | `/api/rooms/{roomId}/photos` | USER / ADMIN | `roomId` | 200, 400, 401, 403, 404 |
+| `GET` | `/api/hotels/{id}` | USER / ADMIN | `id` | 200, 400, 401, 403, 404 |
+| `PUT` | `/api/hotels/{id}` | ADMIN | `id`; JSON: `name`, `address` | 200, 400, 401, 403, 404, 409 |
+| `GET` | `/api/hotels/{id}/room-selection-strategy` | USER / ADMIN | `id` | 200, 400, 401, 403, 404 |
+| `PUT` | `/api/hotels/{id}/room-selection-strategy` | ADMIN | `id`; JSON: `strategy` | 200, 400, 401, 403, 404 |
+| `DELETE` | `/api/hotels/{id}` | ADMIN | `id` | 204, 400, 401, 403, 404, 409 |
+| `GET` | `/api/hotels/{hotelId}/photos/{photoId}/file` | USER / ADMIN | `hotelId`, `photoId`; выдача `image/*` | 200, 400, 401, 403, 404 |
+| `POST` | `/api/hotels/{hotelId}/photos` | ADMIN | `hotelId`; `multipart/form-data`: поле `file` | 201, 400, 401, 403, 404, 413, 415 |
+| `PATCH` | `/api/hotels/{hotelId}/photos/{photoId}/primary` | ADMIN | `hotelId`, `photoId` | 200, 400, 401, 403, 404 |
+| `PATCH` | `/api/hotels/{hotelId}/photos/{photoId}/order` | ADMIN | `hotelId`, `photoId`, `sortOrder` (query) | 200, 400, 401, 403, 404 |
+| `DELETE` | `/api/hotels/{hotelId}/photos/{photoId}` | ADMIN | `hotelId`, `photoId` | 204, 400, 401, 403, 404 |
+| `PATCH` | `/api/hotels/{hotelId}/presentation` | ADMIN | `hotelId`; JSON: `description?`, `rating?`, `amenities?`, `checkInTime?`, `checkOutTime?` | 200, 400, 401, 403, 404 |
+| `GET` | `/api/hotels/{hotelId}/statistics` | ADMIN | `hotelId` | 200, 400, 401, 403, 404 |
+| `GET` | `/api/rooms/{id}` | USER / ADMIN | `id` | 200, 400, 401, 403, 404 |
+| `PATCH` | `/api/rooms/{id}/availability` | ADMIN | `id`; JSON: `available` | 200, 400, 401, 403, 404, 409 |
+| `GET` | `/api/rooms/available` | USER / ADMIN | `hotelId`, `page?`, `size?`, `sort?` | 200, 400, 401, 403, 404 |
+| `PUT` | `/api/rooms/{id}` | ADMIN | `id`; JSON: `number` | 200, 400, 401, 403, 404, 409 |
+| `DELETE` | `/api/rooms/{id}` | ADMIN | `id` | 204, 400, 401, 403, 404, 409 |
+| `GET` | `/api/rooms/recommend` | USER / ADMIN | `hotelId`, `checkIn`, `checkOut`; `strategy?`, `guestCount?` | 200, 400, 401, 403, 404 |
+| `PATCH` | `/api/rooms/{roomId}/details` | ADMIN | `roomId`; JSON: `category?`, `capacity?`, `pricePerNight?`, `amenities?` | 200, 400, 401, 403, 404 |
+| `GET` | `/api/rooms/{roomId}/photos/{photoId}/file` | USER / ADMIN | `roomId`, `photoId`; выдача `image/*` | 200, 400, 401, 403, 404 |
+| `POST` | `/api/rooms/{roomId}/photos` | ADMIN | `roomId`; `multipart/form-data`: `file` | 201, 400, 401, 403, 404, 413, 415 |
+| `PATCH` | `/api/rooms/{roomId}/photos/{photoId}/primary` | ADMIN | `roomId`, `photoId` | 200, 400, 401, 403, 404 |
+| `PATCH` | `/api/rooms/{roomId}/photos/{photoId}/order` | ADMIN | `roomId`, `photoId`, `sortOrder` (query) | 200, 400, 401, 403, 404 |
+| `DELETE` | `/api/rooms/{roomId}/photos/{photoId}` | ADMIN | `roomId`, `photoId` | 204, 400, 401, 403, 404 |
+| `POST` | `/api/rooms/{id}/confirm-availability` | Внутренний Booking → Hotel | `id`; service JWT; JSON: `reservationId`, `checkIn`, `checkOut`, `guestCount?` | 200, 400, 401, 403, 409 |
+| `POST` | `/api/rooms/{id}/release` | Внутренний Booking → Hotel | `id`; service JWT; JSON: `reservationId`, `compensation` | 200, 400, 401, 403, 409 |
 
-| Сервис | Swagger UI | JSON-спецификация |
-|---|---|---|
-| Booking | `http://localhost:8081/swagger-ui.html` | `http://localhost:8081/v3/api-docs` |
-| Hotel | `http://localhost:8082/swagger-ui.html` | `http://localhost:8082/v3/api-docs` |
+## Параметры поиска и сортировки
 
-Для выполнения защищённого запроса в Swagger UI нажмите **Authorize**, вставьте пользовательский JWT и используйте **Try it out → Execute**. UI доступен без токена; доступ к операциям регулируется Spring Security.
+### Отели — `GET /api/hotels`
+
+| Параметр | Значение |
+|---|---|
+| `name`, `address` | Поиск по названию или адресу |
+| `q` | Поиск по названию либо адресу одним запросом |
+| `minRating` | Нижняя граница рейтинга |
+| `amenity` | Одно удобство из `WIFI`, `PARKING`, `POOL`, `GYM`, `RESTAURANT` |
+| `amenities` | Список удобств, которые должны присутствовать одновременно |
+| `sortBy`, `direction` | Поле сортировки (по умолчанию `id`), направление `asc` или `desc` |
+| `page`, `size` | Номер и размер страницы (по умолчанию 20 записей) |
+
+### Номера — `GET /api/rooms`
+
+Обязателен `hotelId`. Допускаются `category` (`STANDARD`, `DELUXE`, `SUITE`), `minCapacity`, `minPrice`, `maxPrice`, `available`, `amenity` (`WIFI`, `TV`, `AIR_CONDITIONING`, `MINIBAR`, `BALCONY`), `sortBy`, `direction`, `page`, `size`. Для списка только административно доступных номеров предусмотрен `GET /api/rooms/available?hotelId=...`; он **не проверяет свободные даты**. Подбор по датам доступен через `GET /api/rooms/recommend`.
+
+### Бронирования и пользователи
+
+- `GET /api/bookings/my`: `status?`, `checkOutFrom?`, `page?`, `size?`, `sort?`. Для фильтра `checkOutFrom` используется дата ISO; в запросе с этой датой необходимо указать `status=CONFIRMED`.
+- `GET /api/bookings` (ADMIN): `status?`, `page?`, `size?`, `sort?`.
+- `GET /api/users` (ADMIN): `q?` (поиск по имени пользователя, имени, фамилии или email), `page?`, `size?`, `sort?`.
+
+## Бронирование и стратегии выбора
+
+При **ручном** выборе клиент передаёт `autoSelect=false` и `roomId`. При **автоматическом** подборе — `autoSelect=true` и `hotelId`; указанный `roomId` игнорируется. Поле `guestCount` по умолчанию равно 1 (допустимый диапазон 1–20).
+
+Стратегия по умолчанию — `LEAST_BOOKED` (по возрастанию `times_booked`, при равенстве по `id`). Дополнительный вариант `MOST_EXPENSIVE` выбирает более дорогие номера. Текущая логика приоритета: **параметр `strategy` запроса → стратегия отеля → `LEAST_BOOKED` для отеля без индивидуальной настройки**. Стратегию отеля изменяет ADMIN через `PUT /api/hotels/{id}/room-selection-strategy`. При ручном выборе `strategy` не влияет на номер.
+
+Пример создания с ручным выбором:
+
+```http
+POST http://localhost:8080/api/bookings
+Authorization: Bearer <JWT>
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "autoSelect": false,
+  "checkIn": "2027-04-10",
+  "checkOut": "2027-04-12",
+  "guestCount": 2
+}
+```
+
+Пример автоматического подбора (без переопределения стратегии отеля):
+
+```json
+{
+  "hotelId": 1,
+  "autoSelect": true,
+  "checkIn": "2027-04-10",
+  "checkOut": "2027-04-12",
+  "guestCount": 2
+}
+```
+
+Даты в примерах демонстрационные; для выполнения запроса они должны быть допустимыми на момент запуска.
+
+## Запросы изменения данных
+
+- `HotelRequest`: обязательные `name` (до 150 символов), `address` (до 255); оформление меняется отдельно через `PATCH /api/hotels/{hotelId}/presentation`.
+- `HotelPresentationRequest`: `description?` (до 3000), `rating?` (0–5), `amenities?`, `checkInTime?`, `checkOutTime?`.
+- `RoomRequest`: обязательные `hotelId`, `number` (до 20); дополнительные `category?`, `capacity?`, `pricePerNight?`, `amenities?`.
+- `RoomUpdateRequest`: только `number`; изменения категории, вместимости, цены и удобств выполняются через `PATCH /api/rooms/{roomId}/details`.
+- Регистрация: `email`, `password` (8–64 символа), `username` (3–30 символов с заданным шаблоном), `firstName`, `lastName`; `phone` необязателен.
+- Изменение профиля и пользователя администратором — частичные операции `PATCH`. Изменение собственной роли ADMIN и удаление последнего администратора ограничены.
+- Фотографии загружаются через `multipart/form-data`, поле `file`. Поддерживаются JPEG/PNG/WebP, до 5 МБ на файл и до 10 фотографий на объект. Выдача бинарного файла осуществляется `GET .../photos/{photoId}/file`, тип ответа соответствует изображению.
+
+## Ответы и ошибки
+
+Успешное создание бронирования/отеля/номера возвращает `201 Created`; удаление отеля, номера или фотографии — `204 No Content`, удаление пользователя — `200 OK` с телом ответа, административный повтор Recovery — `202 Accepted`. Чтение и изменение обычно возвращают `200 OK`. Ответы поиска используют Spring Data `Page` (поля `content`, `totalElements`, `totalPages`, `number`, `size` и др.).
+
+Сервисные ошибки используют `ErrorResponse`:
+
+```json
+{
+  "timestamp": "2026-11-03T09:00:00Z",
+  "status": 409,
+  "code": "ROOM_ALREADY_BOOKED",
+  "message": "Room is already booked for requested dates",
+  "path": "/api/bookings",
+  "traceId": "example-trace-id"
+}
+```
+
+Поля `traceId` и `fieldErrors` зависят от контекста и наличия данных; некоторые поля могут отсутствовать. Коды: `400` — валидация, `401` — JWT, `403` — права, `404` — ресурс не найден, `409` — конфликт, `413` — размер фотографии, `415` — формат файла, `429` — Rate Limiting, `503` — временная недоступность зависимости. При `429` ориентируйтесь на `Retry-After`, когда этот заголовок присутствует. Для подробной OpenAPI-спецификации см. [Swagger и OpenAPI](swagger.md).
+
+## Внутренние операции
+
+`POST /api/rooms/{id}/confirm-availability` и `POST /api/rooms/{id}/release` вызываются Booking Service со служебным JWT; `GET /api/users/token-status` используется Gateway для проверки статуса пользовательского токена. Клиентские запросы к этим маршрутам через Gateway запрещены. Наличие пути в контроллере не означает разрешённый публичный доступ.
