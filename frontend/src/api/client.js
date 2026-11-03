@@ -54,6 +54,13 @@ function cacheLifetime(path) {
   if (/^\/hotels\/\d+\/room-selection-strategy$/.test(path)) return READ_CACHE_MS.hotel
   return 0
 }
+// Interactive reads must not wait behind catalog and photo metadata background work.
+// Mutations and login bypass the read queue as before.
+function readPriority(path) {
+  if (/^\/(?:users\/me|bookings\/\d+|rooms\/recommend(?:\?|$)|rooms\/\d+(?:\?|$))/.test(path)) return 2
+  if (/^\/(?:hotels|rooms)\/\d+\/photos(?:\?|$)/.test(path)) return -1
+  return 0
+}
 async function fetchOnce(path, { method, body, auth, headers, signal, timeoutMs }) {
   const controller = new AbortController()
   let timedOut = false
@@ -115,7 +122,7 @@ export async function request(path, { method = 'GET', body, auth = true, headers
         timeoutMs: isRead ? REQUEST_TIMEOUT_MS.read : REQUEST_TIMEOUT_MS.write })
       // Writes are never retried: their result may have committed before the connection failed.
       const result = isRead
-        ? await retryRead(() => readQueue.run(execute, signal), { signal })
+        ? await retryRead(() => readQueue.run(execute, signal, readPriority(path)), { signal })
         : await execute()
       if (isRead && ttl && epoch === generation && latestReadStart.get(path) === serial)
         readCache.put(path, result, ttl)

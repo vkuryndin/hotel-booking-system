@@ -45,14 +45,15 @@ export async function retryRead(load, { retries = 2, signal, sleep = wait, jitte
   }
 }
 
-/** Abortable FIFO queue. Do not queue login or writes behind image downloads. */
+/** Abortable priority queue with FIFO within a priority. Writes/login bypass it entirely. */
 export function createTaskQueue(limit = 4) {
   if (!Number.isInteger(limit) || limit < 1) throw new RangeError('Invalid concurrency limit')
   let active = 0
   const pending = []
   function drain() {
     while (active < limit && pending.length) {
-      const item = pending.shift()
+      const first = pending.reduce((best, entry, i) => entry.priority > pending[best].priority ? i : best, 0)
+      const item = pending.splice(first, 1)[0]
       if (item.signal?.aborted) { item.cancel(); continue }
       item.signal?.removeEventListener('abort', item.cancel)
       active++
@@ -60,10 +61,10 @@ export function createTaskQueue(limit = 4) {
     }
   }
   return {
-    run(task, signal) {
+    run(task, signal, priority = 0) {
       if (signal?.aborted) return Promise.reject(abortError())
       return new Promise((resolve, reject) => {
-        const item = { task, resolve, reject, signal, cancel: null }
+        const item = { task, resolve, reject, signal, priority, cancel: null }
         item.cancel = () => {
           const index = pending.indexOf(item)
           if (index !== -1) { pending.splice(index, 1); signal?.removeEventListener('abort', item.cancel); reject(abortError()) }

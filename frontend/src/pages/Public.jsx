@@ -85,17 +85,30 @@ export function CatalogPage(){
  const [page,setPage]=useState(0)
  const [totalPages,setTotalPages]=useState(1)
  const [totalElements,setTotalElements]=useState(0)
+ const [appliedFilters, setAppliedFilters] = useState(() => ({ rating, amenities }))
  const previousQueryRef=useRef(null)
+ useEffect(() => {
+   // First catalogue request is immediate; only rapid subsequent filter changes wait.
+   if (appliedFilters.rating === rating && appliedFilters.amenities === amenities) return
+   const timeout = setTimeout(() => setAppliedFilters({ rating, amenities }), 300)
+   return () => clearTimeout(timeout)
+ }, [rating, amenities, appliedFilters])
  const city=params.get('city')?.trim()||''
  const q=params.toString()
  useEffect(()=>{setPage(0)},[city])
  useEffect(()=>{
    if(!user){setLoading(false);return}
+   // Abort the previous query immediately while rapid filter changes settle.
+   // Do not issue an intermediate request for an outdated filter combination.
+   if (rating !== appliedFilters.rating || amenities !== appliedFilters.amenities) {
+     setLoading(true)
+     return
+   }
    let active=true
    const controller=new AbortController()
    const query={page,size:CATALOG_PAGE_SIZE,sortBy:sort,direction:sort==='rating'?'desc':'asc',
-     ...(city?{q:city}:{}),...(rating?{minRating:rating}:{}),
-     ...(amenities.length?{amenities:amenities.join(',')}:{}),
+     ...(city?{q:city}:{}),...(appliedFilters.rating?{minRating:appliedFilters.rating}:{}),
+     ...(appliedFilters.amenities.length?{amenities:appliedFilters.amenities.join(',')}:{}),
    }
    const queryKey=JSON.stringify(query)
    // Keep the previous cards visible only while refreshing the SAME search.
@@ -115,7 +128,7 @@ export function CatalogPage(){
    }})
      .finally(()=>{if(active)setLoading(false)})
    return ()=>{active=false;controller.abort()}
- },[user,page,city,rating,sort,amenities])
+ },[user,page,city,appliedFilters,sort,rating,amenities])
  function toggle(name){setPage(0);setAmenities(a=>a.includes(name)?a.filter(i=>i!==name):[...a,name])}
  return <div className="container catalog-page"><PageTitle eyebrow="ИССЛЕДУЙТЕ МИР" title="Каталог отелей" subtitle="Найдите идеальное место для следующей поездки."/><SearchBar compact defaults={{city,checkIn:params.get('checkIn'),checkOut:params.get('checkOut'),guests:params.get('guests')}}/><div className="catalog-layout"><aside className="filters-panel"><div className="filters-top"><b><SlidersHorizontal size={18}/> Фильтры</b><button className="link-button" onClick={()=>{setRating(0);setAmenities([]);setPage(0);setParams(p=>{p.delete('city');return p})}}>Сбросить</button></div><h4>Рейтинг</h4><div className="filter-stack">{[5,4,3].map(x=><label key={x} className="check-line"><input type="radio" name="rating" checked={rating===x} onChange={()=>{setRating(x);setPage(0)}}/><span><Star size={14} fill="#f9bc45" color="#f9bc45"/> {x}+ звёзд</span></label>)}<label className="check-line"><input type="radio" name="rating" checked={rating===0} onChange={()=>{setRating(0);setPage(0)}}/>Любой рейтинг</label></div><h4>Удобства</h4><div className="filter-stack">{HOTEL_AMENITIES.map(a=><label key={a} className="check-line"><input type="checkbox" checked={amenities.includes(a)} onChange={()=>toggle(a)}/>{amenity(a)}</label>)}</div></aside><section className="catalog-results"><div className="results-top"><div className="catalog-count"><b>{user && loading && hotels.length === 0 ? 'Загружаем отели…' : `Отелей в каталоге: ${totalElements}`}</b>{!loading && totalElements > 0 && <small>Показано {page * CATALOG_PAGE_SIZE + 1}–{Math.min((page + 1) * CATALOG_PAGE_SIZE,totalElements)} из {totalElements}</small>}</div><label className="sort-select">Сортировать: <select value={sort} onChange={e=>{setSort(e.target.value);setPage(0)}}><option value="id">По добавлению</option><option value="name">По названию</option><option value="rating">По рейтингу</option></select></label></div>{params.get('checkIn') && params.get('checkOut') && <p className="catalog-availability-note"><CalendarDays size={17}/> Поездка: {formatDate(params.get('checkIn'))} — {formatDate(params.get('checkOut'))}, гостей: {params.get('guests') || '2'}. Список показывает отели из каталога, а не подтверждённую доступность. Чтобы узнать, есть ли свободные номера на эти даты, откройте отель и нажмите «Найти номера».</p>}{error&&<Alert error={error}/>} {!user?<Empty icon={Hotel} title="Для просмотра каталога требуется вход" text="Войдите в аккаунт, чтобы увидеть все отели." action={<Link className="btn btn-primary" to="/login">Войти</Link>}/>:loading?<Spinner/>:<>{hotels.length===0?<Empty icon={Search} title="По вашему запросу ничего не найдено" text="Попробуйте изменить город или параметры фильтрации."/>:<div className="catalog-cards">{hotels.map((hotel,i)=><HotelCard key={hotel.id} hotel={hotel} index={i} search={q}/>)}</div>}<Pagination page={page} totalPages={totalPages} onChange={setPage}/></>}</section></div></div>
 }

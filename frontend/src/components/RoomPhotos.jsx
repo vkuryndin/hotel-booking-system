@@ -116,12 +116,26 @@ export function RoomPreviewSlider({ roomId, number, initialPhotos, showAllThumbn
 
 // Read-only gallery for the room card and for the booking details.
 export function RoomGallery({ roomId, hotelId, number, compact = false }) {
+  const rootRef = useRef(null)
+  const [nearViewport, setNearViewport] = useState(() => typeof IntersectionObserver === 'undefined')
   const [photos, setPhotos] = useState([])
   const [selected, setSelected] = useState(0)
   const [open, setOpen] = useState(false)
   const [error,setError] = useState('')
   const [retry,setRetry] = useState(0)
   const modalRef = useModalFocus(open, () => setOpen(false))
+  useEffect(() => {
+    if (nearViewport) return
+    if (typeof IntersectionObserver === 'undefined') { setNearViewport(true); return }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setNearViewport(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '280px' })
+    if (rootRef.current) observer.observe(rootRef.current)
+    return () => observer.disconnect()
+  }, [nearViewport])
   useEffect(() => {
     if (!open || photos.length < 2) return
     const onKey = event => {
@@ -134,19 +148,20 @@ export function RoomGallery({ roomId, hotelId, number, compact = false }) {
   }, [open,photos.length])
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
     setError('')
     setPhotos([])
     setSelected(0)
-    if (!roomId) return () => { active = false }
-    api.roomPhotos(roomId).then(data => {
+    if (!roomId || !nearViewport) return () => { active = false }
+    api.roomPhotos(roomId, { signal: controller.signal }).then(data => {
       if (active) setPhotos(arrayOf(data).sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)))
-    }).catch(err => {if(active)setError(err.message)})
-    return () => { active = false }
-  }, [roomId,retry])
+    }).catch(err => {if(active && err.name !== 'AbortError')setError(err.message)})
+    return () => { active = false; controller.abort() }
+  }, [roomId, retry, nearViewport])
   const main = photos[selected] || photos[0]
-  return <div className={`room-photo-gallery ${compact ? 'room-photo-gallery-compact' : ''}`}>
+  return <div ref={rootRef} className={`room-photo-gallery ${compact ? 'room-photo-gallery-compact' : ''}`}>
     <button className="room-gallery-main hover-photo-zoom" type="button" aria-label={photos.length ? `Открыть галерею фотографий номера ${number || roomId} (${photos.length} фото)` : `Нет фотографий номера ${number || roomId}`} title={photos.length ? 'Посмотреть фотографии номера' : 'Фотографии номера пока отсутствуют'} onClick={() => photos.length && setOpen(true)}>
-      <RoomPhotoImage roomId={roomId} hotelId={hotelId} photoId={main?.id} alt={`Номер ${number || ''}`} />
+      {nearViewport ? <RoomPhotoImage roomId={roomId} hotelId={hotelId} photoId={main?.id} alt={`Номер ${number || ''}`} /> : <RoomNoPhotos message="Загружаем фотографии при прокрутке…"/>}
       {photos.length > 0 && <span className="room-gallery-count"><ImagePlus size={14} /> Смотреть фото ({photos.length})</span>}
     </button>
     {error && <div className="photo-retry" role="alert">Не удалось загрузить фотографии: {error} <Button size="small" variant="outline" onClick={()=>setRetry(v=>v+1)}>Повторить</Button></div>}

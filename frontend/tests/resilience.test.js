@@ -152,3 +152,44 @@ test('a client-side timeout does not trigger more requests against the overloade
   assert.equal(isRetryableReadError({ status: 503 }), true)
   assert.equal(isRetryableReadError({ status: 0, code: 'IMAGE_TIMEOUT' }), false)
 })
+
+test('interactive GET jumps ahead of queued background catalogue reads without preempting running requests', async () => {
+  const queue = createTaskQueue(1)
+  const gate = deferred()
+  const order = []
+  const running = queue.run(async () => { order.push('running'); await gate.promise })
+  const background = queue.run(() => { order.push('background'); return 'background' }, undefined, -1)
+  const normal = queue.run(() => { order.push('normal'); return 'normal' }, undefined, 0)
+  const important = queue.run(() => { order.push('booking'); return 'booking' }, undefined, 2)
+  gate.resolve()
+  await Promise.all([running, background, normal, important])
+  assert.deepEqual(order, ['running', 'booking', 'normal', 'background'])
+})
+
+test('queue preserves original ordering for equally important reads', async () => {
+  const queue = createTaskQueue(1)
+  const gate = deferred()
+  const order = []
+  const busy = queue.run(() => gate.promise)
+  const first = queue.run(() => { order.push('first'); return 1 }, undefined, 2)
+  const second = queue.run(() => { order.push('second'); return 2 }, undefined, 2)
+  gate.resolve()
+  await Promise.all([busy, first, second])
+  assert.deepEqual(order, ['first', 'second'])
+})
+
+test('aborted priority read is removed from queue without executing it', async () => {
+  const queue = createTaskQueue(1)
+  const gate = deferred()
+  const busy = queue.run(() => gate.promise)
+  const controller = new AbortController()
+  let started = false
+  const canceled = queue.run(() => { started = true }, controller.signal, 2)
+  controller.abort()
+  await assert.rejects(canceled, error => error.name === 'AbortError')
+  gate.resolve()
+  await busy
+  await Promise.resolve()
+  assert.equal(started, false)
+  assert.equal(queue.stats().queued, 0)
+})
