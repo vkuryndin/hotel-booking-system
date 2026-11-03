@@ -1,7 +1,10 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import com.hotelbooking.hotel.dto.request.RoomDetailsRequest;
 import com.hotelbooking.hotel.entity.Room;

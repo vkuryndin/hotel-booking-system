@@ -1,6 +1,9 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.hotel.entity.Hotel;
 import com.hotelbooking.hotel.entity.Room;
@@ -85,7 +88,7 @@ class RoomPhotoServiceJpaTest {
   @Test
   void deletingRoomWithPhotosRemovesDatabaseRowsAndDiskFiles() throws Exception {
     Long id = roomId();
-    var uploaded = photos.upload(id, image());
+    photos.upload(id, image());
     Path folder = STORAGE.resolve(id.toString());
     Path file;
     try (var files = java.nio.file.Files.list(folder)) {

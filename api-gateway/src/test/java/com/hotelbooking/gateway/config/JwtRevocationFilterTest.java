@@ -1,6 +1,7 @@
 package com.hotelbooking.gateway.config;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -176,7 +177,7 @@ class JwtRevocationFilterTest {
           return Mono.empty();
         };
     var both = Mono.when(filter.filter(first, chain), filter.filter(second, chain));
-    var running = both.subscribe();
+    final var running = both.subscribe();
     assertEquals(1, checks.get());
     sharedResponse.tryEmitValue(ClientResponse.create(HttpStatus.NO_CONTENT).build());
     assertEquals(2, forwarded.get());

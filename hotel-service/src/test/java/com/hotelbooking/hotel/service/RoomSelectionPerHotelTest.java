@@ -1,11 +1,17 @@
 package com.hotelbooking.hotel.service;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.hotelbooking.hotel.entity.Hotel;
 import com.hotelbooking.hotel.mapper.RoomMapper;
-import com.hotelbooking.hotel.repository.*;
-import com.hotelbooking.hotel.strategy.*;
+import com.hotelbooking.hotel.repository.HotelRepository;
+import com.hotelbooking.hotel.repository.RoomRepository;
+import com.hotelbooking.hotel.repository.RoomReservationRepository;
+import com.hotelbooking.hotel.strategy.MostExpensiveStrategy;
+import com.hotelbooking.hotel.strategy.RoomSelectionMode;
+import com.hotelbooking.hotel.strategy.RoomSelectionStrategy;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +24,7 @@ class RoomSelectionPerHotelTest {
     var hotels = mock(HotelRepository.class);
     var least = mock(RoomSelectionStrategy.class);
     var expensive = mock(MostExpensiveStrategy.class);
-    var service =
+    final var service =
         new RoomService(
             rooms,
             hotels,

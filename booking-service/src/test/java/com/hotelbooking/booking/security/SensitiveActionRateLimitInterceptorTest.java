@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.security;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.hotelbooking.booking.exception.RateLimitExceededException;
 import org.junit.jupiter.api.AfterEach;
@@ -48,7 +49,7 @@ class SensitiveActionRateLimitInterceptorTest {
     authenticate("admin-1");
     var resp = new MockHttpServletResponse();
     var reset = request("POST", "/api/users/42/reset-password");
-    var update = request("PATCH", "/api/users/42");
+    final var update = request("PATCH", "/api/users/42");
     assertDoesNotThrow(() -> interceptor.preHandle(reset, resp, new Object()));
     assertDoesNotThrow(() -> interceptor.preHandle(reset, resp, new Object()));
     assertThrows(
@@ -60,8 +61,9 @@ class SensitiveActionRateLimitInterceptorTest {
   void otherMethodsAreNotLimited() {
     authenticate("admin-1");
     var req = request("GET", "/api/users/42");
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 5; i++) {
       assertDoesNotThrow(
           () -> interceptor.preHandle(req, new MockHttpServletResponse(), new Object()));
+    }
   }
 }

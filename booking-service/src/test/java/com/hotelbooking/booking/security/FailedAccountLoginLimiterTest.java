@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.security;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -13,7 +14,9 @@ class FailedAccountLoginLimiterTest {
     var limiter =
         new FailedAccountLoginLimiter(
             Clock.fixed(Instant.parse("2026-10-30T10:00:00Z"), ZoneOffset.UTC), 5, 900);
-    for (int i = 0; i < 5; i++) limiter.recordFailure("a@test.example");
+    for (int i = 0; i < 5; i++) {
+      limiter.recordFailure("a@test.example");
+    }
     assertTrue(limiter.retryAfter("a@test.example") > 0);
     assertEquals(0, limiter.retryAfter("b@test.example"));
     limiter.clear("a@test.example");

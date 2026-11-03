@@ -1,8 +1,10 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.hotelbooking.hotel.entity.Room;
 import com.hotelbooking.hotel.entity.RoomReservation;
@@ -28,9 +30,9 @@ class RoomReservationDuplicateKeyTest {
 
   @BeforeEach
   void setUp() {
-    RoomRepository rooms = mock(RoomRepository.class);
+    final RoomRepository rooms = mock(RoomRepository.class);
     reservationRepository = mock(RoomReservationRepository.class);
-    RoomReservationNightRepository nights = mock(RoomReservationNightRepository.class);
+    final RoomReservationNightRepository nights = mock(RoomReservationNightRepository.class);
     Room room = mock(Room.class);
     when(room.getCapacity()).thenReturn(2);
     when(room.isAvailable()).thenReturn(true);

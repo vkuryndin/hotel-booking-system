@@ -419,7 +419,8 @@ class BookingRoutesMvcTest {
   @Test
   void conflictingRegistrationReturns409() throws Exception {
     when(registrationService.register(any(RegisterRequest.class)))
-        .thenThrow(new com.hotelbooking.booking.exception.EmailAlreadyRegisteredException());
+        .thenThrow(
+            new com.hotelbooking.booking.exception.EmailAlreadyRegisteredException());
     mvc.perform(
             authorize(
                 request(HttpMethod.POST, "/api/users/register")

@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.booking.dto.request.UpdateAdminUserRequest;
 import com.hotelbooking.booking.entity.AppUser;
@@ -47,7 +48,7 @@ class AdminConcurrencyJpaTest {
         new UpdateAdminUserRequest(null, Role.USER, null, null, null, null);
     CountDownLatch start = new CountDownLatch(1);
     var pool = Executors.newFixedThreadPool(2);
-    Callable<Boolean> aDemotesB =
+    Callable<Boolean> adminADemotesOther =
         () -> {
           assertTrue(start.await(10, TimeUnit.SECONDS));
           try {
@@ -58,7 +59,7 @@ class AdminConcurrencyJpaTest {
             return false;
           }
         };
-    Callable<Boolean> bDemotesA =
+    Callable<Boolean> adminBDemotesOther =
         () -> {
           assertTrue(start.await(10, TimeUnit.SECONDS));
           try {
@@ -70,8 +71,8 @@ class AdminConcurrencyJpaTest {
           }
         };
     try {
-      var first = pool.submit(aDemotesB);
-      var second = pool.submit(bDemotesA);
+      var first = pool.submit(adminADemotesOther);
+      var second = pool.submit(adminBDemotesOther);
       start.countDown();
       long successes =
           (first.get(20, TimeUnit.SECONDS) ? 1 : 0) + (second.get(20, TimeUnit.SECONDS) ? 1 : 0);

@@ -1,6 +1,10 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.hotel.dto.response.HotelStatisticsResponse;
 import com.hotelbooking.hotel.entity.Hotel;
@@ -50,7 +54,7 @@ class HotelStatisticsTombstoneJpaTest {
   }
 
   @Test
-  void releaseBeforeReserveIsTombstoneAndNotARealCancellation() {
+  void releaseBeforeReserveCreatesTombstoneWithoutCancellation() {
     UUID id = UUID.randomUUID();
 
     reservationService.release(id, roomId, true);

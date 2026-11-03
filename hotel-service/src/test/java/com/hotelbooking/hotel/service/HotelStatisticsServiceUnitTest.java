@@ -1,11 +1,19 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import com.hotelbooking.hotel.entity.ReservationStatus;
 import com.hotelbooking.hotel.exception.HotelNotFoundException;
-import com.hotelbooking.hotel.repository.*;
+import com.hotelbooking.hotel.repository.HotelRepository;
+import com.hotelbooking.hotel.repository.RoomRepository;
+import com.hotelbooking.hotel.repository.RoomReservationNightRepository;
+import com.hotelbooking.hotel.repository.RoomReservationRepository;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

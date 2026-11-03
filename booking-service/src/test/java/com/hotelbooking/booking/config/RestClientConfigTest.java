@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.config;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
 import org.junit.jupiter.api.Test;

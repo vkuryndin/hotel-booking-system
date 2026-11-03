@@ -1,13 +1,23 @@
 package com.hotelbooking.booking.service;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import com.hotelbooking.booking.dto.request.CreateAdminUserRequest;
-import com.hotelbooking.booking.entity.*;
-import com.hotelbooking.booking.exception.*;
-import com.hotelbooking.booking.repository.*;
-import java.util.*;
+import com.hotelbooking.booking.entity.AppUser;
+import com.hotelbooking.booking.entity.Role;
+import com.hotelbooking.booking.exception.UserOperationException;
+import com.hotelbooking.booking.exception.UsernameAlreadyRegisteredException;
+import com.hotelbooking.booking.repository.AppUserRepository;
+import com.hotelbooking.booking.repository.BookingRepository;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;

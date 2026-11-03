@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.security;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.time.Clock;
@@ -18,8 +19,11 @@ class LoginRegistrationRateLimiterCapacityTest {
             Clock.fixed(Instant.parse("2026-10-30T10:00:00Z"), ZoneOffset.UTC));
     for (int i = 0; i < 10_050; i++) {
       long retryAfter = limiter.acquire("ip:" + i, 5, Duration.ofMinutes(1));
-      if (i < 10_000) assertEquals(0, retryAfter);
-      else assertTrue(retryAfter > 0);
+      if (i < 10_000) {
+        assertEquals(0, retryAfter);
+      } else {
+        assertTrue(retryAfter > 0);
+      }
     }
     Field field = LoginRegistrationRateLimiter.class.getDeclaredField("counters");
     field.setAccessible(true);

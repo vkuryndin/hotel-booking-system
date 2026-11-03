@@ -39,7 +39,7 @@ class HotelAmenitiesBatchJpaTest {
   @Autowired private EntityManagerFactory entityManagerFactory;
 
   @Test
-  void pagedHotelsLoadAmenitiesWithoutNPlusOne() {
+  void pagedHotelsLoadAmenitiesWithoutExtraQueries() {
     String prefix = "s19-h-" + UUID.randomUUID() + "-";
 
     for (int i = 0; i < 25; i++) {
@@ -78,7 +78,7 @@ class HotelAmenitiesBatchJpaTest {
   }
 
   @Test
-  void pagedRoomsLoadAmenitiesWithoutNPlusOne() {
+  void pagedRoomsLoadAmenitiesWithoutExtraQueries() {
     String prefix = "s19-r-" + UUID.randomUUID();
     Hotel hotel = hotels.saveAndFlush(new Hotel(prefix, "Address"));
 

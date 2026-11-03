@@ -1,6 +1,7 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.hotel.entity.Hotel;
 import com.hotelbooking.hotel.entity.Room;

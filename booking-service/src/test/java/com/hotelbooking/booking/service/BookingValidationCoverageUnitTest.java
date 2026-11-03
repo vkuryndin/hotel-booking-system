@@ -1,18 +1,23 @@
 package com.hotelbooking.booking.service;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.hotelbooking.booking.client.HotelServiceClient;
 import com.hotelbooking.booking.dto.client.HotelRoomResponse;
 import com.hotelbooking.booking.dto.request.BookingRequest;
-import com.hotelbooking.booking.exception.*;
+import com.hotelbooking.booking.exception.NoAvailableRoomsException;
+import com.hotelbooking.booking.exception.RoomUnavailableException;
 import com.hotelbooking.booking.mapper.BookingMapper;
 import com.hotelbooking.booking.repository.BookingRepository;
 import jakarta.validation.Validator;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class BookingValidationCoverageUnitTest {
@@ -22,7 +27,8 @@ class BookingValidationCoverageUnitTest {
   BookingSagaStateService state = mock(BookingSagaStateService.class);
   BookingService service = new BookingService(hotel, repo, mapper, state, mock(Validator.class));
   UUID key = UUID.fromString("90000000-0000-0000-0000-000000000001");
-  LocalDate in = LocalDate.of(2055, 1, 1), out = in.plusDays(2);
+  LocalDate in = LocalDate.of(2055, 1, 1);
+  LocalDate out = in.plusDays(2);
 
   BookingRequest manual(Long room, Long hotelId, LocalDate a, LocalDate b, int guests) {
     return new BookingRequest(room, hotelId, false, a, b, guests, null);

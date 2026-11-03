@@ -1,6 +1,9 @@
 package com.hotelbooking.hotel.config;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.hotel.repository.HotelPhotoRepository;
 import com.hotelbooking.hotel.repository.HotelRepository;
@@ -81,14 +84,14 @@ class DemoHotelsIdempotencyJpaTest {
   @Test
   void rollbackRemovesNewlyCopiedDemoFiles() throws Exception {
     var tx = new TransactionTemplate(transactions);
-    long hotelCountBefore = hotels.count();
+    final long hotelCountBefore = hotels.count();
     var hotel =
         hotels.findAll().stream()
             .filter(h -> !photos.findByHotel_IdOrderBySortOrderAscIdAsc(h.getId()).isEmpty())
             .findFirst()
             .orElseThrow();
     var photo = photos.findByHotel_IdOrderBySortOrderAscIdAsc(hotel.getId()).get(0);
-    long photoCountBefore = photos.count();
+    final long photoCountBefore = photos.count();
     Path target =
         BASE.resolve("hotels").resolve(hotel.getId().toString()).resolve(photo.getFileName());
     // Commit removal before rerunning the initializer; otherwise JPA still sees the photo.

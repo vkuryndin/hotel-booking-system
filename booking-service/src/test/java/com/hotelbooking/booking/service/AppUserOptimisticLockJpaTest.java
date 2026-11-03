@@ -1,6 +1,8 @@
 package com.hotelbooking.booking.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.entity.Role;
@@ -61,14 +63,18 @@ class AppUserOptimisticLockJpaTest {
             staleSession.getTransaction().commit();
           },
           "A stale entity version must fail instead of overwriting the demotion");
-      if (staleSession.getTransaction().isActive()) staleSession.getTransaction().rollback();
+      if (staleSession.getTransaction().isActive()) {
+        staleSession.getTransaction().rollback();
+      }
 
       AppUser persisted = users.findById(id).orElseThrow();
       assertEquals(Role.USER, persisted.getRole());
       assertEquals(1, persisted.getTokenVersion());
       assertEquals("First", persisted.getFirstName());
     } finally {
-      if (staleSession.getTransaction().isActive()) staleSession.getTransaction().rollback();
+      if (staleSession.getTransaction().isActive()) {
+        staleSession.getTransaction().rollback();
+      }
       staleSession.close();
       users.deleteById(id);
     }
@@ -110,14 +116,18 @@ class AppUserOptimisticLockJpaTest {
             staleSession.flush();
             staleSession.getTransaction().commit();
           });
-      if (staleSession.getTransaction().isActive()) staleSession.getTransaction().rollback();
+      if (staleSession.getTransaction().isActive()) {
+        staleSession.getTransaction().rollback();
+      }
 
       AppUser persisted = users.findById(id).orElseThrow();
       assertEquals("reset-password-hash", persisted.getPasswordHash());
       assertTrue(persisted.isPasswordChangeRequired());
       assertEquals(1, persisted.getTokenVersion());
     } finally {
-      if (staleSession.getTransaction().isActive()) staleSession.getTransaction().rollback();
+      if (staleSession.getTransaction().isActive()) {
+        staleSession.getTransaction().rollback();
+      }
       staleSession.close();
       users.deleteById(id);
     }

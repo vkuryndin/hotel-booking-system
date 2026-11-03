@@ -1,6 +1,8 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.hotel.entity.Hotel;
 import com.hotelbooking.hotel.exception.PhotoNotFoundException;

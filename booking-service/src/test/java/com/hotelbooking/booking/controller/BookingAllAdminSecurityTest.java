@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.controller;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.hotelbooking.booking.entity.BookingStatus;
 import com.hotelbooking.booking.service.BookingService;

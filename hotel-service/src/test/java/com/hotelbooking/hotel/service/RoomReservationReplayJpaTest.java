@@ -1,6 +1,9 @@
 package com.hotelbooking.hotel.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -128,15 +131,11 @@ class RoomReservationReplayJpaTest {
     String url = "/api/rooms/" + roomId + "/confirm-availability";
 
     String request =
-        """
-                {"reservationId":"%s","checkIn":"%s","checkOut":"%s","guestCount":1}
-                """
-            .formatted(id, IN, OUT);
+        "{\"reservationId\":\"%s\",\"checkIn\":\"%s\",\"checkOut\":\"%s\",\"guestCount\":1}"
+            .formatted(id, IN, OUT) + "\n";
     String otherGuestCount =
-        """
-                {"reservationId":"%s","checkIn":"%s","checkOut":"%s","guestCount":2}
-                """
-            .formatted(id, IN, OUT);
+        "{\"reservationId\":\"%s\",\"checkIn\":\"%s\",\"checkOut\":\"%s\",\"guestCount\":2}"
+            .formatted(id, IN, OUT) + "\n";
 
     mockMvc
         .perform(post(url).contentType(MediaType.APPLICATION_JSON).content(request))
@@ -155,10 +154,8 @@ class RoomReservationReplayJpaTest {
     UUID id = UUID.randomUUID();
     LocalDate yesterday = LocalDate.now().minusDays(1);
     String request =
-        """
-                {"reservationId":"%s","checkIn":"%s","checkOut":"%s","guestCount":1}
-                """
-            .formatted(id, yesterday, yesterday.plusDays(2));
+        "{\"reservationId\":\"%s\",\"checkIn\":\"%s\",\"checkOut\":\"%s\",\"guestCount\":1}"
+            .formatted(id, yesterday, yesterday.plusDays(2)) + "\n";
 
     mockMvc
         .perform(

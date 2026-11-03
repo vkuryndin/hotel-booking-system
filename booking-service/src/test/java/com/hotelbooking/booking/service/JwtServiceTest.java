@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.hotelbooking.booking.entity.AppUser;
 import com.hotelbooking.booking.entity.Role;
@@ -150,9 +151,11 @@ class JwtServiceTest {
 
     assertEquals("USER", before.getClaimAsString("role"));
     assertEquals("ADMIN", after.getClaimAsString("role"));
-    assertEquals(
-        ((Number) before.getClaim("tokenVersion")).longValue() + 1,
-        ((Number) after.getClaim("tokenVersion")).longValue());
+    Number previousVersion =
+        (Number) java.util.Objects.requireNonNull(before.getClaim("tokenVersion"));
+    Number nextVersion =
+        (Number) java.util.Objects.requireNonNull(after.getClaim("tokenVersion"));
+    assertEquals(previousVersion.longValue() + 1, nextVersion.longValue());
     // Revocation of an otherwise valid old signature is enforced by UserTokenStateWebConfig.
     assertEquals("USER", decoder.decode(before.getTokenValue()).getClaimAsString("role"));
   }

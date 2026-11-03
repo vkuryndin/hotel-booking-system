@@ -1,6 +1,8 @@
 package com.hotelbooking.booking.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.booking.entity.Booking;
 import com.hotelbooking.booking.entity.BookingCreationOutcome;
@@ -38,7 +40,7 @@ class ManualBookingRecoveryJpaTest {
   @Test
   void requeuesPendingWithoutLosingReservationIdentity() {
     Booking booking = create();
-    var uuid = booking.getReservationId();
+    final var uuid = booking.getReservationId();
     exhaust(booking);
     assertEquals(1, manual.exhausted().size());
 

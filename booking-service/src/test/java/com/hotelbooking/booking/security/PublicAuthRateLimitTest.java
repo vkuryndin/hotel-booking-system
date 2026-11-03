@@ -1,6 +1,7 @@
 package com.hotelbooking.booking.security;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hotelbooking.booking.exception.RateLimitExceededException;
 import java.time.Clock;
@@ -64,7 +65,7 @@ class PublicAuthRateLimitTest {
 
   @Test
   void trustedGatewaySeparatesClientAddresses() {
-    var trusted = new PublicAuthRateLimitInterceptor(limiter, 2, 1, "test-secret");
+    final var trusted = new PublicAuthRateLimitInterceptor(limiter, 2, 1, "test-secret");
     var first = request("/api/users/register", "127.0.0.1", "POST");
     first.addHeader("X-Gateway-Internal-Secret", "test-secret");
     first.addHeader("X-Verified-Client-IP", "10.20.30.1");
@@ -80,7 +81,7 @@ class PublicAuthRateLimitTest {
 
   @Test
   void untrustedClientCannotSpoofVerifiedHeader() {
-    var trusted = new PublicAuthRateLimitInterceptor(limiter, 2, 1, "test-secret");
+    final var trusted = new PublicAuthRateLimitInterceptor(limiter, 2, 1, "test-secret");
     var first = request("/api/users/register", "10.10.10.1", "POST");
     first.addHeader("X-Gateway-Internal-Secret", "wrong");
     first.addHeader("X-Verified-Client-IP", "10.20.30.1");
