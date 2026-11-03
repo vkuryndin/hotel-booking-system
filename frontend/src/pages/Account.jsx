@@ -5,6 +5,7 @@ import { api } from '../api/client.js'
 import { USERNAME_HTML_PATTERN, USERNAME_RULES, usernameValidationMessage } from '../utils/username.js'
 import { readLoginCooldown, clearLoginCooldown } from '../utils/loginRateLimit.js'
 import { cachedHotel, cachedRoom } from '../utils/detailCache.js'
+import { createBookingRequestId } from '../utils/bookingId.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Alert, Button, Empty, ImageBlock, PageTitle, Spinner, Status, PasswordInput, Pagination } from '../components/Shared.jsx'
 import { RoomGallery, RoomPhotoImage } from '../components/RoomPhotos.jsx'
@@ -110,9 +111,9 @@ export function ForcedPasswordChangePage() {
     <button className="link-button forced-logout" type="button" onClick={()=>{logout();navigate('/login',{replace:true})}}>Выйти из аккаунта</button>
   </div></div>
 }
-export function BookingPage(){const {hotelId}=useParams();const [params]=useSearchParams();const {user}=useAuth();const roomId=params.get('roomId');const autoSelect=!roomId;const [checkIn,setCheckIn]=useState(params.get('checkIn')||plusDays(1));const [checkOut,setCheckOut]=useState(params.get('checkOut')||plusDays(3));const [guests,setGuests]=useState(Number(params.get('guests')||2));const [hotel,setHotel]=useState(null);const [room,setRoom]=useState(null);const [error,setError]=useState('');const [saving,setSaving]=useState(false);const [result,setResult]=useState(null);const [key,setKey]=useState(()=>crypto.randomUUID());const [ready,setReady]=useState(false)
+export function BookingPage(){const {hotelId}=useParams();const [params]=useSearchParams();const {user}=useAuth();const roomId=params.get('roomId');const autoSelect=!roomId;const [checkIn,setCheckIn]=useState(params.get('checkIn')||plusDays(1));const [checkOut,setCheckOut]=useState(params.get('checkOut')||plusDays(3));const [guests,setGuests]=useState(Number(params.get('guests')||2));const [hotel,setHotel]=useState(null);const [room,setRoom]=useState(null);const [error,setError]=useState('');const [saving,setSaving]=useState(false);const [result,setResult]=useState(null);const [key,setKey]=useState(()=>createBookingRequestId());const [ready,setReady]=useState(false)
  useEffect(()=>{let alive=true;Promise.allSettled([api.hotel(hotelId),roomId?api.room(roomId):Promise.resolve(null)]).then(([h,r])=>{if(!alive)return;if(h.status==='fulfilled')setHotel(h.value);else setError(h.reason.message);if(r.status==='fulfilled' && r.value){const found=normalRoom(r.value);if(String(found.id)===String(roomId)&&String(getHotelId(found))===String(hotelId))setRoom(found);else setError('Выбранный номер не принадлежит этому отелю.')}else if(roomId&&r.status==='rejected')setError(r.reason.message)}).finally(()=>{if(alive)setReady(true)});return()=>{alive=false}},[hotelId,roomId])
- function changeData(fn,value){fn(value);setKey(crypto.randomUUID());setError('')}
+ function changeData(fn,value){fn(value);setKey(createBookingRequestId());setError('')}
  async function submit(e){e.preventDefault();if(!validDates(checkIn,checkOut)){setError('Выберите корректные даты (1–365 ночей).');return}if(!autoSelect&&!room){setError('Не удалось подтвердить выбранный номер. Вернитесь к поиску.');return}setSaving(true);setError('');try{const data={checkIn,checkOut,guestCount:guests,...(autoSelect?{hotelId:Number(hotelId),autoSelect:true}:{roomId:Number(roomId)})};const booking=await api.createBooking(data,key);setResult(booking)}catch(err){setError(err.message);if(err.code!=='REQUEST_IN_PROGRESS'&&err.code!=='IDEMPOTENCY_KEY_CONFLICT'){/* keep key to safely retry same request */}}finally{setSaving(false)}}
  if(!ready)return <div className="container"><Spinner/></div>
  return <div className="container checkout-page"><div className="breadcrumbs"><Link to="/hotels">Каталог</Link><ChevronRight size={14}/><Link to={`/hotels/${hotelId}`}>{hotel?.name||'Отель'}</Link><ChevronRight size={14}/>Бронирование</div>{result?<div className="booking-success"><div className="success-icon"><CheckCircle2 size={48}/></div><h1>Бронирование подтверждено!</h1><p>Ваше бронирование #{result.id} успешно создано. Все детали доступны в личном кабинете.</p><div className="success-card"><span>Номер бронирования</span><b>#{result.id}</b><span>Статус</span><Status value={result.status}/><span>Номер комнаты</span><b>#{result.roomId||roomId||'назначен автоматически'}</b></div><div className="button-row"><Link className="btn btn-primary" to={`/account/bookings/${result.id}`}>Детали бронирования <ArrowRight size={17}/></Link><Link className="btn btn-outline" to="/account/bookings">Мои бронирования <ArrowRight size={17}/></Link><Link className="btn btn-outline" to="/hotels">Продолжить поиск</Link></div></div>:<><PageTitle eyebrow="ПОЧТИ ГОТОВО" title="Оформление бронирования" subtitle="Проверьте детали поездки перед подтверждением."/><div className="checkout-steps"><span className="active">1 · Выбор номера</span><span className="active">2 · Детали поездки</span><span>3 · Подтверждение</span></div><div className="checkout-layout"><form className="checkout-main" onSubmit={submit}><div className="white-card"><h2>Ваш отель</h2><div className="selected-hotel">{room&&!autoSelect ? <RoomPhotoImage fallbackToHotel roomId={room.id} hotelId={hotelId} fallback={2}/> : <ImageBlock hotelId={hotelId} fallback={2}/>}<div><h3>{hotel?.name||`Отель #${hotelId}`}</h3><p><MapPin size={15}/>{hotel?.address||hotel?.city||'Адрес не указан'}</p><p>{room?`Номер ${room.number} · ${room.category}`:'Автоматический подбор номера'}</p></div></div></div><div className="white-card"><h2>Даты и гости</h2><div className="form-row"><label>Дата заезда<input type="date" min={plusDays(0)} value={checkIn} onChange={e=>changeData(setCheckIn,e.target.value)}/></label><label>Дата выезда<input type="date" min={checkIn} value={checkOut} onChange={e=>changeData(setCheckOut,e.target.value)}/></label></div><label>Количество гостей<select value={guests} onChange={e=>changeData(setGuests,Number(e.target.value))}>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></label></div><div className="white-card checkout-room-choice">
@@ -213,15 +214,19 @@ export function AccountBookings(){
  const [revision,setRevision]=useState(0)
  useEffect(()=>{
    let active=true
-   Promise.all(['ALL','CONFIRMED','CANCELLED'].map(s=>api.bookingsMy({page:0,size:1,...(s==='ALL'?{}:{status:s})}))).then(results=>{
+   const controller=new AbortController()
+   Promise.all(['ALL','CONFIRMED','CANCELLED'].map(s=>api.bookingsMy(
+     {page:0,size:1,...(s==='ALL'?{}:{status:s})}, {signal:controller.signal}
+   ))).then(results=>{
      if(active)setCounts(Object.fromEntries(results.map((r,i)=>[['ALL','CONFIRMED','CANCELLED'][i],Number(r.totalElements||0)])))
-   }).catch(e=>{if(active)setError(e.message)})
-   return()=>{active=false}
+   }).catch(e=>{if(active && e.name!=='AbortError')setError(e.message)})
+   return()=>{active=false;controller.abort()}
  },[revision])
  useEffect(()=>{
    let active=true
+   const controller=new AbortController()
    setLoading(true);setError('')
-   api.bookingsMy({page:bookingPage,size:10,...(status==='ALL'?{}:{status})}).then(data=>{
+   api.bookingsMy({page:bookingPage,size:10,...(status==='ALL'?{}:{status})},{signal:controller.signal}).then(data=>{
      if(!active)return
      setList(arrayOf(data));setTotalPages(Math.max(1,Number(data.totalPages||1)))
      if(bookingPage>=Math.max(1,Number(data.totalPages||1)))setBookingPage(0)
