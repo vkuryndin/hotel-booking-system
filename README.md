@@ -1,6 +1,6 @@
 # Hotel Booking System
 
-Микросервисная система бронирования отелей с REST API и веб-интерфейсом на React. Backend реализован на Java 17, Spring Boot 4.1.1 и Spring Cloud. Система включает управление пользователями, отелями и номерами, поиск свободных номеров по датам и согласованное бронирование между микросервисами..
+Микросервисная система бронирования отелей с REST API и веб-интерфейсом на React. Backend реализован на Java 17, Spring Boot 4.1.1 и Spring Cloud. Система включает управление пользователями, отелями и номерами, поиск свободных номеров по датам и согласованное бронирование между микросервисами.
 
 ## Возможности
 
@@ -33,7 +33,7 @@
 | Обнаружение | Spring Cloud Netflix Eureka |
 | Данные | Spring Data JPA / Hibernate; независимые H2 in-memory; локальные `@Transactional` |
 | Безопасность | Spring Security Resource Server, JWT, `@PreAuthorize` |
-| Надёжность | Spring Retry (`@Retryable`), Resilience4j Circuit Breaker |
+| Надёжность | Spring Framework Retry (`@Retryable`), Resilience4j Circuit Breaker |
 | Логирование и трассировка | SLF4J, Logback, Logstash JSON Encoder, `traceId` |
 | Проверка | JUnit, Spring Test, MockMvc и E2E |
 | Статический анализ и форматирование | Checkstyle, SpotBugs, Spotless |
@@ -166,6 +166,20 @@ chmod +x ./gradlew
 
 На macOS/Linux используйте `./gradlew` вместо `.\gradlew.bat`. Дождитесь регистрации Gateway, Booking и Hotel в Eureka: `http://localhost:8761/`. При холодном старте discovery короткие `503` возможны до регистрации сервисов. HTTP-запросы для ручной проверки находятся в `test/manual/requests.http`; основной прогон и дополнительные сценарии Rate Limiting выполняются раздельно по инструкции в файле.
 
+**Запуск React-клиента.** После запуска backend-сервисов выполните в отдельном терминале из корня проекта:
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+В режиме разработки интерфейс доступен по адресу `http://localhost:5173/`; запросы `/api` проксируются в API Gateway (`http://localhost:8080`). Для проверки React-клиента из каталога `frontend` выполните:
+
+```powershell
+npm run check
+```
+
 ## Использование API
 
 Базовый адрес: `http://localhost:8080`. Самые важные маршруты:
@@ -290,7 +304,7 @@ sequenceDiagram
 .\gradlew.bat spotlessApply
 ```
 
-`spotlessApply` изменяет Java-файлы
+`spotlessApply` автоматически форматирует файлы, указанные в конфигурации Spotless, включая тестовые Java-файлы, и изменяет исходники.
 
 ## Документация
 
