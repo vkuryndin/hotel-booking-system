@@ -8,6 +8,7 @@ import { HOTEL_AMENITIES } from '../constants/amenities.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Alert, Amenities, Button, Empty, ImageBlock, PageTitle, Price, Spinner, Stars, Pagination } from '../components/Shared.jsx'
 import { arrayOf, amenity, formatDate, normalRoom, plusDays, today, toQuery, validDates } from '../utils/format.js'
+import { homeHotelsDisplayState } from '../utils/homeHotelsState.js'
 
 const CATALOG_PAGE_SIZE = 9
 
@@ -19,15 +20,55 @@ export function SearchBar({compact=false,defaults={}}){const navigate=useNavigat
  function go(e){e.preventDefault();if(!validDates(checkIn,checkOut)){setError('Выберите корректные даты (от 1 до 365 ночей).');return}navigate(`/hotels?${toQuery({city,checkIn,checkOut,guests})}`)}
  return <form className={`search-bar ${compact?'search-bar-compact':''}`} onSubmit={go}><label><span><MapPin size={15}/> Куда поедем?</span><input aria-label="Город или отель" placeholder="Город или отель" value={city} onChange={e=>setCity(e.target.value)}/></label><label><span><CalendarDays size={15}/> Заезд</span><input aria-label="Заезд" type="date" min={today()} value={checkIn} onChange={e=>setCheckIn(e.target.value)}/></label><label><span><CalendarDays size={15}/> Выезд</span><input aria-label="Выезд" type="date" min={checkIn||today()} value={checkOut} onChange={e=>setCheckOut(e.target.value)}/></label><label><span><BedDouble size={15}/> Гости</span><select value={guests} onChange={e=>setGuests(Number(e.target.value))}>{Array.from({length:12},(_,i)=><option key={i} value={i+1}>{i+1} {i===0?'гость':i<4?'гостя':'гостей'}</option>)}</select></label><button className="btn btn-primary search-submit" type="submit"><Search size={18}/> Найти отели</button>{error&&<small className="form-error">{error}</small>}</form>
 }
-export function HomePage(){const {user}=useAuth();const [hotels,setHotels]=useState([]);const [error,setError]=useState('');useEffect(()=>{
-  if(!user)return
-  let active=true
-  const controller=new AbortController()
-  api.hotelsPage({page:0,size:3},{signal:controller.signal,allowStaleOnError:true,
-    onStale:()=>{if(active)setError('Сервис временно недоступен. Показаны сохранённые данные каталога.')}
-  }).then(data=>{if(active)setHotels(arrayOf(data))}).catch(e=>{if(active&&e.name!=='AbortError')setError(e.message)})
-  return()=>{active=false;controller.abort()}
- },[user]);return <><section className="hero"><div className="hero-backdrop"/><div className="container hero-content"><span className="hero-tag"><Star size={15} fill="currentColor"/> Путешествуйте с комфортом</span><h1>Найдите идеальный отель для вашей поездки</h1><p>Уютные номера, удобный поиск и мгновенное подтверждение бронирования.</p><SearchBar/></div></section><section className="container features"><div><span className="feature-icon"><Search size={23}/></span><div><b>Лучшие варианты</b><p>Подбор номера под ваши пожелания</p></div></div><div><span className="feature-icon"><CalendarDays size={23}/></span><div><b>Простое бронирование</b><p>Несколько шагов до новой поездки</p></div></div><div><span className="feature-icon"><Shield size={23}/></span><div><b>Надёжный сервис</b><p>Подтверждённые бронирования</p></div></div></section><section className="container section-space"><div className="section-top"><div><span className="eyebrow">ПОДБОРКА ДЛЯ ВАС</span><h2>Откройте новые места</h2><p>Выберите отель, который подходит именно вам.</p></div><Link className="text-link" to="/hotels">Все отели <ArrowRight size={18}/></Link></div>{error&&<Alert error={error}/>}<div className="cards-grid">{hotels.map((hotel,i)=><HotelCard key={hotel.id} hotel={hotel} index={i}/>)}</div>{!user?<Empty icon={Hotel} title="Войдите, чтобы посмотреть отели" text="Каталог защищён авторизацией. После входа вы увидите реальные отели и цены." action={<Link to="/login" className="btn btn-primary">Войти в аккаунт</Link>}/>:!error&&hotels.length===0&&<Empty icon={Hotel} title="Отели пока не добавлены" text="Администратор может добавить первые отели через панель управления."/>}</section><section className="container cta-banner"><div><span className="eyebrow">ВАШИ ПОЕЗДКИ</span><h2>Всё для путешествия — в одном месте</h2><p>Управляйте бронями, следите за статусами и возвращайтесь к любимым отелям.</p><Link className="btn btn-white" to="/account">Перейти в личный кабинет <ArrowRight size={17}/></Link></div><div className="cta-art"><BedDouble size={104}/></div></section></>}
+export function HomePage() {
+ const { user, loading: authLoading } = useAuth()
+ const [hotels, setHotels] = useState([])
+ const [loading, setLoading] = useState(true)
+ const [error, setError] = useState('')
+ const [reload, setReload] = useState(0)
+ useEffect(() => {
+   if (!user) { setHotels([]); setError(''); setLoading(false); return }
+   let active = true
+   const controller = new AbortController()
+   setLoading(true)
+   setError('')
+   api.hotelsPage({ page: 0, size: 3 }, {
+     signal: controller.signal,
+     forceRefresh: reload > 0,
+     allowStaleOnError: true,
+     onStale: () => {
+       if (active) setError('Сервис временно недоступен. Показаны сохранённые данные каталога.')
+     },
+   }).then(data => {
+     if (active) setHotels(arrayOf(data))
+   }).catch(err => {
+     if (active && err.name !== 'AbortError') setError(err.message)
+   }).finally(() => {
+     if (active) setLoading(false)
+   })
+   return () => { active = false; controller.abort() }
+ }, [user, reload])
+ const displayState = homeHotelsDisplayState({
+   authLoading, authenticated: Boolean(user), loading, error, count: hotels.length,
+ })
+ return <>
+   <section className="hero"><div className="hero-backdrop"/><div className="container hero-content"><span className="hero-tag"><Star size={15} fill="currentColor"/> Путешествуйте с комфортом</span><h1>Найдите идеальный отель для вашей поездки</h1><p>Уютные номера, удобный поиск и мгновенное подтверждение бронирования.</p><SearchBar/></div></section>
+   <section className="container features"><div><span className="feature-icon"><Search size={23}/></span><div><b>Лучшие варианты</b><p>Подбор номера под ваши пожелания</p></div></div><div><span className="feature-icon"><CalendarDays size={23}/></span><div><b>Простое бронирование</b><p>Несколько шагов до новой поездки</p></div></div><div><span className="feature-icon"><Shield size={23}/></span><div><b>Надёжный сервис</b><p>Подтверждённые бронирования</p></div></div></section>
+   <section className="container section-space">
+     <div className="section-top"><div><span className="eyebrow">ПОДБОРКА ДЛЯ ВАС</span><h2>Откройте новые места</h2><p>Выберите отель, который подходит именно вам.</p></div><Link className="text-link" to="/hotels">Все отели <ArrowRight size={18}/></Link></div>
+     {error && <Alert error={error}/>}
+     {displayState === 'loading' && <Spinner label="Загружаем отели…"/>}
+     {displayState === 'sign-in' && <Empty icon={Hotel} title="Войдите, чтобы посмотреть отели" text="Каталог защищён авторизацией. После входа вы увидите реальные отели и цены." action={<Link to="/login" className="btn btn-primary">Войти в аккаунт</Link>}/>}
+     {displayState === 'empty' && <Empty icon={Hotel} title="Отели пока не добавлены" text="Администратор может добавить первые отели через панель управления."/>}
+     {displayState === 'error' && <div className="catalog-retry"><Button onClick={() => setReload(n => n + 1)}>Повторить загрузку</Button></div>}
+     {displayState === 'cards' && <>
+       {loading && <Spinner label="Обновляем отели…"/>}
+       <div className="cards-grid">{hotels.map((hotel, i) => <HotelCard key={hotel.id} hotel={hotel} index={i}/>)}</div>
+     </>}
+   </section>
+   <section className="container cta-banner"><div><span className="eyebrow">ВАШИ ПОЕЗДКИ</span><h2>Всё для путешествия — в одном месте</h2><p>Управляйте бронями, следите за статусами и возвращайтесь к любимым отелям.</p><Link className="btn btn-white" to="/account">Перейти в личный кабинет <ArrowRight size={17}/></Link></div><div className="cta-art"><BedDouble size={104}/></div></section>
+ </>
+}
 export function HotelCard({hotel,index=0,search=''}){
  const subtitle=hotel?.address||hotel?.city||'Адрес не указан'
  return <article className="hotel-card"><Link className="hotel-card-photo" to={`/hotels/${hotel.id}${search?`?${search}`:''}`}><ImageBlock hotelId={hotel.id} fallback={index} alt={hotel.name}/></Link><div className="hotel-card-body"><div className="hotel-title-row"><Link to={`/hotels/${hotel.id}${search?`?${search}`:''}`}><h3>{hotel.name}</h3></Link><Stars rating={hotel.rating}/></div><p className="muted hotel-address"><MapPin size={15}/>{subtitle}</p><Amenities items={hotel.amenities} limit={3}/><div className="hotel-card-bottom"><span className="hotel-category">{hotel.description?.slice(0,65)||'Стоимость и номера — в карточке отеля'}</span><Link className="btn btn-primary btn-small" to={`/hotels/${hotel.id}${search?`?${search}`:''}`}>Подробнее <ChevronRight size={16}/></Link></div></div></article>
@@ -76,7 +117,7 @@ export function CatalogPage(){
    return ()=>{active=false;controller.abort()}
  },[user,page,city,rating,sort,amenities])
  function toggle(name){setPage(0);setAmenities(a=>a.includes(name)?a.filter(i=>i!==name):[...a,name])}
- return <div className="container catalog-page"><PageTitle eyebrow="ИССЛЕДУЙТЕ МИР" title="Каталог отелей" subtitle="Найдите идеальное место для следующей поездки."/><SearchBar compact defaults={{city,checkIn:params.get('checkIn'),checkOut:params.get('checkOut'),guests:params.get('guests')}}/><div className="catalog-layout"><aside className="filters-panel"><div className="filters-top"><b><SlidersHorizontal size={18}/> Фильтры</b><button className="link-button" onClick={()=>{setRating(0);setAmenities([]);setPage(0);setParams(p=>{p.delete('city');return p})}}>Сбросить</button></div><h4>Рейтинг</h4><div className="filter-stack">{[5,4,3].map(x=><label key={x} className="check-line"><input type="radio" name="rating" checked={rating===x} onChange={()=>{setRating(x);setPage(0)}}/><span><Star size={14} fill="#f9bc45" color="#f9bc45"/> {x}+ звёзд</span></label>)}<label className="check-line"><input type="radio" name="rating" checked={rating===0} onChange={()=>{setRating(0);setPage(0)}}/>Любой рейтинг</label></div><h4>Удобства</h4><div className="filter-stack">{HOTEL_AMENITIES.map(a=><label key={a} className="check-line"><input type="checkbox" checked={amenities.includes(a)} onChange={()=>toggle(a)}/>{amenity(a)}</label>)}</div></aside><section className="catalog-results"><div className="results-top"><div className="catalog-count"><b>Отелей в каталоге: {totalElements}</b>{!loading && totalElements > 0 && <small>Показано {page * CATALOG_PAGE_SIZE + 1}–{Math.min((page + 1) * CATALOG_PAGE_SIZE,totalElements)} из {totalElements}</small>}</div><label className="sort-select">Сортировать: <select value={sort} onChange={e=>{setSort(e.target.value);setPage(0)}}><option value="id">По добавлению</option><option value="name">По названию</option><option value="rating">По рейтингу</option></select></label></div>{params.get('checkIn') && params.get('checkOut') && <p className="catalog-availability-note"><CalendarDays size={17}/> Поездка: {formatDate(params.get('checkIn'))} — {formatDate(params.get('checkOut'))}, гостей: {params.get('guests') || '2'}. Список показывает отели из каталога, а не подтверждённую доступность. Чтобы узнать, есть ли свободные номера на эти даты, откройте отель и нажмите «Найти номера».</p>}{error&&<Alert error={error}/>} {!user?<Empty icon={Hotel} title="Для просмотра каталога требуется вход" text="Войдите в аккаунт, чтобы увидеть все отели." action={<Link className="btn btn-primary" to="/login">Войти</Link>}/>:loading?<Spinner/>:<>{hotels.length===0?<Empty icon={Search} title="По вашему запросу ничего не найдено" text="Попробуйте изменить город или параметры фильтрации."/>:<div className="catalog-cards">{hotels.map((hotel,i)=><HotelCard key={hotel.id} hotel={hotel} index={i} search={q}/>)}</div>}<Pagination page={page} totalPages={totalPages} onChange={setPage}/></>}</section></div></div>
+ return <div className="container catalog-page"><PageTitle eyebrow="ИССЛЕДУЙТЕ МИР" title="Каталог отелей" subtitle="Найдите идеальное место для следующей поездки."/><SearchBar compact defaults={{city,checkIn:params.get('checkIn'),checkOut:params.get('checkOut'),guests:params.get('guests')}}/><div className="catalog-layout"><aside className="filters-panel"><div className="filters-top"><b><SlidersHorizontal size={18}/> Фильтры</b><button className="link-button" onClick={()=>{setRating(0);setAmenities([]);setPage(0);setParams(p=>{p.delete('city');return p})}}>Сбросить</button></div><h4>Рейтинг</h4><div className="filter-stack">{[5,4,3].map(x=><label key={x} className="check-line"><input type="radio" name="rating" checked={rating===x} onChange={()=>{setRating(x);setPage(0)}}/><span><Star size={14} fill="#f9bc45" color="#f9bc45"/> {x}+ звёзд</span></label>)}<label className="check-line"><input type="radio" name="rating" checked={rating===0} onChange={()=>{setRating(0);setPage(0)}}/>Любой рейтинг</label></div><h4>Удобства</h4><div className="filter-stack">{HOTEL_AMENITIES.map(a=><label key={a} className="check-line"><input type="checkbox" checked={amenities.includes(a)} onChange={()=>toggle(a)}/>{amenity(a)}</label>)}</div></aside><section className="catalog-results"><div className="results-top"><div className="catalog-count"><b>{user && loading && hotels.length === 0 ? 'Загружаем отели…' : `Отелей в каталоге: ${totalElements}`}</b>{!loading && totalElements > 0 && <small>Показано {page * CATALOG_PAGE_SIZE + 1}–{Math.min((page + 1) * CATALOG_PAGE_SIZE,totalElements)} из {totalElements}</small>}</div><label className="sort-select">Сортировать: <select value={sort} onChange={e=>{setSort(e.target.value);setPage(0)}}><option value="id">По добавлению</option><option value="name">По названию</option><option value="rating">По рейтингу</option></select></label></div>{params.get('checkIn') && params.get('checkOut') && <p className="catalog-availability-note"><CalendarDays size={17}/> Поездка: {formatDate(params.get('checkIn'))} — {formatDate(params.get('checkOut'))}, гостей: {params.get('guests') || '2'}. Список показывает отели из каталога, а не подтверждённую доступность. Чтобы узнать, есть ли свободные номера на эти даты, откройте отель и нажмите «Найти номера».</p>}{error&&<Alert error={error}/>} {!user?<Empty icon={Hotel} title="Для просмотра каталога требуется вход" text="Войдите в аккаунт, чтобы увидеть все отели." action={<Link className="btn btn-primary" to="/login">Войти</Link>}/>:loading?<Spinner/>:<>{hotels.length===0?<Empty icon={Search} title="По вашему запросу ничего не найдено" text="Попробуйте изменить город или параметры фильтрации."/>:<div className="catalog-cards">{hotels.map((hotel,i)=><HotelCard key={hotel.id} hotel={hotel} index={i} search={q}/>)}</div>}<Pagination page={page} totalPages={totalPages} onChange={setPage}/></>}</section></div></div>
 }
 export function HotelPage(){const {id}=useParams();const [params]=useSearchParams();const navigate=useNavigate();const [hotel,setHotel]=useState(null);const [photos,setPhotos]=useState([]);const [photosError,setPhotosError]=useState('');const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [checkIn,setCheckIn]=useState(params.get('checkIn')||plusDays(1));const [checkOut,setCheckOut]=useState(params.get('checkOut')||plusDays(3));const [guests,setGuests]=useState(Number(params.get('guests')||2));const [recommend,setRecommend]=useState([]);const [searching,setSearching]=useState(false);const [queried,setQueried]=useState(false);const [searchStatus,setSearchStatus]=useState('idle');const [searchMessage,setSearchMessage]=useState('');const searchIdRef=useRef(0);const searchAbortRef=useRef(null)
  useEffect(()=>{
