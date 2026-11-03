@@ -3,6 +3,7 @@ package com.hotelbooking.hotel.controller;
 import com.hotelbooking.hotel.dto.request.HotelRequest;
 import com.hotelbooking.hotel.dto.response.HotelResponse;
 import com.hotelbooking.hotel.entity.HotelAmenity;
+import com.hotelbooking.hotel.service.HotelSearchService;
 import com.hotelbooking.hotel.service.HotelService;
 import com.hotelbooking.hotel.strategy.RoomSelectionMode;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,9 +36,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class HotelController {
 
   private final HotelService hotelService;
+  private final HotelSearchService hotelSearchService;
 
-  public HotelController(HotelService hotelService) {
+  public HotelController(HotelService hotelService, HotelSearchService hotelSearchService) {
     this.hotelService = hotelService;
+    this.hotelSearchService = hotelSearchService;
   }
 
   @Operation(
@@ -107,7 +110,7 @@ public class HotelController {
           @RequestParam(required = false)
           List<HotelAmenity> amenities) {
     return ResponseEntity.ok(
-        hotelService.searchHotels(
+        hotelSearchService.searchHotels(
             name, address, minRating, amenity, sortBy, direction, pageable, q, amenities));
   }
 
@@ -124,7 +127,7 @@ public class HotelController {
   @GetMapping("/{id}")
   public ResponseEntity<HotelResponse> getHotelById(
       @Parameter(description = "Идентификатор отеля.") @PathVariable Long id) {
-    return ResponseEntity.ok(hotelService.getHotelById(id));
+    return ResponseEntity.ok(hotelSearchService.getHotelById(id));
   }
 
   @Operation(

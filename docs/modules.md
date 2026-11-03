@@ -14,7 +14,7 @@ Spring MVC + Data JPA + Security: регистрация и логин, выда
 
 ## hotel-service (:8082)
 
-Хранит отели, номера, резервирование по датам и фотографии; выполняет статистику, фильтры и алгоритмы рекомендации. `RoomService` отвечает за CRUD и рекомендации; `RoomSearchService` — за чтение, фильтрацию, сортировку и пагинацию номеров. `RoomReservationController` открывает внутренний контракт подтверждения/освобождения, `RoomSelectionStrategy` с реализациями `LeastBookedStrategy` и `MostExpensiveStrategy` обеспечивает подбор. Хранилище — `jdbc:h2:mem:hoteldb`; фото — локальные файлы (`HOTEL_PHOTOS_DIR`).
+Хранит отели, номера, резервирование по датам и фотографии; выполняет статистику, фильтры и алгоритмы рекомендации. `HotelService` отвечает за CRUD отелей и настройку стратегии подбора, `HotelSearchService` — за чтение, фильтрацию, сортировку и пагинацию отелей. `RoomService` отвечает за CRUD и рекомендации; `RoomSearchService` — за чтение, фильтрацию, сортировку и пагинацию номеров. `RoomReservationController` открывает внутренний контракт подтверждения/освобождения, `RoomSelectionStrategy` с реализациями `LeastBookedStrategy` и `MostExpensiveStrategy` обеспечивает подбор. Хранилище — `jdbc:h2:mem:hoteldb`; фото — локальные файлы (`HOTEL_PHOTOS_DIR`).
 
 ## Межсервисные границы
 

@@ -21,6 +21,7 @@ import com.hotelbooking.hotel.dto.response.RoomResponse;
 import com.hotelbooking.hotel.entity.RoomReservation;
 import com.hotelbooking.hotel.service.HotelPhotoService;
 import com.hotelbooking.hotel.service.HotelPresentationService;
+import com.hotelbooking.hotel.service.HotelSearchService;
 import com.hotelbooking.hotel.service.HotelService;
 import com.hotelbooking.hotel.service.HotelStatisticsService;
 import com.hotelbooking.hotel.service.RoomDetailsService;
@@ -86,6 +87,7 @@ class HotelRoutesMvcTest {
   @Autowired private MockMvc mvc;
   @Autowired private RequestMappingHandlerMapping routeMapping;
   @MockitoBean private HotelService hotelService;
+  @MockitoBean private HotelSearchService hotelSearchService;
   @MockitoBean private HotelPhotoService hotelPhotoService;
   @MockitoBean private HotelPresentationService presentationService;
   @MockitoBean private HotelStatisticsService statisticsService;
@@ -520,7 +522,7 @@ class HotelRoutesMvcTest {
 
   @Test
   void missingHotelReturnsDomain404() throws Exception {
-    when(hotelService.getHotelById(1L))
+    when(hotelSearchService.getHotelById(1L))
         .thenThrow(new com.hotelbooking.hotel.exception.HotelNotFoundException(1L));
     mvc.perform(authorize(request(HttpMethod.GET, "/api/hotels/1"), "mvc-user", true))
         .andExpect(status().isNotFound())
