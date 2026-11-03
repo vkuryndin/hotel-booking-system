@@ -2,6 +2,7 @@ package com.hotelbooking.gateway.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -21,6 +22,7 @@ import reactor.core.publisher.Mono;
 /** Exercises Gateway token-state checks without starting Eureka or a real HTTP server. */
 class JwtRevocationFilterTest {
   private static final String SECRET = "gateway-test-secret";
+  private static final String TRACE_ID = "a0141b1f-563b-4aae-9bdb-bbd0aa9eaff2";
 
   private record CallResult(
       MockServerWebExchange exchange, int forwarded, int authChecks, ClientRequest request) {}
@@ -41,7 +43,8 @@ class JwtRevocationFilterTest {
                 });
 
     JwtRevocationFilter filter = new JwtRevocationFilter(builder, SECRET);
-    MockServerHttpRequest request = MockServerHttpRequest.method(method, path).build();
+    MockServerHttpRequest request =
+        MockServerHttpRequest.method(method, path).header(TraceWebFilter.HEADER, TRACE_ID).build();
 
     MockServerWebExchange exchange;
 
@@ -66,6 +69,36 @@ class JwtRevocationFilterTest {
         };
     filter.filter(exchange, chain).block();
     return new CallResult(exchange, forwarded.get(), checks.get(), captured.get());
+  }
+
+  private static void assertErrorBody(CallResult result, int status, String code, String path) {
+    String body = result.exchange().getResponse().getBodyAsString().block();
+    assertNotNull(body);
+    assertTrue(body.contains("\"timestamp\":"), body);
+    assertTrue(body.contains("\"status\":" + status), body);
+    assertTrue(body.contains("\"code\":\"" + code + "\""), body);
+    assertTrue(body.contains("\"message\":"), body);
+    assertTrue(body.contains("\"path\":\"" + path + "\""), body);
+    assertTrue(body.contains("\"traceId\":\"" + TRACE_ID + "\""), body);
+  }
+
+  @Test
+  void rejectedRequestsHaveUniformJsonErrorAndTraceId() {
+    assertErrorBody(
+        run(HttpMethod.GET, "/api/rooms", "USER", true, 401),
+        401,
+        "TOKEN_REVOKED",
+        "/api/rooms");
+    assertErrorBody(
+        run(HttpMethod.GET, "/api/hotels", "USER", true, 403),
+        403,
+        "PASSWORD_CHANGE_REQUIRED",
+        "/api/hotels");
+    assertErrorBody(
+        run(HttpMethod.GET, "/api/hotels", "USER", true, 503),
+        503,
+        "AUTH_SERVICE_UNAVAILABLE",
+        "/api/hotels");
   }
 
   @Test

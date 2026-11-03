@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -70,6 +71,25 @@ class HotelTokenAccessTest {
     assertFalse(interceptor.preHandle(request, response, new Object()));
     assertEquals(403, response.getStatus());
     assertTrue(response.getContentAsString().contains("GATEWAY_REQUIRED"));
+  }
+
+  @Test
+  void rejectedHotelRequestHasUniformErrorFieldsAndTraceId() throws Exception {
+    jwt("42", "USER", "hotel-service");
+    String traceId = "a0141b1f-563b-4aae-9bdb-bbd0aa9eaff2";
+    MDC.put("traceId", traceId);
+    try {
+      assertFalse(interceptor.preHandle(request, response, new Object()));
+      String body = response.getContentAsString();
+      assertTrue(body.contains("\"timestamp\":"), body);
+      assertTrue(body.contains("\"status\":403"), body);
+      assertTrue(body.contains("\"code\":\"GATEWAY_REQUIRED\""), body);
+      assertTrue(body.contains("\"message\":\"Use API Gateway\""), body);
+      assertTrue(body.contains("\"path\":\"/api/rooms\""), body);
+      assertTrue(body.contains("\"traceId\":\"" + traceId + "\""), body);
+    } finally {
+      MDC.remove("traceId");
+    }
   }
 
   @Test

@@ -9,6 +9,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.Authentication;
@@ -59,7 +60,7 @@ public final class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerI
           && audience.contains("hotel-service")) {
         return true;
       }
-      return reject(request, response, 403, "INVALID_SERVICE_TOKEN");
+      return reject(request, response, 403, "INVALID_SERVICE_TOKEN", "Invalid service token");
     }
 
     String supplied = request.getHeader(GATEWAY_HEADER);
@@ -69,11 +70,15 @@ public final class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerI
       return true;
     }
 
-    return reject(request, response, 403, "GATEWAY_REQUIRED");
+    return reject(request, response, 403, "GATEWAY_REQUIRED", "Use API Gateway");
   }
 
   private boolean reject(
-      HttpServletRequest request, HttpServletResponse response, int status, String code)
+      HttpServletRequest request,
+      HttpServletResponse response,
+      int status,
+      String code,
+      String message)
       throws IOException {
     response.setStatus(status);
     response.setContentType("application/json");
@@ -83,6 +88,12 @@ public final class UserTokenStateWebConfig implements WebMvcConfigurer, HandlerI
     body.put("timestamp", Instant.now().toString());
     body.put("status", status);
     body.put("code", code);
+    body.put("message", message);
+    body.put("path", request.getRequestURI());
+    String traceId = MDC.get("traceId");
+    if (traceId != null && !traceId.isBlank()) {
+      body.put("traceId", traceId);
+    }
     response.getWriter().write(JSON.writeValueAsString(body));
 
     return false;

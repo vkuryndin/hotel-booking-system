@@ -1,6 +1,5 @@
 package com.hotelbooking.gateway.config;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,7 +10,6 @@ import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -133,16 +131,19 @@ public final class JwtRevocationFilter implements GlobalFilter, Ordered {
   }
 
   private Mono<Void> reject(ServerWebExchange exchange, HttpStatus status, String code) {
-    var response = exchange.getResponse();
-    response.setStatusCode(status);
-    response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-
     if (status == HttpStatus.UNAUTHORIZED) {
-      response.getHeaders().set(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+      exchange.getResponse().getHeaders().set(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
     }
 
-    byte[] body = ("{\"code\":\"" + code + "\"}").getBytes(StandardCharsets.UTF_8);
-
-    return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
+    String message =
+        switch (code) {
+          case "INVALID_TOKEN" -> "Invalid or missing token";
+          case "TOKEN_REVOKED" -> "Token has been revoked";
+          case "PASSWORD_CHANGE_REQUIRED" -> "Password change required";
+          case "AUTH_SERVICE_UNAVAILABLE" -> "Authentication service unavailable";
+          case "FORBIDDEN" -> "Access denied";
+          default -> "Request rejected";
+        };
+    return GatewayErrorResponseWriter.write(exchange, status, code, message);
   }
 }

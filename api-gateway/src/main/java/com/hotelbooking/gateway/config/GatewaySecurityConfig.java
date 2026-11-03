@@ -70,7 +70,9 @@ public class GatewaySecurityConfig {
 
   @Bean
   public SecurityWebFilterChain securityFilterChain(
-      ServerHttpSecurity http, UrlBasedCorsConfigurationSource corsConfigurationSource) {
+      ServerHttpSecurity http,
+      UrlBasedCorsConfigurationSource corsConfigurationSource,
+      GatewaySecurityErrorHandler securityErrorHandler) {
     return http.cors(cors -> cors.configurationSource(corsConfigurationSource))
         .csrf(ServerHttpSecurity.CsrfSpec::disable)
         .authorizeExchange(
@@ -86,7 +88,17 @@ public class GatewaySecurityConfig {
                     .permitAll()
                     .anyExchange()
                     .authenticated())
-        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> {}))
+        .exceptionHandling(
+            exceptions ->
+                exceptions
+                    .authenticationEntryPoint(securityErrorHandler)
+                    .accessDeniedHandler(securityErrorHandler))
+        .oauth2ResourceServer(
+            oauth ->
+                oauth
+                    .authenticationEntryPoint(securityErrorHandler)
+                    .accessDeniedHandler(securityErrorHandler)
+                    .jwt(jwt -> {}))
         .build();
   }
 }
