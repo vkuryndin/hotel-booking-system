@@ -314,7 +314,7 @@ export function BookingDetailsPage() {
           <div><dt>Номер</dt><dd>{room ? `${room.number} · ${room.category}` : `ID #${booking.roomId || '—'}`}</dd></div>
           <div><dt>Дата создания</dt><dd>{booking.createdAt ? new Date(booking.createdAt).toLocaleString('ru-RU') : '—'}</dd></div>
         </dl>
-        {room?.pricePerNight!=null && <p className="muted smaller">Текущая цена номера: {formatMoney(room.pricePerNight)} за ночь. Итоговую стоимость исходного заказа Booking Service не возвращает.</p>}
+        {room?.pricePerNight!=null && <p className="muted smaller">Текущая цена номера: {formatMoney(room.pricePerNight)} за ночь.</p>}
         {booking.status==='CONFIRMED' && <Button type="button" variant="danger-light" disabled={cancelling} onClick={cancelBooking}>{cancelling?'Отменяем...':'Отменить бронирование'}</Button>}
       </section>
       <div className="booking-detail-galleries">
