@@ -21,15 +21,16 @@ function HotelPicker({value,onChange}) {
   const [revision,setRevision]=useState(0)
   useEffect(()=>{
     let active=true
+    const controller=new AbortController()
     setLoading(true);setError('')
-    api.hotelsPage({page,size:20,...(query?{q:query}:{})}).then(data=>{
+    api.hotelsPage({page,size:20,...(query?{q:query}:{})},{signal:controller.signal,forceRefresh:revision>0}).then(data=>{
       if(!active)return
       const items=arrayOf(data)
       setHotels(items)
       setPages(Math.max(1,Number(data.totalPages||1)))
-    }).catch(e=>{if(active){setHotels([]);setPages(1);setError(e.message)}})
+    }).catch(e=>{if(active&&e.name!=='AbortError')setError(`${e.message} Отображаемые данные могут быть устаревшими.`)})
       .finally(()=>{if(active)setLoading(false)})
-    return()=>{active=false}
+    return()=>{active=false;controller.abort()}
   },[query,page,revision])
   // Auto-select after the page loads; depend explicitly on the latest selection
   // and handler, rather than capturing stale props inside the fetch effect.
@@ -92,15 +93,16 @@ export function AdminRooms(){
  const [revision,setRevision]=useState(0)
  useEffect(()=>{
    let active=true
+   const controller=new AbortController()
    setRooms([]);setError('')
-   if(!hotelId)return ()=>{active=false}
+   if(!hotelId)return ()=>{active=false;controller.abort()}
    setLoading(true)
-   api.roomsPage({hotelId,page,size:20}).then(data=>{
+   api.roomsPage({hotelId,page,size:20},{signal:controller.signal}).then(data=>{
      if(!active)return
      setRooms(arrayOf(data).map(normalRoom));setPages(Math.max(1,Number(data.totalPages||1)))
-   }).catch(err=>{if(active){setError(err.message);setRooms([]);setPages(1)}})
+   }).catch(err=>{if(active&&err.name!=='AbortError')setError(`${err.message} Отображаемые данные могут быть устаревшими.`)})
      .finally(()=>{if(active)setLoading(false)})
-   return()=>{active=false}
+   return()=>{active=false;controller.abort()}
  },[hotelId,page,revision])
  function refresh(){setRevision(v=>v+1)}
  return <>
@@ -111,7 +113,7 @@ export function AdminRooms(){
    {wizard&&createPortal(<RoomCreationWizard key={wizard.room?.id||'create'} hotelId={hotelId} hotelName={hotel?.name||`Отель #${hotelId}`}
      roomToEdit={wizard.room||null} initialStep={wizard.initialStep||0} onSaved={refresh} onClose={()=>{setWizard(null);refresh()}}/>,document.body)}
    {loading?<Spinner/>:<div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>Номер</th><th>Категория</th><th>Гости</th><th>Цена за ночь</th><th>Удобства</th><th>Фото</th><th>Действия</th></tr></thead>
-   <tbody>{rooms.map(room=><tr key={room.id}><td><b>№ {room.number}</b><small>ID {room.id}</small></td><td>{room.category}</td><td>{room.capacity}</td><td>{formatMoney(room.pricePerNight)}</td><td><Amenities items={room.amenities} limit={2}/></td><td className="room-admin-preview"><RoomPhotoImage roomId={room.id} hotelId={hotelId} alt={`Номер ${room.number}`}/></td><td className="room-admin-controls"><Button type="button" size="small" variant="outline" onClick={()=>setWizard({mode:'edit',room,initialStep:0})}><Pencil size={15}/> Изменить</Button><Button type="button" size="small" variant="outline" onClick={()=>setWizard({mode:'edit',room,initialStep:1})}><ImagePlus size={15}/> Фотографии</Button></td></tr>)}</tbody></table>
+   <tbody>{rooms.map(room=><tr key={room.id}><td><b>№ {room.number}</b><small>ID {room.id}</small></td><td>{room.category}</td><td>{room.capacity}</td><td>{formatMoney(room.pricePerNight)}</td><td><Amenities items={room.amenities} limit={2}/></td><td className="room-admin-preview"><RoomPhotoImage retryable roomId={room.id} hotelId={hotelId} alt={`Номер ${room.number}`}/></td><td className="room-admin-controls"><Button type="button" size="small" variant="outline" onClick={()=>setWizard({mode:'edit',room,initialStep:0})}><Pencil size={15}/> Изменить</Button><Button type="button" size="small" variant="outline" onClick={()=>setWizard({mode:'edit',room,initialStep:1})}><ImagePlus size={15}/> Фотографии</Button></td></tr>)}</tbody></table>
    {!hotelId?<Empty title="Выберите отель"/>:rooms.length===0&&!error?<Empty title="Для этого отеля нет номеров" action={<Button type="button" onClick={()=>setWizard({mode:'create'})}>Создать номер</Button>}/>:null}
    <Pagination page={page} totalPages={pages} onChange={setPage}/></div>}
  </>
@@ -126,13 +128,13 @@ export function AdminBookings(){
  const [pages,setPages]=useState(1)
  const [revision,setRevision]=useState(0)
  useEffect(()=>{
-   let active=true;setLoading(true);setError('')
-   api.bookingsAdmin({page,size:20,...(status==='ALL'?{}:{status})}).then(data=>{
+   let active=true;const controller=new AbortController();setLoading(true);setError('')
+   api.bookingsAdmin({page,size:20,...(status==='ALL'?{}:{status})},{signal:controller.signal}).then(data=>{
      if(!active)return
      setBookings(arrayOf(data));setPages(Math.max(1,Number(data.totalPages||1)))
-   }).catch(e=>{if(active){setBookings([]);setPages(1);setError(e.message)}})
+   }).catch(e=>{if(active&&e.name!=='AbortError')setError(`${e.message} Отображаемые данные могут быть устаревшими.`)})
      .finally(()=>{if(active)setLoading(false)})
-   return()=>{active=false}
+   return()=>{active=false;controller.abort()}
  },[status,page,revision])
  return <><PageTitle eyebrow="ЗАКАЗЫ" title="Все бронирования" subtitle="Статусы бронирований в Booking Service."/>
  <div className="admin-filter"><label>Статус<select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="ALL">Все</option>{['CONFIRMED','CANCELLED','PENDING','CANCELLING'].map(s=><option key={s} value={s}>{s}</option>)}</select></label><Button variant="outline" onClick={()=>setRevision(v=>v+1)}><RefreshCcw size={16}/> Обновить</Button></div>
@@ -148,13 +150,13 @@ export function AdminStatistics(){
  const [error,setError]=useState('')
  const [loading,setLoading]=useState(false)
  useEffect(()=>{
-   let active=true;setStats(null);setError('')
-   if(!hotelId)return()=>{active=false}
+   let active=true;const controller=new AbortController();setStats(null);setError('')
+   if(!hotelId)return()=>{active=false;controller.abort()}
    setLoading(true)
-   api.statistics(hotelId).then(data=>{if(active)setStats(data)})
-     .catch(e=>{if(active){setStats(null);setError(e.message)}})
+   api.statistics(hotelId,{signal:controller.signal}).then(data=>{if(active)setStats(data)})
+     .catch(e=>{if(active&&e.name!=='AbortError'){setStats(null);setError(e.message)}})
      .finally(()=>{if(active)setLoading(false)})
-   return()=>{active=false}
+   return()=>{active=false;controller.abort()}
  },[hotelId])
  const metrics=Object.entries(stats||{}).filter(([,v])=>typeof v==='number'||typeof v==='string'||typeof v==='boolean')
  return <><PageTitle eyebrow="АНАЛИТИКА" title="Статистика отелей" subtitle="Актуальные показатели Hotel Service, без имитации данных."/>

@@ -226,9 +226,10 @@ export function AdminUsers() {
   const [nameQuery, setNameQuery] = useState('')
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
     setLoading(true)
     setError('')
-    api.adminUsers({page, size: PAGE_SIZE, ...(nameQuery ? {q:nameQuery} : {})}).then(response => {
+    api.adminUsers({page, size: PAGE_SIZE, ...(nameQuery ? {q:nameQuery} : {})}, {signal:controller.signal}).then(response => {
       if (!active) return
       const entries = Array.isArray(response?.content) ? response.content : []
       const maxPage = Math.max(1, Number(response?.totalPages ?? 1))
@@ -236,9 +237,9 @@ export function AdminUsers() {
       setTotalPages(maxPage)
       setTotalElements(Number(response?.totalElements ?? entries.length))
       if(page >= maxPage) setPage(maxPage - 1)
-    }).catch(err => {if(active){setUsers([]);setTotalElements(0);setTotalPages(1);setError(err.message)}})
+    }).catch(err => {if(active && err.name!=='AbortError'){setError(`${err.message} Ранее загруженные данные могут не соответствовать выбранной странице или фильтру.`)}})
       .finally(() => {if(active) setLoading(false)})
-    return () => {active = false}
+    return () => {active = false;controller.abort()}
   }, [page, revision, nameQuery])
 
   const isSearching = Boolean(nameQuery)

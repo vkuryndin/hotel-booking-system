@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getPageWindow } from '../src/utils/paging.js'
-import { createPromiseCache } from '../src/utils/promiseCache.js'
 import { accountLogin, arrayOf, fullName, nights, normalRoom, statusName } from '../src/utils/format.js'
 
 test('pagination stays within bounds for the first, middle and last pages',()=>{
@@ -14,35 +13,6 @@ test('pagination stays within bounds for the first, middle and last pages',()=>{
 test('pagination safely clamps invalid numbers',()=>{
   assert.deepEqual(getPageWindow(-1,0).pages,[0])
   assert.equal(getPageWindow('garbage','garbage').current,0)
-})
-test('in-flight data is fetched only once per key',async()=>{
-  let calls=0
-  const cache=createPromiseCache()
-  const a=cache('123',()=>{calls++;return Promise.resolve({id:123})})
-  const b=cache('123',()=>{calls++;return Promise.resolve({id:123})})
-  assert.strictEqual(a,b)
-  assert.deepEqual(await a,{id:123})
-  assert.equal(calls,1)
-})
-test('failed requests are not cached',async()=>{
-  let calls=0
-  const cache=createPromiseCache()
-  await assert.rejects(cache('x',()=>{calls++;throw Error('offline')}))
-  await Promise.resolve() // Flush microtasks after rejection cleanup.
-  await cache('x',()=>{calls++;return Promise.resolve(true)})
-  assert.equal(calls,2)
-})
-test('cache expires and is bounded',async()=>{
-  let now=0,calls=0
-  const cache=createPromiseCache({maxEntries:2,ttlMs:10,now:()=>now})
-  await cache('a',()=>++calls)
-  await cache('b',()=>++calls)
-  await cache('c',()=>++calls)
-  await cache('a',()=>++calls)
-  assert.equal(calls,4)
-  now=11
-  await cache('a',()=>++calls)
-  assert.equal(calls,5)
 })
 test('booking DTO helpers tolerate missing fields and real status values',()=>{
   assert.deepEqual(arrayOf({content:[{id:1}]}),[{id:1}])

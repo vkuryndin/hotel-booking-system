@@ -1,9 +1,8 @@
-import { api, tokenStorage } from '../api/client.js'
-import { createPromiseCache } from './promiseCache.js'
+import { api } from '../api/client.js'
 
-// Keyed by current JWT to prevent cross-account reuse; bounded and short-lived.
-const cached=createPromiseCache({maxEntries:150,ttlMs:90_000})
-const lookup=(kind,id,loader)=>cached(`${tokenStorage.get()||''}:${kind}:${id}`,loader)
-export const cachedRoom = id => lookup('room',id,()=>api.room(id))
-export const cachedHotel = id => lookup('hotel',id,()=>api.hotel(id))
-export const cachedRoomPhotos = id => lookup('roomPhotos',id,()=>api.roomPhotos(id))
+// The central API client now owns its bounded GET cache and invalidation after writes.
+// Keep these helpers so existing booking-detail callers share that cache without
+// storing the JWT in cache keys or maintaining a second stale layer.
+export const cachedRoom = id => api.room(id)
+export const cachedHotel = id => api.hotel(id)
+export const cachedRoomPhotos = id => api.roomPhotos(id)

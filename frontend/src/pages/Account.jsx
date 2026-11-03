@@ -225,9 +225,9 @@ export function AccountBookings(){
      if(!active)return
      setList(arrayOf(data));setTotalPages(Math.max(1,Number(data.totalPages||1)))
      if(bookingPage>=Math.max(1,Number(data.totalPages||1)))setBookingPage(0)
-   }).catch(e=>{if(active){setList([]);setTotalPages(1);setError(e.message)}})
+   }).catch(e=>{if(active&&e.name!=='AbortError')setError(`${e.message} Показана ранее загруженная история.`)})
      .finally(()=>{if(active)setLoading(false)})
-   return()=>{active=false}
+   return()=>{active=false;controller.abort()}
  },[status,bookingPage,revision])
  async function cancel(booking){
    if(!window.confirm(`Отменить бронирование #${booking.id}?`))return

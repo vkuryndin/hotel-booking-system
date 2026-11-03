@@ -911,3 +911,24 @@
 
 /* Login rate limiter: visible feedback while another request is blocked. */
 .login-rate-limit-note { margin: 0 0 16px; font-size: 0.9rem; font-weight: 600; line-height: 1.55; color: var(--text-secondary, #5e6677); }
+
+/* Retry button is shown only in standalone, non-linked image placeholders. */
+.image-retry-control {
+  position:absolute;
+  left:50%;
+  bottom:5px;
+  transform:translateX(-50%);
+  z-index:2;
+  max-width:calc(100% - 10px);
+  padding:4px 7px;
+  border:1px solid #c3d0df;
+  background:#fff;
+  color:#38547c;
+  border-radius:7px;
+  font:inherit;
+  font-size:11px;
+  font-weight:700;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.image-retry-control:hover { border-color:#3567bf; }

@@ -619,13 +619,14 @@ export function AdminHotels() {
 
   useEffect(()=>{
     let active=true
+    const controller=new AbortController()
     setLoading(true);setLoadError('')
-    api.hotelsPage({page:listPage,size:HOTEL_LIST_PAGE_SIZE}).then(result=>{
+    api.hotelsPage({page:listPage,size:HOTEL_LIST_PAGE_SIZE}, {signal:controller.signal,forceRefresh:refreshVersion>0}).then(result=>{
       if(!active)return
       setHotels(arrayOf(result));setListPages(Math.max(1,Number(result.totalPages||1)))
-    }).catch(err=>{if(active){setHotels([]);setListPages(1);setLoadError(err.message)}})
+    }).catch(err=>{if(active&&err.name!=='AbortError')setLoadError(`${err.message} Показан ранее загруженный список, если он доступен.`)})
       .finally(()=>{if(active)setLoading(false)})
-    return()=>{active=false}
+    return()=>{active=false;controller.abort()}
   },[listPage,refreshVersion])
   function wizardDone(hotel) {
     const edited=wizard?.mode==='edit'
@@ -652,7 +653,7 @@ export function AdminHotels() {
 
     {loading ? <Spinner/> : <div className="admin-hotel-list">
       {hotels.map((hotel,index) => <div className="admin-hotel-row" key={hotel.id}>
-        <ImageBlock key={`${hotel.id}-${refreshVersion}`} hotelId={hotel.id} fallback={index} alt={hotel.name}/>
+        <ImageBlock retryable key={`${hotel.id}-${refreshVersion}`} hotelId={hotel.id} fallback={index} alt={hotel.name}/>
         <div><b>{hotel.name}</b><p>{hotel.address || hotel.city}</p>
           <small>ID: {hotel.id} · {hotel.rating != null ? `Рейтинг: ${hotel.rating}` : 'Без рейтинга'}</small>
         </div>

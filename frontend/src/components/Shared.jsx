@@ -1,4 +1,4 @@
-import { createElement, useEffect, useState } from 'react'
+import { createElement, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UsersRound, BedDouble, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleUserRound, CreditCard, Hotel, ImagePlus, LayoutDashboard, LogOut, MapPin, Menu, Search, Settings, Shield, Star, UserRound, X, Wifi, CircleAlert, LoaderCircle, ArrowRight, Home, CheckCircle2, SlidersHorizontal, ImageOff, Eye, EyeOff } from 'lucide-react'
 import { api, imageBlob } from '../api/client.js'
@@ -35,42 +35,56 @@ export function HotelNoPhotos({message='Нет фотографий отеля',
     <ImageOff size={34} strokeWidth={1.6} aria-hidden="true"/><span>{message}</span>
   </div>
 }
-export function ImageBlock({hotelId,photoId,alt='',className='',fallback=0}) {
-  const [url,setUrl]=useState(null)
-  const [state,setState]=useState('loading')
-  useEffect(()=>{
-    let alive=true
+export function ImageBlock({ hotelId, photoId, alt = '', className = '', fallback = 0, retryable = false }) {
+  const [url, setUrl] = useState(null)
+  const [state, setState] = useState('loading')
+  const [retry, setRetry] = useState(0)
+  const [visible, setVisible] = useState(() => typeof IntersectionObserver === 'undefined')
+  const frameRef = useRef(null)
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') { setVisible(true); return }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { setVisible(true); observer.disconnect() }
+    }, { rootMargin: '280px' })
+    if (frameRef.current) observer.observe(frameRef.current)
+    return () => observer.disconnect()
+  }, [])
+  useEffect(() => {
+    if (!visible) return
+    let active = true
     let objectUrl
-    const controller=new AbortController()
+    const controller = new AbortController()
     setUrl(null)
     setState(hotelId ? 'loading' : 'empty')
-    if (!hotelId) return () => controller.abort()
-    async function load(){
+    async function load() {
+      if (!hotelId) return
       try {
-        let id=photoId
-        if(!id){
-          const list=await api.photos(hotelId)
-          if(!alive)return
-          const photos=Array.isArray(list)?list:[]
-          id=(photos.find(p=>p.primary)||photos[0])?.id
+        let id = photoId
+        if (!id) {
+          const photos = await api.photos(hotelId, { signal: controller.signal })
+          if (!active) return
+          const list = Array.isArray(photos) ? photos : []
+          id = (list.find(photo => photo.primary) || list[0])?.id
         }
-        if(!id){ if(alive)setState('empty'); return }
-        const blob=await imageBlob(`/hotels/${hotelId}/photos/${id}/file`,controller.signal)
-        if(!alive)return
-        objectUrl=URL.createObjectURL(blob)
+        if (!id) { if (active) setState('empty'); return }
+        const blob = await imageBlob(`/hotels/${hotelId}/photos/${id}/file`, controller.signal)
+        if (!active) return
+        objectUrl = URL.createObjectURL(blob)
         setUrl(objectUrl)
         setState('ready')
-      } catch (err) {
-        if(alive && err.name!=='AbortError')setState('error')
+      } catch (error) {
+        if (active && error.name !== 'AbortError') setState('error')
       }
     }
     load()
-    return ()=>{alive=false;controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)}
-  },[hotelId,photoId])
-  return <div className={`photo-frame photo-${fallback%5} ${className}`}>
-    {state==='ready'&&url ? <img src={url} alt={alt||'Фотография отеля'} loading="lazy"/>
-      : state==='loading' ? <div className="hotel-no-photos hotel-photo-loading" role="status"><LoaderCircle size={24} className="spin"/><span>Загружаем фото…</span></div>
-      : <HotelNoPhotos message={state==='error'?'Не удалось загрузить фото отеля':'Нет фотографий отеля'}/>}
+    return () => { active = false; controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [hotelId, photoId, visible, retry])
+  return <div ref={frameRef} className={`photo-frame photo-${fallback % 5} ${className}`}>
+    {state === 'ready' && url
+      ? <img src={url} alt={alt || 'Фотография отеля'} loading="lazy" decoding="async"/>
+      : state === 'loading' || (!visible && hotelId)
+        ? <div className="hotel-no-photos hotel-photo-loading" role="status"><LoaderCircle size={24} className="spin"/><span>Загружаем фото…</span></div>
+        : <><HotelNoPhotos message={state === 'error' ? 'Не удалось загрузить фото отеля' : 'Нет фотографий отеля'}/>{retryable && state === 'error' && <button className="image-retry-control" type="button" onClick={() => setRetry(n => n + 1)} aria-label="Повторить загрузку фотографии">Повторить</button>}</>}
   </div>
 }
 /** Shared numeric pagination; page and callback use zero-based indexes. */

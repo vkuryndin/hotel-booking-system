@@ -19,8 +19,9 @@ export function RoomNoPhotos({ compact = false, message = 'Нет фотогра
   </div>
 }
 
-export function RoomPhotoImage({ roomId, photoId, hotelId, className = '', alt = 'Фотография номера', fallback = 0, fallbackToHotel = false }) {
+export function RoomPhotoImage({ roomId, photoId, hotelId, className = '', alt = 'Фотография номера', fallback = 0, fallbackToHotel = false, retryable = false }) {
   const [state, setState] = useState({ status: 'loading', url: null })
+  const [retry,setRetry] = useState(0)
   const rootRef=useRef(null)
   const [visible,setVisible]=useState(()=>typeof IntersectionObserver==='undefined')
   useEffect(()=>{
@@ -58,11 +59,12 @@ export function RoomPhotoImage({ roomId, photoId, hotelId, className = '', alt =
     }
     load()
     return () => { active = false; controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
-  }, [roomId, photoId, visible])
-  if (state.url) return <div ref={rootRef} className={`photo-frame ${className}`}><img src={state.url} alt={alt}/></div>
+  }, [roomId, photoId, visible, retry])
+  if (state.url) return <div ref={rootRef} className={`photo-frame ${className}`}><img src={state.url} alt={alt} loading="lazy" decoding="async"/></div>
   if (fallbackToHotel && hotelId && state.status !== 'loading') return <ImageBlock hotelId={hotelId} className={className} alt={alt} fallback={fallback}/>
   return <div ref={rootRef} className={`photo-frame room-empty-photo-frame ${className}`}>
     <RoomNoPhotos compact={false} message={state.status === 'loading' ? 'Загружаем фото…' : state.status === 'error' ? 'Не удалось загрузить фото' : 'Нет фотографий номера'}/>
+    {retryable && state.status === 'error' && <button className="image-retry-control" type="button" onClick={() => setRetry(n => n + 1)} aria-label="Повторить загрузку фотографии">Повторить</button>}
   </div>
 }
 
