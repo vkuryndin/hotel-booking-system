@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { api, tokenStorage } from '../api/client.js'
+import { clearLoginCooldown, saveLoginCooldown } from '../utils/loginRateLimit.js'
 
 const AuthContext = createContext(null)
 const FORCE_PASSWORD_KEY = 'hotel_booking_password_change_required'
@@ -49,7 +50,11 @@ export function AuthProvider({children}) {
     return ()=>{active=false}
   },[token,logout,passwordChangeRequired])
   async function login(email,password){
-    const response=await api.login({email,password})
+    const response=await api.login({email,password}).catch(err=>{
+      if(err.status===429) saveLoginCooldown(err.retryAfterSeconds)
+      throw err
+    })
+    clearLoginCooldown()
     const raw=response?.accessToken || response?.token
     if(!raw) throw Error('Сервер не вернул accessToken')
     tokenStorage.set(raw)

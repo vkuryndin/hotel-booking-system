@@ -1,3 +1,6 @@
+import { USERNAME_RULES } from '../utils/username.js'
+import { parseRetryAfterSeconds } from '../utils/loginRateLimit.js'
+
 const BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/,'')
 const KEY = 'hotel_booking_token'
 export const tokenStorage = {
@@ -6,12 +9,13 @@ export const tokenStorage = {
   clear: () => sessionStorage.removeItem(KEY),
 }
 export class ApiError extends Error {
-  constructor(message, status, code, traceId) { super(message); this.name='ApiError'; this.status=status; this.code=code; this.traceId=traceId }
+  constructor(message, status, code, traceId, retryAfterSeconds=null) { super(message); this.name='ApiError'; this.status=status; this.code=code; this.traceId=traceId; this.retryAfterSeconds=retryAfterSeconds }
 }
 function errorText(data, response) {
   if (typeof data === 'string' && data.trim()) return data
-  const messages = { PASSWORD_CHANGE_REQUIRED:'Для продолжения смените временный пароль.', REQUEST_IN_PROGRESS:'Бронирование уже обрабатывается. Проверьте историю заказов.', ROOM_ALREADY_BOOKED:'Этот номер уже занят на выбранные даты.', NO_AVAILABLE_ROOMS:'Нет свободных номеров на выбранные даты.', IDEMPOTENCY_KEY_CONFLICT:'Данные заказа изменились. Начните новое бронирование.', INVALID_CREDENTIALS:'Неверный email или пароль.' }
-  return messages[data?.code] || data?.message || data?.detail || ({400:'Проверьте введённые данные.',401:'Для продолжения войдите в аккаунт.',403:'Недостаточно прав для этой операции.',404:'Данные не найдены.',409:'Конфликт данных. Обновите страницу и повторите действие.',502:'Сервис временно недоступен.',503:'Сервис временно недоступен.'}[response.status]) || `Ошибка сервера (${response.status})`
+  if (data?.code === 'VALIDATION_ERROR' && data?.fieldErrors?.username) return USERNAME_RULES
+  const messages = { USERNAME_ALREADY_REGISTERED:'Этот логин уже занят. Выберите другой.', EMAIL_ALREADY_REGISTERED:'Этот email уже зарегистрирован.', PASSWORD_CHANGE_REQUIRED:'Для продолжения смените временный пароль.', REQUEST_IN_PROGRESS:'Бронирование уже обрабатывается. Проверьте историю заказов.', ROOM_ALREADY_BOOKED:'Этот номер уже занят на выбранные даты.', NO_AVAILABLE_ROOMS:'Нет свободных номеров на выбранные даты.', IDEMPOTENCY_KEY_CONFLICT:'Данные заказа изменились. Начните новое бронирование.', INVALID_CREDENTIALS:'Неверный email или пароль.', TOO_MANY_REQUESTS:'Слишком много запросов. Повторите попытку позже.' }
+  return messages[data?.code] || data?.message || data?.detail || ({400:'Проверьте введённые данные.',401:'Для продолжения войдите в аккаунт.',403:'Недостаточно прав для этой операции.',404:'Данные не найдены.',409:'Конфликт данных. Обновите страницу и повторите действие.',429:'Слишком много запросов. Повторите попытку позже.',502:'Сервис временно недоступен.',503:'Сервис временно недоступен.'}[response.status]) || `Ошибка сервера (${response.status})`
 }
 export async function request(path, { method='GET', body, auth=true, headers={}, signal }={}) {
   const controller = new AbortController()
@@ -32,7 +36,7 @@ export async function request(path, { method='GET', body, auth=true, headers={},
     if (!response.ok) {
       if (response.status===401 && auth && token) window.dispatchEvent(new Event('hotel:auth-expired'))
       if (response.status===403 && data?.code==='PASSWORD_CHANGE_REQUIRED' && auth && token) window.dispatchEvent(new Event('hotel:password-change-required'))
-      throw new ApiError(errorText(data, response), response.status, data?.code, response.headers.get('X-Trace-Id') || data?.traceId)
+      throw new ApiError(errorText(data, response), response.status, data?.code, response.headers.get('X-Trace-Id') || data?.traceId, parseRetryAfterSeconds(response.headers.get('Retry-After')))
     }
     return data
   } catch (err) {

@@ -5,6 +5,7 @@ import {
   RefreshCcw, ShieldCheck, Trash2, UsersRound, X,
 } from 'lucide-react'
 import { api } from '../api/client.js'
+import { USERNAME_HTML_PATTERN, USERNAME_RULES, usernameValidationMessage } from '../utils/username.js'
 import { Alert, Button, Empty, PageTitle, Spinner, PasswordInput, Pagination } from '../components/Shared.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useModalFocus } from '../utils/useModalFocus.js'
@@ -47,6 +48,11 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
   const setFailure = message => { setError(message); setBusy(false) }
 
   function validateUser() {
+    const validationError = usernameValidationMessage(data.username)
+    if (validationError) {
+      setError(validationError)
+      return false
+    }
     if (isCreate && (data.password.length < 8 || passwordByteLength(data.password) > 72)) {
       setError('Пароль должен содержать минимум 8 символов и не более 72 байт UTF-8.')
       return false
@@ -144,7 +150,7 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
               <div className="admin-users-form-grid">
                 <label>Имя *<input name="firstName" required maxLength={80} value={data.firstName} onChange={change} autoComplete="off"/></label>
                 <label>Фамилия *<input name="lastName" required maxLength={80} value={data.lastName} onChange={change} autoComplete="off"/></label>
-                <label>Имя пользователя *<input name="username" required minLength={3} maxLength={30} pattern="[A-Za-z][A-Za-z0-9._-]{2,29}" title="3–30 символов: латинские буквы, цифры, точка, дефис, подчёркивание. Первый символ — буква." value={data.username} onChange={change} autoComplete="off"/></label>
+                <label>Логин *<input name="username" required minLength={3} maxLength={30} pattern={USERNAME_HTML_PATTERN} title={USERNAME_RULES} value={data.username} onChange={change} onInvalid={e=>setError(usernameValidationMessage(e.currentTarget.value))} autoComplete="off"/><small className={data.username && usernameValidationMessage(data.username) ? 'username-field-error' : 'username-field-hint'}>{data.username && usernameValidationMessage(data.username) || USERNAME_RULES}</small></label>
                 <label>Email *<input name="email" type="email" required maxLength={255} value={data.email} onChange={change} autoComplete="off"/></label>
                 <label>Телефон (необязательно)<input name="phone" type="tel" placeholder="+374XXXXXXXX" pattern={"\\+[1-9][0-9]{7,14}"} title="Международный формат: + и 8–15 цифр" value={data.phone} onChange={change} autoComplete="off"/></label>
                 <label>Роль *<select name="role" value={data.role} onChange={change} disabled={isSelf} required><option value="USER">Пользователь (USER)</option><option value="ADMIN">Администратор (ADMIN)</option></select></label>
@@ -176,7 +182,7 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
           </form>}
           {mode === 'delete' && <div className="admin-users-delete-warning">
             <Trash2 size={24}/><div><h3>Удалить пользователя «{name}»?</h3>
-              <p>Операция необратима. Пользователя с историей бронирований удалить нельзя. Backend также запрещает удалять самого себя или последнего администратора.</p></div>
+              <p>Удаление необратимо. Нельзя удалить свою учётную запись, последнего администратора или пользователя, у которого есть история бронирований.</p></div>
           </div>}
         </div>
         <footer className="hotel-wizard-footer admin-users-dialog-footer">

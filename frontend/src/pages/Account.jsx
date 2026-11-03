@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, CheckCircle2, ChevronRight, CircleUserRound, MapPin, Search, Shield, KeyRound, UserRound } from 'lucide-react'
 import { api } from '../api/client.js'
+import { USERNAME_HTML_PATTERN, USERNAME_RULES, usernameValidationMessage } from '../utils/username.js'
+import { readLoginCooldown, clearLoginCooldown } from '../utils/loginRateLimit.js'
 import { cachedHotel, cachedRoom } from '../utils/detailCache.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Alert, Button, Empty, ImageBlock, PageTitle, Spinner, Status, PasswordInput, Pagination } from '../components/Shared.jsx'
@@ -9,10 +11,56 @@ import { RoomGallery, RoomPhotoImage } from '../components/RoomPhotos.jsx'
 import { HotelGallery } from '../components/HotelGallery.jsx'
 import { arrayOf, formatDate, formatMoney, fullName, getHotelId, nights, normalRoom, plusDays, validDates } from '../utils/format.js'
 
-export function AuthPage({mode='login'}){const {login,register,user,passwordChangeRequired}=useAuth();const navigate=useNavigate();const location=useLocation();const [form,setForm]=useState({email:'',password:'',username:'',firstName:'',lastName:''});const [error,setError]=useState('');const [saving,setSaving]=useState(false);const [passwordConfirmation,setPasswordConfirmation]=useState('')
+export function AuthPage({mode='login'}){
+ const {login,register,user,passwordChangeRequired}=useAuth()
+ const navigate=useNavigate()
+ const location=useLocation()
+ const [form,setForm]=useState({email:location.state?.email || '',password:'',username:'',firstName:'',lastName:''})
+ const [error,setError]=useState('')
+ const [saving,setSaving]=useState(false)
+ const [passwordConfirmation,setPasswordConfirmation]=useState('')
+ const [cooldown,setCooldown]=useState(()=>readLoginCooldown())
+ const [clock,setClock]=useState(Date.now())
+ useEffect(()=>{
+   if (!cooldown) return undefined
+   const timer=setInterval(()=>{
+     const now=Date.now()
+     setClock(now)
+     if(now>=cooldown.until){clearLoginCooldown();setCooldown(null)}
+   },1000)
+   return ()=>clearInterval(timer)
+ },[cooldown])
+ const waitSeconds=mode==='login' && cooldown ? Math.max(0,Math.ceil((cooldown.until-clock)/1000)) : 0
+ const rateLimited=waitSeconds>0
+ const limitMessage='Слишком много попыток входа. В целях безопасности вход временно ограничен.'
  if(user) return passwordChangeRequired ? <Navigate to="/change-password" replace/> : <div className="container section-space"><div className="auth-panel"><h2>Вы уже вошли в аккаунт</h2><Link className="btn btn-primary" to="/account">Личный кабинет <ArrowRight size={17}/></Link></div></div>
- async function submit(e){e.preventDefault();setSaving(true);setError('');try{if(mode==='register' && (form.password.length>64 || new TextEncoder().encode(form.password).length>72))throw new Error('Пароль: до 64 символов и до 72 байт UTF-8.');if(mode==='register' && form.password!==passwordConfirmation)throw new Error('Пароль и подтверждение не совпадают.');let signedIn;if(mode==='register'){await register(form);signedIn=await login(form.email,form.password)}else signedIn=await login(form.email,form.password);if(signedIn?.passwordChangeRequired){navigate('/change-password', {replace:true});return}navigate(location.state?.from ? `${location.state.from.pathname}${location.state.from.search || ''}` : '/account', {replace:true})}catch(err){setError(err.message)}finally{setSaving(false)}}
- return <div className="auth-area"><div className="auth-image"><div><span className="eyebrow">HOTEL BOOKING</span><h2>Ваше следующее путешествие начинается здесь</h2><p>Исследуйте новые направления и управляйте поездками в одном месте.</p></div></div><div className="auth-form-side"><div className="auth-panel"><Link to="/" className="back-link"><ArrowLeft size={17}/> На главную</Link><span className="eyebrow">{mode==='login'?'С ВОЗВРАЩЕНИЕМ':'НАЧНИТЕ ПУТЕШЕСТВИЕ'}</span><h1>{mode==='login'?'Вход в аккаунт':'Создать аккаунт'}</h1><p className="muted">{mode==='login'?'Войдите, чтобы управлять своими бронированиями.':'Зарегистрируйтесь, чтобы бронировать отели.'}</p><Alert error={error}/><Alert success={location.state?.passwordChanged ? "Пароль изменён. Войдите с новым паролем." : ""}/><form onSubmit={submit} className="form-stack">{mode==='register'&&<><div className="form-row"><label>Имя<input required maxLength="80" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} placeholder="Иван"/></label><label>Фамилия<input required maxLength="80" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} placeholder="Петров"/></label></div><label>Имя пользователя<input required minLength="3" maxLength="30" pattern="[A-Za-z][A-Za-z0-9._-]{2,29}" title="3–30 символов, латиница, цифры, точка, дефис или подчёркивание" autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="ivanpetrov"/></label></>}<label>Email<input type="email" required maxLength={255} autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="you@example.com"/></label><label>Пароль<PasswordInput required minLength={mode==='register'?8:1} maxLength={mode==='register'?64:undefined} autoComplete={mode==='register'?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Введите пароль"/></label>{mode==='register'&&<label>Подтвердите пароль<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={passwordConfirmation} onChange={e=>setPasswordConfirmation(e.target.value)} placeholder="Повторите пароль"/></label>}<Button type="submit" disabled={saving}>{saving?'Подождите...':mode==='register'?'Зарегистрироваться':'Войти'} <ArrowRight size={17}/></Button></form><div className="auth-switch">{mode==='login'?<>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></>:<>Уже зарегистрированы? <Link to="/login">Войти</Link></>}</div></div></div></div>
+ async function submit(e){
+   e.preventDefault()
+   if(saving || (mode==='login' && rateLimited)) return
+   setSaving(true)
+   setError('')
+   let registered=false
+   try{
+     if(mode==='register' && usernameValidationMessage(form.username))throw new Error(usernameValidationMessage(form.username))
+     if(mode==='register' && (form.password.length>64 || new TextEncoder().encode(form.password).length>72))throw new Error('Пароль: до 64 символов и до 72 байт UTF-8.')
+     if(mode==='register' && form.password!==passwordConfirmation)throw new Error('Пароль и подтверждение не совпадают.')
+     if(mode==='register'){await register(form);registered=true}
+     const signedIn=await login(form.email,form.password)
+     if(signedIn?.passwordChangeRequired){navigate('/change-password', {replace:true});return}
+     navigate(location.state?.from ? `${location.state.from.pathname}${location.state.from.search || ''}` : '/account', {replace:true})
+   }catch(err){
+     if(err.status===429 && registered){
+       navigate('/login',{replace:true,state:{registrationComplete:true,email:form.email}})
+     } else if(err.status===429 && mode==='login'){
+       setCooldown(readLoginCooldown())
+       setClock(Date.now())
+       setError(limitMessage)
+     } else {
+       setError(err.message)
+     }
+   }finally{setSaving(false)}
+ }
+ return <div className="auth-area"><div className="auth-image"><div><span className="eyebrow">HOTEL BOOKING</span><h2>Ваше следующее путешествие начинается здесь</h2><p>Исследуйте новые направления и управляйте поездками в одном месте.</p></div></div><div className="auth-form-side"><div className="auth-panel"><Link to="/" className="back-link"><ArrowLeft size={17}/> На главную</Link><span className="eyebrow">{mode==='login'?'С ВОЗВРАЩЕНИЕМ':'НАЧНИТЕ ПУТЕШЕСТВИЕ'}</span><h1>{mode==='login'?'Вход в аккаунт':'Создать аккаунт'}</h1><p className="muted">{mode==='login'?'Войдите, чтобы управлять своими бронированиями.':'Зарегистрируйтесь, чтобы бронировать отели.'}</p><Alert error={error || (rateLimited ? limitMessage : '')}/><Alert success={location.state?.passwordChanged ? 'Пароль изменён. Войдите с новым паролем.' : location.state?.registrationComplete ? 'Аккаунт создан. Вход временно ограничен, повторите попытку после окончания ожидания.' : ''}/>{rateLimited&&<p className="login-rate-limit-note" role="status">{cooldown.exact ? `Повторная попытка будет доступна через ${waitSeconds} с.` : 'Подождите примерно минуту перед следующей попыткой входа.'}</p>}<form onSubmit={submit} className="form-stack">{mode==='register'&&<><div className="form-row"><label>Имя<input required maxLength="80" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} placeholder="Иван"/></label><label>Фамилия<input required maxLength="80" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} placeholder="Петров"/></label></div><label>Логин<input required minLength="3" maxLength="30" pattern={USERNAME_HTML_PATTERN} title={USERNAME_RULES} autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} onInvalid={e=>setError(usernameValidationMessage(e.currentTarget.value))} placeholder="ivanpetrov"/><small className={form.username && usernameValidationMessage(form.username) ? 'username-field-error' : 'username-field-hint'}>{form.username && usernameValidationMessage(form.username) || USERNAME_RULES}</small></label></>}<label>Email<input type="email" required maxLength={255} autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="you@example.com"/></label><label>Пароль<PasswordInput required minLength={mode==='register'?8:1} maxLength={mode==='register'?64:undefined} autoComplete={mode==='register'?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Введите пароль"/></label>{mode==='register'&&<label>Подтвердите пароль<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={passwordConfirmation} onChange={e=>setPasswordConfirmation(e.target.value)} placeholder="Повторите пароль"/></label>}<Button type="submit" disabled={saving||rateLimited}>{saving?'Подождите...':rateLimited?(cooldown.exact?`Войти через ${waitSeconds} с`:'Вход временно ограничен'):mode==='register'?'Зарегистрироваться':'Войти'} {!rateLimited&&<ArrowRight size={17}/>}</Button></form><div className="auth-switch">{mode==='login'?<>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></>:<>Уже зарегистрированы? <Link to="/login">Войти</Link></>}</div></div></div></div>
 }
 /** Only screen allowed for an authenticated account that must replace its temporary password. */
 export function ForcedPasswordChangePage() {
@@ -43,7 +91,7 @@ export function ForcedPasswordChangePage() {
         navigate('/account',{replace:true})
       } catch {
         logout()
-        navigate('/login',{replace:true,state:{passwordChanged:true}})
+        navigate('/login',{replace:true,state:{passwordChanged:true,email:accountEmail}})
       }
     }catch(err){setError(err.message)}finally{setSaving(false)}
   }
@@ -306,6 +354,8 @@ export function AccountProfile() {
     setError('')
     setSuccess('')
     try {
+      const validationError = usernameValidationMessage(form.username)
+      if (validationError) throw new Error(validationError)
       await api.editMe(form)
       await refreshUser()
       setSuccess('Данные профиля обновлены.')
@@ -352,7 +402,7 @@ export function AccountProfile() {
           <label>Имя<input required maxLength={80} value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})}/></label>
           <label>Фамилия<input required maxLength={80} value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})}/></label>
         </div>
-        <label>Имя пользователя<input required minLength={3} maxLength={30} pattern="[A-Za-z][A-Za-z0-9._-]{2,29}" value={form.username} onChange={e=>setForm({...form,username:e.target.value})}/></label>
+        <label>Логин<input required minLength={3} maxLength={30} pattern={USERNAME_HTML_PATTERN} title={USERNAME_RULES} value={form.username} onChange={e=>{setForm({...form,username:e.target.value});setError('')}} onInvalid={e=>setError(usernameValidationMessage(e.currentTarget.value))}/><small className={form.username && usernameValidationMessage(form.username) ? 'username-field-error' : 'username-field-hint'}>{form.username && usernameValidationMessage(form.username) || USERNAME_RULES}</small></label>
         <label>Телефон<input type="tel" pattern="\+[1-9][0-9]{7,14}" title="Номер в международном формате: + и 8–15 цифр" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="+374 ..."/></label>
         <label>Email <span className="muted-inline">(используется для входа)</span><input value={user?.email||''} disabled/></label>
         <div className="profile-actions"><Button type="submit" disabled={saving}>{saving?'Сохраняем...':'Сохранить изменения'}</Button></div>

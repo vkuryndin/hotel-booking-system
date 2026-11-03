@@ -902,3 +902,12 @@
 .room-lightbox-thumbnails button{flex:0 0 100px;height:73px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer;background:#eff4fb}
 .room-lightbox-thumbnails button.selected{border-color:var(--blue)}
 .room-lightbox-thumbnails .photo-frame,.room-lightbox-thumbnails img{width:100%;height:100%;object-fit:cover}
+
+/* Username rules mirror the Booking Service DTO validation. */
+.username-field-hint,
+.username-field-error { display: block; font-size: 12px; line-height: 1.5; margin-top: 5px; font-weight: 400; }
+.username-field-hint { color: var(--muted, #687b9c); }
+.username-field-error { color: #c3343a; }
+
+/* Login rate limiter: visible feedback while another request is blocked. */
+.login-rate-limit-note { margin: 0 0 16px; font-size: 0.9rem; font-weight: 600; line-height: 1.55; color: var(--text-secondary, #5e6677); }
