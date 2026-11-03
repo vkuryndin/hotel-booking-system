@@ -1,6 +1,6 @@
 // Source: hotel-service/src/main/java/com/hotelbooking/hotel/entity/
 // HotelAmenity.java and RoomAmenity.java (backend enums).
-// Do not add values here without a matching backend enum constant.
+
 export const HOTEL_AMENITIES = Object.freeze([
   'WIFI', 'PARKING', 'POOL', 'GYM', 'RESTAURANT',
 ])

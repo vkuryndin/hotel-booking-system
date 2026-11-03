@@ -124,7 +124,7 @@ services:
       api-gateway:
         condition: service_started
     ports:
-      - "8080:80"
+      - "80:80"
     networks:
       - backend
     healthcheck:
