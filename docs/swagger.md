@@ -34,7 +34,7 @@
 
 ## Служебные маршруты
 
-`RoomReservationController` (подтверждение и освобождение слота) исключён из OpenAPI через `@Hidden`; операции предназначены для Booking Service, а не пользовательского клиента. `GET /api/users/token-status` реализован в Booking Service для Gateway и может отображаться в спецификации самого Booking Service, но внешний вызов через Gateway заблокирован. Такой маршрут нельзя использовать как публичную проверку JWT.
+`RoomReservationController` (подтверждение и освобождение слота) исключён из OpenAPI через `@Hidden`; операции предназначены для Booking Service, а не пользовательского клиента. `GET /api/users/token-status` реализован в Booking Service для Gateway и исключён из спецификации Booking Service через `@Hidden`. Внешний вызов через Gateway заблокирован: этот маршрут не предназначен для публичной проверки JWT.
 
 ## Проверка спецификаций
 

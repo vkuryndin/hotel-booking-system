@@ -1,6 +1,6 @@
 # Hotel Booking System
 
-Распределённая система бронирования отелей с REST API и React-клиентом. Backend реализован на Java 17, Spring Boot 4.1.1 и Spring Cloud. Система включает управление пользователями, отелями и номерами, подбор свободных номеров по датам и согласованное бронирование между микросервисами.
+Микросервисная система бронирования отелей с REST API и веб-интерфейсом на React. Backend реализован на Java 17, Spring Boot 4.1.1 и Spring Cloud. Система включает управление пользователями, отелями и номерами, поиск свободных номеров по датам и согласованное бронирование между микросервисами..
 
 ## Возможности
 
@@ -9,7 +9,8 @@
 - Ручной выбор номера (`autoSelect=false`) или автоподбор (`autoSelect=true`); `LEAST_BOOKED` по умолчанию и дополнительная стратегия `MOST_EXPENSIVE`. При автоподборе явно переданная `strategy` имеет приоритет над настройкой отеля.
 - Идемпотентное создание бронирований с `Idempotency-Key`, контроль конфликтов дат и защита от конкурентного бронирования.
 - Saga: подтверждение бронирования между Booking Service и Hotel Service, компенсация при сбоях, автоматическое и административное восстановление.
-- Корреляция `traceId`, обработка ошибок, Retry/Timeout/Circuit Breaker, unit/integration/E2E и нагрузочные сценарии.
+- Структурированное JSON-логирование во всех микросервисах, сквозная корреляция запросов по `traceId`, журналирование резервирования, подтверждения, отмены и компенсации Saga, а также Recovery.
+- Обработка ошибок, Retry/Timeout/Circuit Breaker, unit/integration/E2E и нагрузочные сценарии.
 
 ## Возможности сверх базового ТЗ
 
@@ -33,7 +34,9 @@
 | Данные | Spring Data JPA / Hibernate; независимые H2 in-memory; локальные `@Transactional` |
 | Безопасность | Spring Security Resource Server, JWT, `@PreAuthorize` |
 | Надёжность | Spring Retry (`@Retryable`), Resilience4j Circuit Breaker |
+| Логирование и трассировка | SLF4J, Logback, Logstash JSON Encoder, `traceId` |
 | Проверка | JUnit, Spring Test, MockMvc и E2E |
+| Статический анализ и форматирование | Checkstyle, SpotBugs, Spotless |
 
 ## Архитектура
 
@@ -64,6 +67,8 @@ flowchart TB
 
 Оба бизнес-сервиса используют **собственные** in-memory БД. Запросы клиентов направляются через Gateway (`/api/users/**`, `/api/bookings/**`, `/api/hotels/**`, `/api/rooms/**`). Защищённые внутренние операции `confirm-availability`/`release` не предназначены для внешнего использования и блокируются политикой Gateway. Подробности: [модули](docs/modules.md), [ADR-001](docs/adr/001-microservices.md), [ADR-002](docs/adr/002-security.md).
 
+**Оптимизация Service Discovery:** настройки Eureka Server и Eureka Client адаптированы для сокращения времени обнаружения изменений доступности сервисов после их перезапуска. Реестр обновляется периодически, поэтому восстановление взаимодействия не мгновенное.
+
 ## Требования к окружению
 
 - JDK 17 или совместимый JDK; установленный Java в `PATH`/`JAVA_HOME`.
@@ -81,7 +86,7 @@ flowchart TB
 | `JWT_KEYSTORE_PASSWORD` | Пароль хранилища |
 | `SERVICE_JWT_KEYSTORE_PATH` | Путь к отдельному PKCS#12 keystore для service JWT |
 | `SERVICE_JWT_KEYSTORE_PASSWORD` | Пароль служебного хранилища |
-| `GATEWAY_INTERNAL_SECRET` | Секрет доверенного взаимодействия Gateway/сервисов; согласовать значение между компонентами, которые его используют |
+| `GATEWAY_INTERNAL_SECRET` | Секрет доверенного взаимодействия Gateway/сервисов. Во всех компонентах, использующих эту переменную, должно быть установлено одинаковое значение. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Необязательная инициализация администратора |
 | `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` | Необязательные пароли демопользователей |
 
@@ -133,9 +138,7 @@ API Gateway проверяет JWT и добавляет служебный за
 | Hotel Service | `GATEWAY_INTERNAL_SECRET`, `APP_DEMO_ENABLED=true`, `HOTEL_PHOTOS_DIR=$PROJECT_DIR$/storage/hotels`; для фото номеров при необходимости добавьте в **VM options** `-Dapp.room-photos.directory=<абсолютный-путь>` |
 | Booking Service | `GATEWAY_INTERNAL_SECRET`, `JWT_KEYSTORE_PATH`, `JWT_KEYSTORE_PASSWORD`, `SERVICE_JWT_KEYSTORE_PATH`, `SERVICE_JWT_KEYSTORE_PASSWORD`, `APP_DEMO_ENABLED=true`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` |
 
-`GATEWAY_INTERNAL_SECRET` должен иметь **одно и то же значение** в Gateway, Hotel и Booking. `JWT_KEYSTORE_PATH` и `SERVICE_JWT_KEYSTORE_PATH` указывают на PKCS#12-файлы Booking Service; публичные сертификаты из этих хранилищ должны быть экспортированы и размещены в Gateway/Hotel Service, как показано выше. Пароли и сами секреты в README не приводятся. После настройки запускайте сервисы в порядке Eureka → Gateway → Hotel → Booking.
-
-**E2E All:** отдельная конфигурация **JUnit** для модуля `hotel-booking-system.booking-service.test`, с **JDK 17**, выбором **All in package** → `com.hotelbooking.booking.e2e`, **VM options** `-ea -Dhotel.e2e=true` и **Working directory** `$MODULE_WORKING_DIR$`. Четыре сервиса должны быть запущены. Подробности, в том числе сценарии Saga Fault и файл локальных ADMIN-параметров, приведены в [документации тестирования](docs/testing.md).
+`GATEWAY_INTERNAL_SECRET` должен иметь **одно и то же значение** в Gateway, Hotel и Booking. `JWT_KEYSTORE_PATH` и `SERVICE_JWT_KEYSTORE_PATH` указывают на PKCS#12-файлы Booking Service; публичные сертификаты из этих хранилищ должны быть экспортированы и размещены в Gateway/Hotel Service, как показано выше. После настройки запускайте сервисы в порядке Eureka → Gateway → Hotel → Booking.
 
 ## Сборка и запуск
 
@@ -204,7 +207,7 @@ chmod +x ./gradlew
 | Booking Service | `http://localhost:8081/swagger-ui.html` | `http://localhost:8081/v3/api-docs` |
 | Hotel Service | `http://localhost:8082/swagger-ui.html` | `http://localhost:8082/v3/api-docs` |
 
-Откройте Swagger UI, нажмите **Authorize** и вставьте JWT, полученный через `/api/users/login`. Регистрация и вход доступны без JWT. Служебные операции бронирования номеров исключены из публичной спецификации Hotel Service через `@Hidden`. Страницы Swagger открываются напрямую на портах соответствующих сервисов; защищённые REST-операции продолжают проверять авторизацию.
+Для работы с защищёнными API сначала выполните `POST /api/users/login`, указав логин и пароль. Полученный JWT вставьте через **Authorize** в Swagger UI. Запросы регистрации (`POST /api/users/register`) и входа (`POST /api/users/login`) не требуют предварительной авторизации. Служебные операции бронирования номеров исключены из публичной спецификации Hotel Service через `@Hidden`. Страницы Swagger открываются напрямую на портах соответствующих сервисов; защищённые REST-операции продолжают проверять авторизацию.
 
 ## Бронирование и согласованность
 
@@ -212,15 +215,10 @@ chmod +x ./gradlew
 sequenceDiagram
     actor U as Пользователь
     participant G as API Gateway
-    participant E as Eureka Server
     participant B as Booking Service
     participant H as Hotel Service
 
-    Note over G,H: Регистрация сервисов и обновление реестра Eureka выполняются независимо от бронирования
-    G->>E: Получение реестра сервисов
-    E-->>G: Адреса Booking и Hotel Service
-    B->>E: Получение реестра сервисов
-    E-->>B: Адрес Hotel Service
+    Note over G,H: Eureka обновляет реестр сервисов в фоне
 
     U->>G: POST /api/bookings + JWT + Idempotency-Key
     G->>B: GET /api/users/token-status (проверка JWT)
@@ -230,12 +228,12 @@ sequenceDiagram
     B->>H: POST /api/rooms/{id}/confirm-availability (service JWT)
 
     alt Резервация успешна
-        H-->>B: Подтверждение
+        H-->>B: 200 OK (RESERVED)
         B->>B: CONFIRMED
         B-->>G: 201 Created
         G-->>U: 201 Created
     else Сбой или отказ
-        opt Если резервация создана
+        opt Резервация создана или результат неизвестен
             B->>H: POST /api/rooms/{id}/release (компенсация)
             H-->>B: Результат освобождения
         end
@@ -257,7 +255,7 @@ sequenceDiagram
 .\gradlew.bat clean test
 ```
 
-**E2E-тестирование** выполняется через конфигурацию `E2E All` в IntelliJ IDEA при работающих Eureka Server, API Gateway, Hotel Service и Booking Service. Для изоляции повторных прогонов используется перезапуск сервисов со сбросом данных H2 in-memory.
+**E2E-тестирование** выполняется через конфигурацию `E2E All` в IntelliJ IDEA: тип **JUnit**, модуль `hotel-booking-system.booking-service.test`, **JDK 17**, **All in package** → `com.hotelbooking.booking.e2e`, **VM options** `-ea -Dhotel.e2e=true`, **Working directory** `$MODULE_WORKING_DIR$`. Перед запуском должны работать Eureka Server, API Gateway, Hotel Service и Booking Service. Для изоляции повторных прогонов полного набора рекомендуется перезапуск сервисов со сбросом данных H2 in-memory.
 
 Автоматизированные тесты охватывают:
 
@@ -268,9 +266,7 @@ sequenceDiagram
 - Подтверждение, компенсацию и восстановление Saga (Recovery).
 - Корректность учёта бронирований в `timesBooked`.
 
-Unit- и E2E-наборы выполняются раздельно; методика и условия их запуска описаны в `docs/testing.md`.
-
-Подробности: [тестирование](docs/testing.md).
+Модульные и интеграционные тесты запускаются вместе, E2E — отдельно. Подробности, включая сценарии Saga Fault и локальные ADMIN-параметры: [тестирование](docs/testing.md).
 
 ## Проверка качества кода
 
@@ -294,7 +290,7 @@ Unit- и E2E-наборы выполняются раздельно; метод�
 .\gradlew.bat spotlessApply
 ```
 
-`spotlessApply` изменяет Java-файлы, в том числе тесты и E2E, поэтому изменения следует проверить перед коммитом.
+`spotlessApply` изменяет Java-файлы
 
 ## Документация
 
@@ -305,8 +301,9 @@ Unit- и E2E-наборы выполняются раздельно; метод�
 - [Тестирование и демонстрация](docs/testing.md)
 - [Реестр ADR](docs/adr/README.md) — 7 архитектурных решений
 
-## Ограничения и эксплуатационные особенности
+## Ограничения учебного проекта
 
 - `H2 in-memory` и `ddl-auto: create-drop`: после рестарта содержимое БД теряется; это требование учебной версии.
 - Фотографии хранятся в локальной файловой системе. См. [ADR-007](docs/adr/007-photo-storage.md).
 - Локальные in-memory механизмы ограничения частоты запросов не являются распределённым лимитером на несколько экземпляров.
+- **Единая точка отказа при проверке JWT.** Актуальность токенов централизованно проверяется через Booking Service. При его недоступности API Gateway не может проверить, что токен не отозван, поэтому отклоняет защищённые запросы, включая обращения к работающему Hotel Service. Это осознанное архитектурное ограничение учебного проекта.

@@ -7,10 +7,10 @@
 | Группа | Классов | Объявлений тестовых методов |
 |---|---:|---:|
 | API Gateway | 3 | 17 |
-| Booking Service (локальные тесты) | 42 | 219 |
-| Hotel Service | 31 | 148 |
+| Booking Service (локальные тесты) | 42 | 221 |
+| Hotel Service | 31 | 149 |
 | E2E (Booking Service) | 14 | 118 |
-| **Всего** | **90** | **502** |
+| **Всего** | **90** | **505** |
 
 Классы `ExtendedE2ESupport` и `SagaE2ESupport` — вспомогательные. `UiDataSeedManualTest` — отдельная утилита для нагрузочного заполнения H2, она **не входит** в прогон JUnit. `@ParameterizedTest` может дать несколько фактических запусков из одного объявления; E2E пропускаются в обычном `clean test`, если не активирована системная опция.
 
@@ -27,7 +27,7 @@
 Набор проверяет создание и отмену бронирования, валидацию дат, права USER/ADMIN, обработку ошибок, ограничение частоты запросов, правила выбора номера, JPA-ограничения, блокировки, сценарии компенсации и восстановления, а также маршруты и OpenAPI. Проверки формата Java-кода выполняются отдельно:
 
 ```powershell
-.\gradlew.bat checkstyleMain spotbugsMain spotlessCheck
+.\gradlew.bat checkstyleMain spotbugsMain spotlessJavaCheck
 ```
 
 Checkstyle и SpotBugs анализируют код, Spotless проверяет форматирование. Задачи `checkstyleTest` и `spotbugsTest` проверяют тестовый код отдельно; E2E являются частью исходников `src/test/java` и могут попадать в анализ тестового кода.
@@ -61,7 +61,7 @@ password=<пароль администратора>
 
 Файл `test/manual/requests.http` предназначен для IntelliJ IDEA HTTP Client. Его начальные разделы выполняются последовательно на чистой H2 и сохраняют JWT/ID через `client.global`. Отдельные разделы проверяют нестандартные ошибки, отказы и ограничение частоты запросов. Сценарий входа ADMIN в файле также используется тестовой инфраструктурой E2E для чтения тестовых учётных данных.
 
-**Rate Limiting:** регистрация ограничена 5 попытками с IP за час (включая неуспешные), вход — 20 попытками с IP за минуту. Основной регрессионный прогон и дополнительные негативные проверки выполняются раздельно. В разделе 15 файла есть инструкции по паузам: для регистрации при исчерпании лимита ориентир — 61 минута или `Retry-After` + 2 секунды, для входа — 61 секунда или `Retry-After` + 2 секунды. Эти интервалы относятся к одному экземпляру Booking Service; отключать Rate Limiting для тестирования не требуется.
+**Rate Limiting:** регистрация ограничена 5 попытками с IP за час (включая неуспешные), вход — 20 попытками с IP за минуту. Основной регрессионный прогон и дополнительные негативные проверки выполняются раздельно. В разделе 13 файла есть инструкции по паузам: для регистрации при исчерпании лимита ориентир — 61 минута или `Retry-After` + 2 секунды, для входа — 61 секунда или `Retry-After` + 2 секунды. Эти интервалы относятся к одному экземпляру Booking Service; отключать Rate Limiting для тестирования не требуется.
 
 Разделы с отключением/перезапуском сервисов выполняются отдельно от основной последовательности; при повторном создании ресурсов используйте новые данные и Idempotency-Key либо очищенную H2.
 
@@ -98,10 +98,10 @@ password=<пароль администратора>
 
 `openCircuitBreakerDoesNotRetry`, `transientNetworkFailureStillRetriesTwice`.
 
-**`OpenApiErrorResponseTest` — 1**  
+**`OpenApiErrorResponseTest` — 3**  
 `booking-service/src/test/java/com/hotelbooking/booking/config/OpenApiErrorResponseTest.java`
 
-`centralizesErrorSchemasWithoutChangingResponseCodesOrSpecificDescriptions`.
+`centralizesErrorSchemasWithoutChangingResponseCodesOrSpecificDescriptions`, `errorResponseReferenceResolvesToSerializedSchemaWithActualFields`, `internalGatewayTokenStatusIsNotPublishedInSwagger`.
 
 **`RestClientConfigTest` — 2**  
 `booking-service/src/test/java/com/hotelbooking/booking/config/RestClientConfigTest.java`
@@ -321,10 +321,10 @@ password=<пароль администратора>
 
 `validServiceTokenIsAcceptedWithoutGatewayHeader`, `serviceTokenWithWrongAudienceIsDenied`, `serviceTokenWithWrongSubjectIsDenied`, `userJwtWithoutTrustedGatewayHeaderIsDenied`, `rejectedHotelRequestHasUniformErrorFieldsAndTraceId`, `userJwtWithCorrectGatewayHeaderIsAccepted`, `userJwtWithForgedGatewayHeaderIsDenied`.
 
-**`OpenApiErrorResponseTest` — 1**  
+**`OpenApiErrorResponseTest` — 2**  
 `hotel-service/src/test/java/com/hotelbooking/hotel/config/OpenApiErrorResponseTest.java`
 
-`centralizesErrorSchemasWithoutChangingResponseCodesOrSpecificDescriptions`.
+`centralizesErrorSchemasWithoutChangingResponseCodesOrSpecificDescriptions`, `errorResponseReferenceResolvesToSerializedSchemaWithActualFields`.
 
 **`HotelRoutesMvcTest` — 19**  
 `hotel-service/src/test/java/com/hotelbooking/hotel/controller/HotelRoutesMvcTest.java`

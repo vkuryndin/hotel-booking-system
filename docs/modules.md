@@ -2,15 +2,15 @@
 
 ## discovery-server (:8761)
 
-Spring Cloud Netflix Eureka Server — реестр адресов сервисов, регистрация инстансов, динамический поиск. Не содержит бизнес-операций бронирования. При старте другим приложениям необходимо время для регистрации.
+Spring Cloud Netflix Eureka Server — реестр адресов сервисов, регистрация инстансов, динамический поиск. Не содержит бизнес-операций бронирования. При старте другим приложениям необходимо время для регистрации. Для ускорения обновления списка доступных экземпляров отключён read-only cache реестра (`eureka.server.use-read-only-response-cache=false`); обнаружение изменений при этом остаётся периодическим.
 
 ## api-gateway (:8080)
 
-Spring Cloud Gateway Server WebFlux: маршрут `Path=/api/hotels/**,/api/rooms/**` к `lb://hotel-service`, `Path=/api/bookings/**,/api/users/**` к `lb://booking-service`. Использует Spring Security Resource Server. В конфигурациях/фильтрах учитываются внутренние секреты и трассировка; Gateway не является хранилищем пользователей. Внутренние POST-операции подтверждения и освобождения номера запрещены для публичного вызова.
+Spring Cloud Gateway Server WebFlux: маршрут `Path=/api/hotels/**,/api/rooms/**` к `lb://hotel-service`, `Path=/api/bookings/**,/api/users/**` к `lb://booking-service`. Использует Spring Security Resource Server: локально проверяет подпись и срок действия пользовательского JWT, затем через `GET /api/users/token-status` обращается к Booking Service для проверки актуальности токена (отзыв через `tokenVersion`/`tokenIdentity`). Если Booking Service недоступен, проверка завершается по принципу fail-closed: защищённые запросы отклоняются, включая запросы к Hotel Service. Gateway не хранит пользователей. В фильтрах также учитываются внутренние секреты и трассировка. Для более быстрого обновления маршрутизации задан интервал получения реестра Eureka 2 секунды и отключён кеш Spring Cloud LoadBalancer. Внутренние POST-операции подтверждения и освобождения номера запрещены для публичного вызова.
 
 ## booking-service (:8081)
 
-Spring MVC + Data JPA + Security: регистрация и логин, выдача JWT, администрирование пользователей, бронирования. `BookingService` координирует создание/отмену бронирований и Saga; `BookingQueryService` выполняет чтение, фильтрацию и пагинацию (с проверкой прав доступа); `BookingSagaStateService` управляет переходами состояний в локальных транзакциях, `HotelServiceClient` — HTTP-вызовами в Hotel Service, `BookingSagaRecoveryService`, `ManualBookingRecoveryService` и `ExhaustedSagaMonitor` — восстановлением зависших операций. Хранилище — `jdbc:h2:mem:bookingdb`.
+Spring MVC + Data JPA + Security: регистрация и логин, выдача JWT, администрирование пользователей, бронирования. `BookingService` координирует создание/отмену бронирований и Saga; `BookingQueryService` выполняет чтение, фильтрацию и пагинацию (с проверкой прав доступа); `BookingSagaStateService` управляет переходами состояний в локальных транзакциях, `HotelServiceClient` — HTTP-вызовами в Hotel Service, `BookingSagaRecoveryService`, `ManualBookingRecoveryService` и `ExhaustedSagaMonitor` — восстановлением зависших операций. Клиент Eureka в Booking Service получает обновления реестра каждые 2 секунды. Хранилище — `jdbc:h2:mem:bookingdb`.
 
 ## hotel-service (:8082)
 
@@ -21,4 +21,5 @@ Spring MVC + Data JPA + Security: регистрация и логин, выда
 - Booking Service — источник истины о пользовательских бронированиях и их жизненном цикле.
 - Hotel Service — источник истины о доступности слота номера на интервал дат; собственные резервирования и защита от гонок.
 - Глобальных транзакций XA/2PC нет: Saga координирует последовательность локальных операций, с повтором, компенсацией и восстановлением.
+- Во всех четырёх сервисах включено структурированное JSON-логирование в формате Logstash. Сквозной `traceId` связывает логи обработки запросов, межсервисных вызовов и операций Saga/Recovery.
 - Контракты REST и служебных операций приведены в `docs/api.md`; транзакционная согласованность и восстановление описаны в ADR-003 и ADR-006.
