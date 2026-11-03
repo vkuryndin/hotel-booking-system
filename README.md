@@ -90,7 +90,7 @@ flowchart TB
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Необязательная инициализация администратора |
 | `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` | Необязательные пароли демопользователей |
 
-**Каталоги фотографий (Hotel Service).** Переменная `HOTEL_PHOTOS_DIR` задаёт путь к фотографиям отелей; по умолчанию используется `storage/hotels` (`app.photos.directory` в `hotel-service/src/main/resources/application.yml`). Фотографии номеров используют отдельное свойство `app.room-photos.directory`, по умолчанию `storage/rooms`; его считывают `RoomPhotoService` и `DemoHotelsInitializer`. При необходимости другой каталог для номеров задаётся в VM options **Hotel Service**: `-Dapp.room-photos.directory=<абсолютный-путь>`. Оба относительных пути отсчитываются от рабочей директории процесса Hotel Service, а не Booking Service.
+**Каталоги фотографий (Hotel Service).** Переменная `HOTEL_PHOTOS_DIR` задаёт путь к фотографиям отелей; по умолчанию используется `storage/hotels` (`app.photos.directory` в `hotel-service/src/main/resources/application.yml`). Фотографии номеров используют отдельное свойство `app.room-photos.directory`, по умолчанию `storage/rooms`; его считывают `RoomPhotoService` и `DemoHotelsInitializer`. При необходимости другой каталог для номеров задаётся в VM options **Hotel Service**: `-Dapp.room-photos.directory=<абсолютный-путь>`. Оба относительных пути отсчитываются от рабочей директории процесса Hotel Service.
 
 Создать keystore можно утилитой JDK `keytool` (пример для тестовой среды):
 
@@ -99,7 +99,7 @@ keytool -genkeypair -alias jwt-signing -keyalg RSA -keysize 3072 -sigalg SHA256w
 keytool -genkeypair -alias service-jwt-signing -keyalg RSA -keysize 3072 -sigalg SHA256withRSA -storetype PKCS12 -keystore service-jwt.p12 -validity 365 -dname "CN=hotel-booking-service"
 ```
 
-`keytool` предложит пароль для каждого хранилища. Алиасы `jwt-signing` и `service-jwt-signing` должны совпадать с `app.jwt.keystore.alias` и `app.jwt.service-keystore.alias` в Booking Service. После создания новых ключей **обязательно экспортируйте их публичные X.509-сертификаты**, поскольку API Gateway и Hotel Service проверяют подписанные токены по файлам `.crt`, а не по приватным keystore:
+`keytool` предложит пароль для каждого хранилища. Алиасы `jwt-signing` и `service-jwt-signing` должны совпадать с `app.jwt.keystore.alias` и `app.jwt.service-keystore.alias` в Booking Service. После создания новых ключей **обязательно экспортируйте их публичные X.509-сертификаты**, поскольку API Gateway и Hotel Service проверяют подпись токенов с помощью публичных сертификатов `.crt` (приватные keystore используются только Booking Service):
 
 ```powershell
 # Выполняется из корня проекта, там же, где созданы user-jwt.p12 и service-jwt.p12
