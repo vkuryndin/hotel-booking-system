@@ -119,5 +119,4 @@ class HotelServiceCoverageUnitTest {
     verify(hotels).delete(hotel);
     verify(hotels).flush();
   }
-
 }

@@ -101,8 +101,7 @@ class HotelSearchServiceUnitTest {
 
   @Test
   void searchAcceptsTextQueryAndMultipleAmenities() {
-    when(hotels.findAll(any(Specification.class), any(Pageable.class)))
-        .thenReturn(Page.empty());
+    when(hotels.findAll(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
 
     assertTrue(
         service
