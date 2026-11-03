@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getPageWindow } from '../src/utils/paging.js'
 import { createPromiseCache } from '../src/utils/promiseCache.js'
-import { arrayOf, fullName, nights, normalRoom, statusName } from '../src/utils/format.js'
+import { accountLogin, arrayOf, fullName, nights, normalRoom, statusName } from '../src/utils/format.js'
 
 test('pagination stays within bounds for the first, middle and last pages',()=>{
   assert.deepEqual(getPageWindow(0,12).pages,[0,1,2,3,4])
@@ -50,4 +50,10 @@ test('booking DTO helpers tolerate missing fields and real status values',()=>{
   assert.equal(nights('2026-11-02','2026-11-05'),3)
   assert.equal(normalRoom({roomNumber:'101'}).number,'101')
   assert.equal(statusName('CANCELLING'),'Отмена выполняется')
+})
+
+test('navigation identifies the signed-in account by username, not first and last name',()=>{
+  assert.equal(accountLogin({username:'petya',firstName:'Petya',lastName:'Petya',email:'petya@example.com'}),'petya')
+  assert.equal(accountLogin({email:'petya@example.com'}),'petya@example.com')
+  assert.equal(accountLogin({id:42}),'Учётная запись #42')
 })

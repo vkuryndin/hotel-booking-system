@@ -24,6 +24,7 @@ export const statusName = value => ({ CONFIRMED: 'Подтверждено', CAN
 export const statusTone = value => value === 'CONFIRMED' ? 'success' : value === 'CANCELLED' ? 'danger' : 'warning'
 export const amenityNames = AMENITY_LABEL
 export const amenity = name => amenityNames[name] || String(name).replaceAll('_',' ').toLowerCase()
+export const accountLogin = user => user?.username?.trim() || user?.email?.trim() || (user?.id != null ? `Учётная запись #${user.id}` : 'Пользователь')
 export const fullName = user => [user?.firstName,user?.lastName].filter(Boolean).join(' ') || user?.username || user?.email?.split('@')[0] || 'Пользователь'
 export const normalRoom = room => ({...room, number: room?.number ?? room?.roomNumber ?? '—', category: room?.category ?? 'STANDARD', pricePerNight: room?.pricePerNight ?? 0})
 export const getHotelId = room => room?.hotelId ?? room?.hotel?.id

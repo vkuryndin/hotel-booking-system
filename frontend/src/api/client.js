@@ -97,6 +97,7 @@ export const api = {
   renameRoom: (id,number) => request(`/rooms/${id}`,{method:'PUT',body:{number}}),
   updateHotelIdentity: (id,name,address) => request(`/hotels/${id}`,{method:'PUT',body:{name,address}}),
   bookingsMy: query => request(`/bookings/my${query ? '?'+new URLSearchParams(query) : ''}`),
+  booking: id => request(`/bookings/${encodeURIComponent(id)}`),
   bookingsAdmin: query => request(`/bookings${query ? '?'+new URLSearchParams(query) : ''}`),
   createBooking: (data,key) => request('/bookings',{method:'POST',body:data,headers:{'Idempotency-Key':key}}),
   cancelBooking: id => request(`/bookings/${id}/cancel`, {method:'PATCH'}),

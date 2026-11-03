@@ -5,13 +5,14 @@ import { api } from '../api/client.js'
 import { cachedHotel, cachedRoom } from '../utils/detailCache.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Alert, Button, Empty, ImageBlock, PageTitle, Spinner, Status, PasswordInput, Pagination } from '../components/Shared.jsx'
-import { RoomPhotoImage } from '../components/RoomPhotos.jsx'
+import { RoomGallery, RoomPhotoImage } from '../components/RoomPhotos.jsx'
+import { HotelGallery } from '../components/HotelGallery.jsx'
 import { arrayOf, formatDate, formatMoney, fullName, getHotelId, nights, normalRoom, plusDays, validDates } from '../utils/format.js'
 
-export function AuthPage({mode='login'}){const {login,register,user,passwordChangeRequired}=useAuth();const navigate=useNavigate();const location=useLocation();const [form,setForm]=useState({email:'',password:'',username:'',firstName:'',lastName:''});const [error,setError]=useState('');const [saving,setSaving]=useState(false)
+export function AuthPage({mode='login'}){const {login,register,user,passwordChangeRequired}=useAuth();const navigate=useNavigate();const location=useLocation();const [form,setForm]=useState({email:'',password:'',username:'',firstName:'',lastName:''});const [error,setError]=useState('');const [saving,setSaving]=useState(false);const [passwordConfirmation,setPasswordConfirmation]=useState('')
  if(user) return passwordChangeRequired ? <Navigate to="/change-password" replace/> : <div className="container section-space"><div className="auth-panel"><h2>Вы уже вошли в аккаунт</h2><Link className="btn btn-primary" to="/account">Личный кабинет <ArrowRight size={17}/></Link></div></div>
- async function submit(e){e.preventDefault();setSaving(true);setError('');try{if(mode==='register' && (form.password.length>64 || new TextEncoder().encode(form.password).length>72))throw new Error('Пароль: до 64 символов и до 72 байт UTF-8.');let signedIn;if(mode==='register'){await register(form);signedIn=await login(form.email,form.password)}else signedIn=await login(form.email,form.password);if(signedIn?.passwordChangeRequired){navigate('/change-password', {replace:true});return}navigate(location.state?.from ? `${location.state.from.pathname}${location.state.from.search || ''}` : '/account', {replace:true})}catch(err){setError(err.message)}finally{setSaving(false)}}
- return <div className="auth-area"><div className="auth-image"><div><span className="eyebrow">HOTEL BOOKING</span><h2>Ваше следующее путешествие начинается здесь</h2><p>Исследуйте новые направления и управляйте поездками в одном месте.</p></div></div><div className="auth-form-side"><div className="auth-panel"><Link to="/" className="back-link"><ArrowLeft size={17}/> На главную</Link><span className="eyebrow">{mode==='login'?'С ВОЗВРАЩЕНИЕМ':'НАЧНИТЕ ПУТЕШЕСТВИЕ'}</span><h1>{mode==='login'?'Вход в аккаунт':'Создать аккаунт'}</h1><p className="muted">{mode==='login'?'Войдите, чтобы управлять своими бронированиями.':'Зарегистрируйтесь, чтобы бронировать отели.'}</p><Alert error={error}/><Alert success={location.state?.passwordChanged ? "Пароль изменён. Войдите с новым паролем." : ""}/><form onSubmit={submit} className="form-stack">{mode==='register'&&<><div className="form-row"><label>Имя<input required maxLength="80" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} placeholder="Иван"/></label><label>Фамилия<input required maxLength="80" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} placeholder="Петров"/></label></div><label>Имя пользователя<input required minLength="3" maxLength="30" pattern="[A-Za-z][A-Za-z0-9._-]{2,29}" title="3–30 символов, латиница, цифры, точка, дефис или подчёркивание" autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="ivanpetrov"/></label></>}<label>Email<input type="email" required maxLength={255} autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="you@example.com"/></label><label>Пароль<PasswordInput required minLength={mode==='register'?8:1} maxLength={mode==='register'?64:undefined} autoComplete={mode==='register'?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Введите пароль"/></label><Button type="submit" disabled={saving}>{saving?'Подождите...':mode==='register'?'Зарегистрироваться':'Войти'} <ArrowRight size={17}/></Button></form><div className="auth-switch">{mode==='login'?<>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></>:<>Уже зарегистрированы? <Link to="/login">Войти</Link></>}</div></div></div></div>
+ async function submit(e){e.preventDefault();setSaving(true);setError('');try{if(mode==='register' && (form.password.length>64 || new TextEncoder().encode(form.password).length>72))throw new Error('Пароль: до 64 символов и до 72 байт UTF-8.');if(mode==='register' && form.password!==passwordConfirmation)throw new Error('Пароль и подтверждение не совпадают.');let signedIn;if(mode==='register'){await register(form);signedIn=await login(form.email,form.password)}else signedIn=await login(form.email,form.password);if(signedIn?.passwordChangeRequired){navigate('/change-password', {replace:true});return}navigate(location.state?.from ? `${location.state.from.pathname}${location.state.from.search || ''}` : '/account', {replace:true})}catch(err){setError(err.message)}finally{setSaving(false)}}
+ return <div className="auth-area"><div className="auth-image"><div><span className="eyebrow">HOTEL BOOKING</span><h2>Ваше следующее путешествие начинается здесь</h2><p>Исследуйте новые направления и управляйте поездками в одном месте.</p></div></div><div className="auth-form-side"><div className="auth-panel"><Link to="/" className="back-link"><ArrowLeft size={17}/> На главную</Link><span className="eyebrow">{mode==='login'?'С ВОЗВРАЩЕНИЕМ':'НАЧНИТЕ ПУТЕШЕСТВИЕ'}</span><h1>{mode==='login'?'Вход в аккаунт':'Создать аккаунт'}</h1><p className="muted">{mode==='login'?'Войдите, чтобы управлять своими бронированиями.':'Зарегистрируйтесь, чтобы бронировать отели.'}</p><Alert error={error}/><Alert success={location.state?.passwordChanged ? "Пароль изменён. Войдите с новым паролем." : ""}/><form onSubmit={submit} className="form-stack">{mode==='register'&&<><div className="form-row"><label>Имя<input required maxLength="80" value={form.firstName} onChange={e=>setForm({...form,firstName:e.target.value})} placeholder="Иван"/></label><label>Фамилия<input required maxLength="80" value={form.lastName} onChange={e=>setForm({...form,lastName:e.target.value})} placeholder="Петров"/></label></div><label>Имя пользователя<input required minLength="3" maxLength="30" pattern="[A-Za-z][A-Za-z0-9._-]{2,29}" title="3–30 символов, латиница, цифры, точка, дефис или подчёркивание" autoComplete="username" value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="ivanpetrov"/></label></>}<label>Email<input type="email" required maxLength={255} autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="you@example.com"/></label><label>Пароль<PasswordInput required minLength={mode==='register'?8:1} maxLength={mode==='register'?64:undefined} autoComplete={mode==='register'?'new-password':'current-password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="Введите пароль"/></label>{mode==='register'&&<label>Подтвердите пароль<PasswordInput required minLength={8} maxLength={64} autoComplete="new-password" value={passwordConfirmation} onChange={e=>setPasswordConfirmation(e.target.value)} placeholder="Повторите пароль"/></label>}<Button type="submit" disabled={saving}>{saving?'Подождите...':mode==='register'?'Зарегистрироваться':'Войти'} <ArrowRight size={17}/></Button></form><div className="auth-switch">{mode==='login'?<>Нет аккаунта? <Link to="/register">Зарегистрироваться</Link></>:<>Уже зарегистрированы? <Link to="/login">Войти</Link></>}</div></div></div></div>
 }
 /** Only screen allowed for an authenticated account that must replace its temporary password. */
 export function ForcedPasswordChangePage() {
@@ -66,10 +67,11 @@ export function BookingPage(){const {hotelId}=useParams();const [params]=useSear
  function changeData(fn,value){fn(value);setKey(crypto.randomUUID());setError('')}
  async function submit(e){e.preventDefault();if(!validDates(checkIn,checkOut)){setError('Выберите корректные даты (1–365 ночей).');return}if(!autoSelect&&!room){setError('Не удалось подтвердить выбранный номер. Вернитесь к поиску.');return}setSaving(true);setError('');try{const data={checkIn,checkOut,guestCount:guests,...(autoSelect?{hotelId:Number(hotelId),autoSelect:true}:{roomId:Number(roomId)})};const booking=await api.createBooking(data,key);setResult(booking)}catch(err){setError(err.message);if(err.code!=='REQUEST_IN_PROGRESS'&&err.code!=='IDEMPOTENCY_KEY_CONFLICT'){/* keep key to safely retry same request */}}finally{setSaving(false)}}
  if(!ready)return <div className="container"><Spinner/></div>
- return <div className="container checkout-page"><div className="breadcrumbs"><Link to="/hotels">Каталог</Link><ChevronRight size={14}/><Link to={`/hotels/${hotelId}`}>{hotel?.name||'Отель'}</Link><ChevronRight size={14}/>Бронирование</div>{result?<div className="booking-success"><div className="success-icon"><CheckCircle2 size={48}/></div><h1>Бронирование подтверждено!</h1><p>Ваше бронирование #{result.id} успешно создано. Все детали доступны в личном кабинете.</p><div className="success-card"><span>Номер бронирования</span><b>#{result.id}</b><span>Статус</span><Status value={result.status}/><span>Номер комнаты</span><b>#{result.roomId||roomId||'назначен автоматически'}</b></div><div className="button-row"><Link className="btn btn-primary" to="/account/bookings">Мои бронирования <ArrowRight size={17}/></Link><Link className="btn btn-outline" to="/hotels">Продолжить поиск</Link></div></div>:<><PageTitle eyebrow="ПОЧТИ ГОТОВО" title="Оформление бронирования" subtitle="Проверьте детали поездки перед подтверждением."/><div className="checkout-steps"><span className="active">1 · Выбор номера</span><span className="active">2 · Детали поездки</span><span>3 · Подтверждение</span></div><div className="checkout-layout"><form className="checkout-main" onSubmit={submit}><div className="white-card"><h2>Ваш отель</h2><div className="selected-hotel">{room&&!autoSelect ? <RoomPhotoImage fallbackToHotel roomId={room.id} hotelId={hotelId} fallback={2}/> : <ImageBlock hotelId={hotelId} fallback={2}/>}<div><h3>{hotel?.name||`Отель #${hotelId}`}</h3><p><MapPin size={15}/>{hotel?.address||hotel?.city||'Адрес не указан'}</p><p>{room?`Номер ${room.number} · ${room.category}`:'Автоматический подбор номера'}</p></div></div></div><div className="white-card"><h2>Даты и гости</h2><div className="form-row"><label>Дата заезда<input type="date" min={plusDays(0)} value={checkIn} onChange={e=>changeData(setCheckIn,e.target.value)}/></label><label>Дата выезда<input type="date" min={checkIn} value={checkOut} onChange={e=>changeData(setCheckOut,e.target.value)}/></label></div><label>Количество гостей<select value={guests} onChange={e=>changeData(setGuests,Number(e.target.value))}>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></label></div><div className="white-card checkout-room-choice">
+ return <div className="container checkout-page"><div className="breadcrumbs"><Link to="/hotels">Каталог</Link><ChevronRight size={14}/><Link to={`/hotels/${hotelId}`}>{hotel?.name||'Отель'}</Link><ChevronRight size={14}/>Бронирование</div>{result?<div className="booking-success"><div className="success-icon"><CheckCircle2 size={48}/></div><h1>Бронирование подтверждено!</h1><p>Ваше бронирование #{result.id} успешно создано. Все детали доступны в личном кабинете.</p><div className="success-card"><span>Номер бронирования</span><b>#{result.id}</b><span>Статус</span><Status value={result.status}/><span>Номер комнаты</span><b>#{result.roomId||roomId||'назначен автоматически'}</b></div><div className="button-row"><Link className="btn btn-primary" to={`/account/bookings/${result.id}`}>Детали бронирования <ArrowRight size={17}/></Link><Link className="btn btn-outline" to="/account/bookings">Мои бронирования <ArrowRight size={17}/></Link><Link className="btn btn-outline" to="/hotels">Продолжить поиск</Link></div></div>:<><PageTitle eyebrow="ПОЧТИ ГОТОВО" title="Оформление бронирования" subtitle="Проверьте детали поездки перед подтверждением."/><div className="checkout-steps"><span className="active">1 · Выбор номера</span><span className="active">2 · Детали поездки</span><span>3 · Подтверждение</span></div><div className="checkout-layout"><form className="checkout-main" onSubmit={submit}><div className="white-card"><h2>Ваш отель</h2><div className="selected-hotel">{room&&!autoSelect ? <RoomPhotoImage fallbackToHotel roomId={room.id} hotelId={hotelId} fallback={2}/> : <ImageBlock hotelId={hotelId} fallback={2}/>}<div><h3>{hotel?.name||`Отель #${hotelId}`}</h3><p><MapPin size={15}/>{hotel?.address||hotel?.city||'Адрес не указан'}</p><p>{room?`Номер ${room.number} · ${room.category}`:'Автоматический подбор номера'}</p></div></div></div><div className="white-card"><h2>Даты и гости</h2><div className="form-row"><label>Дата заезда<input type="date" min={plusDays(0)} value={checkIn} onChange={e=>changeData(setCheckIn,e.target.value)}/></label><label>Дата выезда<input type="date" min={checkIn} value={checkOut} onChange={e=>changeData(setCheckOut,e.target.value)}/></label></div><label>Количество гостей<select value={guests} onChange={e=>changeData(setGuests,Number(e.target.value))}>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></label></div><div className="white-card checkout-room-choice">
    {roomId ? <>
      <div className="checkout-room-choice-heading"><h2>Выбранный номер</h2><Link className="btn btn-outline btn-small" to={`/hotels/${hotelId}?${new URLSearchParams({checkIn,checkOut,guests:String(guests)})}#rooms`}>Изменить номер <ArrowRight size={15}/></Link></div>
      <p className="checkout-selected-room"><CheckCircle2 size={18}/> Номер {room?.number || roomId}{room?.category ? ` · ${room.category}` : ''} выбран на предыдущем шаге.</p>
+     {room && <div className="checkout-room-gallery"><h3>Фотографии выбранного номера</h3><RoomGallery roomId={room.id} hotelId={hotelId} number={room.number}/></div>}
      <p className="muted smaller">При подтверждении брони используется именно этот номер. Автоматический подбор не включается.</p>
    </> : <>
      <h2>Автоматический подбор номера</h2>
@@ -135,14 +137,15 @@ export function BookingItem({booking,onCancel,cancelling=false}) {
 
   const canCancel=booking.status==='CONFIRMED'
   return <div className="booking-item">
-    <div className="booking-item-pic"><RoomPhotoImage fallbackToHotel roomId={booking.roomId || room?.id} hotelId={hotelId} fallback={booking.id||0} alt={room?.number ? `Номер ${room.number}` : hotel?.name || 'Фотография отеля'}/></div>
+    <Link to={`/account/bookings/${booking.id}`} className="booking-item-pic" aria-label={`Открыть бронирование #${booking.id}`}><RoomPhotoImage fallbackToHotel roomId={booking.roomId || room?.id} hotelId={hotelId} fallback={booking.id||0} alt={room?.number ? `Номер ${room.number}` : hotel?.name || 'Фотография отеля'}/></Link>
     <div className="booking-item-body">
-      <div className="booking-item-title"><h3>{hotel?.name||booking.hotelName||`Бронирование #${booking.id}`}</h3><Status value={booking.status}/></div>
+      <div className="booking-item-title"><h3><Link to={`/account/bookings/${booking.id}`}>{hotel?.name||booking.hotelName||`Бронирование #${booking.id}`}</Link></h3><Status value={booking.status}/></div>
       <p><CalendarDays size={15}/>{formatDate(booking.checkIn)} — {formatDate(booking.checkOut)}</p>
       <p><BedDouble size={15}/>Номер {room?.number||booking.roomNumber||booking.roomId||'—'} · {booking.guestCount||1} гост.</p>
       <small>Заказ #{booking.id}</small>
     </div>
     <div className="booking-item-actions">
+      <Link className="btn btn-outline btn-small" to={`/account/bookings/${booking.id}`}>Детали <ArrowRight size={15}/></Link>
       {booking.totalPrice!=null&&<strong>{formatMoney(booking.totalPrice)}</strong>}
       {canCancel&&onCancel&&<Button variant="danger-light" size="small" disabled={cancelling} onClick={()=>onCancel(booking)}>{cancelling?'Отменяем...':'Отменить'}</Button>}
       {hotelId&&<Link className="tiny-link" to={`/hotels/${hotelId}`}>Повторить поездку <ArrowRight size={14}/></Link>}
@@ -187,6 +190,97 @@ export function AccountBookings(){
  const tabs=[['ALL','Все'],['CONFIRMED','Подтверждённые'],['CANCELLED','Отменённые']]
  return <><PageTitle eyebrow="ИСТОРИЯ ПОЕЗДОК" title="Мои бронирования" subtitle="Все ваши поездки и их актуальный статус." action={<Link to="/hotels" className="btn btn-primary btn-small">Найти отель <ArrowRight size={16}/></Link>}/><div className="tab-row">{tabs.map(([value,label])=><button key={value} className={status===value?'active':''} onClick={()=>{setStatus(value);setBookingPage(0)}}>{label} <span>({counts[value]})</span></button>)}</div><Alert error={error} success={success}/>{loading?<Spinner/>:list.length?<div className="booking-list">{list.map(b=><BookingItem key={b.id} booking={b} onCancel={cancel} cancelling={cancelling===b.id}/>)}</div>:<Empty title={status==='CONFIRMED'?'Подтверждённых бронирований нет':status==='CANCELLED'?'Отменённых бронирований нет':'Бронирований пока нет'} text="Выберите отель, чтобы забронировать номер." action={<Link to="/hotels" className="btn btn-primary">Выбрать отель</Link>}/>} {!loading&&<Pagination page={bookingPage} totalPages={totalPages} onChange={setBookingPage}/>}</>
 }
+
+/** Booking Service enforces ownership on GET /api/bookings/{id}. */
+export function BookingDetailsPage() {
+  const {id} = useParams()
+  const [booking,setBooking] = useState(null)
+  const [room,setRoom] = useState(null)
+  const [hotel,setHotel] = useState(null)
+  const [photos,setPhotos] = useState([])
+  const [photoError,setPhotoError] = useState('')
+  const [loading,setLoading] = useState(true)
+  const [error,setError] = useState('')
+  const [success,setSuccess] = useState('')
+  const [cancelling,setCancelling] = useState(false)
+  const [revision,setRevision] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true);setError('');setBooking(null);setRoom(null);setHotel(null);setPhotos([]);setPhotoError('')
+    async function load() {
+      try {
+        if (!/^\d+$/.test(String(id))) throw Error('Некорректный номер бронирования.')
+        const data=await api.booking(id)
+        if (!active) return
+        setBooking(data)
+        if (!data.roomId) return
+        try {
+          const foundRoom=normalRoom(await cachedRoom(data.roomId))
+          if (!active) return
+          setRoom(foundRoom)
+          const hotelId=getHotelId(foundRoom)
+          if (hotelId) {
+            const [hotelResult,photosResult]=await Promise.allSettled([cachedHotel(hotelId),api.photos(hotelId)])
+            if (!active) return
+            if (hotelResult.status==='fulfilled') setHotel(hotelResult.value)
+            if (photosResult.status==='fulfilled') setPhotos(arrayOf(photosResult.value))
+            else setPhotoError(photosResult.reason?.message || 'Фотографии отеля недоступны.')
+          }
+        } catch {
+          // A deleted/unavailable room must not prevent opening its booking details.
+        }
+      } catch(err) { if(active) setError(err.message) }
+      finally {if(active) setLoading(false)}
+    }
+    load()
+    return () => {active=false}
+  },[id,revision])
+
+  async function cancelBooking() {
+    if (!window.confirm(`Отменить бронирование #${id}?`)) return
+    setCancelling(true);setError('');setSuccess('')
+    try {await api.cancelBooking(id);setSuccess('Бронирование отменено.');setRevision(n=>n+1)}
+    catch(err){setError(err.message)}
+    finally{setCancelling(false)}
+  }
+
+  const hotelId=getHotelId(room)
+  return <div className="booking-detail-page">
+    <div className="breadcrumbs"><Link to="/account/bookings"><ArrowLeft size={15}/> Мои бронирования</Link><ChevronRight size={14}/> Бронирование #{id}</div>
+    <PageTitle eyebrow="ДЕТАЛИ ПОЕЗДКИ" title={`Бронирование #${id}`} subtitle="Данные заказа и фотографии отеля и номера."/>
+    {success && <Alert success={success}/>} {error && <Alert error={error}/>} 
+    {loading ? <Spinner/> : booking ? <>
+      <section className="white-card booking-detail-summary">
+        <div className="booking-detail-heading"><div><h2>Информация о бронировании</h2><p className="muted">Заказ #{booking.id}</p></div><Status value={booking.status}/></div>
+        <dl className="booking-detail-facts">
+          <div><dt>Заезд</dt><dd>{formatDate(booking.checkIn)}</dd></div>
+          <div><dt>Выезд</dt><dd>{formatDate(booking.checkOut)}</dd></div>
+          <div><dt>Продолжительность</dt><dd>{nights(booking.checkIn,booking.checkOut)} ноч.</dd></div>
+          <div><dt>Количество гостей</dt><dd>{booking.guestCount}</dd></div>
+          <div><dt>Номер</dt><dd>{room ? `${room.number} · ${room.category}` : `ID #${booking.roomId || '—'}`}</dd></div>
+          <div><dt>Дата создания</dt><dd>{booking.createdAt ? new Date(booking.createdAt).toLocaleString('ru-RU') : '—'}</dd></div>
+        </dl>
+        {room?.pricePerNight!=null && <p className="muted smaller">Текущая цена номера: {formatMoney(room.pricePerNight)} за ночь. Итоговую стоимость исходного заказа Booking Service не возвращает.</p>}
+        {booking.status==='CONFIRMED' && <Button type="button" variant="danger-light" disabled={cancelling} onClick={cancelBooking}>{cancelling?'Отменяем...':'Отменить бронирование'}</Button>}
+      </section>
+      <div className="booking-detail-galleries">
+        <section className="white-card booking-detail-gallery-section">
+          <h2>Отель {hotel?.name || (hotelId ? `#${hotelId}` : '')}</h2>
+          {hotel?.address && <p className="muted"><MapPin size={16}/> {hotel.address}</p>}
+          {hotelId ? <HotelGallery hotelId={hotelId} hotelName={hotel?.name || `Отель #${hotelId}`} photos={photos} error={photoError}/> : <p className="muted">Не удалось определить отель по номеру. Сведения о бронировании доступны выше.</p>}
+          {hotelId && <Link className="text-link" to={`/hotels/${hotelId}`}>Открыть страницу отеля <ArrowRight size={16}/></Link>}
+        </section>
+        <section className="white-card booking-detail-gallery-section">
+          <h2>Номер {room?.number || booking.roomId || '—'}</h2>
+          {room?.category && <p className="muted">Категория: {room.category} · Вместимость: {room.capacity ?? '—'}</p>}
+          {booking.roomId ? <RoomGallery roomId={booking.roomId} hotelId={hotelId} number={room?.number || booking.roomId}/> : <p className="muted">Номер пока не определён.</p>}
+        </section>
+      </div>
+    </> : !error && <Empty title="Бронирование не найдено" text="Проверьте номер заказа или вернитесь к истории."/>}
+  </div>
+}
+
 export function AccountProfile() {
   const { user, refreshUser, logout, login } = useAuth()
   const navigate = useNavigate()

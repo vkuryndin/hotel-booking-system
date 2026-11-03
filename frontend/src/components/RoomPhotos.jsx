@@ -121,6 +121,16 @@ export function RoomGallery({ roomId, hotelId, number, compact = false }) {
   const [retry,setRetry] = useState(0)
   const modalRef = useModalFocus(open, () => setOpen(false))
   useEffect(() => {
+    if (!open || photos.length < 2) return
+    const onKey = event => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+      event.preventDefault()
+      setSelected(index => (index + (event.key === 'ArrowRight' ? 1 : -1) + photos.length) % photos.length)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open,photos.length])
+  useEffect(() => {
     let active = true
     setError('')
     setPhotos([])
@@ -133,13 +143,13 @@ export function RoomGallery({ roomId, hotelId, number, compact = false }) {
   }, [roomId,retry])
   const main = photos[selected] || photos[0]
   return <div className={`room-photo-gallery ${compact ? 'room-photo-gallery-compact' : ''}`}>
-    <button className="room-gallery-main hover-photo-zoom" type="button" title={photos.length ? 'Посмотреть фотографии номера' : 'Фотографии номера пока отсутствуют'} onClick={() => photos.length && setOpen(true)}>
+    <button className="room-gallery-main hover-photo-zoom" type="button" aria-label={photos.length ? `Открыть галерею фотографий номера ${number || roomId} (${photos.length} фото)` : `Нет фотографий номера ${number || roomId}`} title={photos.length ? 'Посмотреть фотографии номера' : 'Фотографии номера пока отсутствуют'} onClick={() => photos.length && setOpen(true)}>
       <RoomPhotoImage roomId={roomId} hotelId={hotelId} photoId={main?.id} alt={`Номер ${number || ''}`} />
-      {photos.length > 0 && <span className="room-gallery-count"><ImagePlus size={14} /> {photos.length} фото</span>}
+      {photos.length > 0 && <span className="room-gallery-count"><ImagePlus size={14} /> Смотреть фото ({photos.length})</span>}
     </button>
     {error && <div className="photo-retry" role="alert">Не удалось загрузить фотографии: {error} <Button size="small" variant="outline" onClick={()=>setRetry(v=>v+1)}>Повторить</Button></div>}
     {!compact && photos.length > 1 && <div className="room-gallery-thumbs">{photos.slice(0, 5).map((photo, i) => <button type="button" key={photo.id} className={selected === i ? 'selected' : ''} onClick={() => setSelected(i)} aria-label={`Фотография ${i + 1}`}><RoomPhotoImage roomId={roomId} photoId={photo.id} /></button>)}</div>}
-    {open && createPortal(<div className="room-lightbox" role="presentation" onClick={() => setOpen(false)}><div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Фотографии номера ${number || ''}`} className="room-lightbox-dialog" onClick={e => e.stopPropagation()}><div className="room-lightbox-header"><strong>Номер {number || roomId} · {selected + 1} из {photos.length}</strong><button type="button" onClick={() => setOpen(false)} aria-label="Закрыть"><X size={22}/></button></div><div className="room-lightbox-photo"><RoomPhotoImage roomId={roomId} photoId={main?.id}/></div>{photos.length > 1 && <div className="room-lightbox-controls"><Button type="button" variant="outline" onClick={() => setSelected(i => (i + photos.length - 1) % photos.length)}><ChevronLeft size={18}/> Назад</Button><Button type="button" variant="outline" onClick={() => setSelected(i => (i + 1) % photos.length)}>Вперёд <ChevronRight size={18}/></Button></div>}</div></div>, document.body)}
+    {open && createPortal(<div className="room-lightbox" role="presentation" onClick={() => setOpen(false)}><div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Фотографии номера ${number || ''}`} className="room-lightbox-dialog" onClick={e => e.stopPropagation()}><div className="room-lightbox-header"><strong>Номер {number || roomId} · {selected + 1} из {photos.length}</strong><button type="button" onClick={() => setOpen(false)} aria-label="Закрыть"><X size={22}/></button></div><div className="room-lightbox-photo"><RoomPhotoImage roomId={roomId} photoId={main?.id}/></div>{photos.length > 1 && <><div className="room-lightbox-controls"><Button type="button" variant="outline" onClick={() => setSelected(i => (i + photos.length - 1) % photos.length)}><ChevronLeft size={18}/> Назад</Button><Button type="button" variant="outline" onClick={() => setSelected(i => (i + 1) % photos.length)}>Вперёд <ChevronRight size={18}/></Button></div><div className="room-lightbox-thumbnails" aria-label="Выбрать фотографию номера">{photos.map((photo,i)=><button key={photo.id} type="button" className={i===selected?'selected':''} aria-label={`Фотография ${i+1} из ${photos.length}`} aria-pressed={i===selected} onClick={()=>setSelected(i)}><RoomPhotoImage roomId={roomId} photoId={photo.id} alt={`Миниатюра ${i+1}`}/></button>)}</div></>}</div></div>, document.body)}
   </div>
 }
 

@@ -866,3 +866,39 @@
  .hotel-picker-controls .btn { flex:0 0 auto; }
  .hotel-picker-controls label { flex-basis:100%; }
 }
+
+
+/* v12.10 — booking details, restored public room gallery, catalog availability wording. */
+.booking-detail-page{max-width:100%;min-width:0;padding-bottom:45px}
+.booking-detail-summary{margin-bottom:22px}
+.booking-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.booking-detail-heading h2{margin:0 0 4px}
+.booking-detail-heading p{margin:0}
+.booking-detail-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;margin:0 0 20px}
+.booking-detail-facts>div{min-width:0;border-top:1px solid var(--border);padding-top:13px}
+.booking-detail-facts dt{font-size:13px;color:var(--muted);margin-bottom:6px}
+.booking-detail-facts dd{margin:0;font-size:15px;font-weight:700;overflow-wrap:anywhere}
+.booking-detail-galleries{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.booking-detail-gallery-section{min-width:0}
+.booking-detail-gallery-section>h2{margin-bottom:12px}
+.booking-detail-gallery-section>p{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.booking-detail-gallery-section>.text-link{display:inline-flex;margin-top:16px}
+.booking-detail-gallery-section .hotel-gallery-showcase{height:280px}
+.booking-detail-gallery-section .room-gallery-main{min-height:255px;max-height:300px}
+.booking-detail-gallery-section .room-gallery-main .photo-frame{min-height:255px}
+.booking-detail-gallery-section .room-gallery-main .photo-frame img{max-height:300px}
+.checkout-room-gallery{max-width:390px;margin:18px 0 14px}
+.checkout-room-gallery h3{font-size:15px;margin:0 0 10px}
+.checkout-room-gallery .room-gallery-main{max-height:215px}
+.checkout-room-gallery .room-gallery-main .photo-frame{height:215px}
+.catalog-count{display:flex;flex-direction:column;gap:4px}
+.catalog-count small{font-size:13px;color:var(--muted)}
+.catalog-availability-note{display:flex;gap:10px;align-items:flex-start;background:#eff5ff;color:#48638b;border:1px solid #dbe8fc;border-radius:10px;padding:12px 15px;font-size:13px;line-height:1.6;margin:0 0 20px}
+.catalog-availability-note svg{flex:none;margin-top:2px}
+@media(max-width:980px){.booking-detail-galleries{grid-template-columns:1fr}.booking-detail-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.booking-detail-facts{grid-template-columns:1fr}.booking-detail-summary,.booking-detail-gallery-section{padding:18px}.checkout-room-gallery{max-width:100%}}
+
+.room-lightbox-thumbnails{display:flex;gap:9px;overflow-x:auto;padding:13px 0 4px;margin-top:7px}
+.room-lightbox-thumbnails button{flex:0 0 100px;height:73px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer;background:#eff4fb}
+.room-lightbox-thumbnails button.selected{border-color:var(--blue)}
+.room-lightbox-thumbnails .photo-frame,.room-lightbox-thumbnails img{width:100%;height:100%;object-fit:cover}

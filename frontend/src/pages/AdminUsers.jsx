@@ -27,6 +27,7 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
   })
   const [step, setStep] = useState(0)
   const [newPassword, setNewPassword] = useState('')
+  const [createConfirmation, setCreateConfirmation] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -48,6 +49,10 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
   function validateUser() {
     if (isCreate && (data.password.length < 8 || passwordByteLength(data.password) > 72)) {
       setError('Пароль должен содержать минимум 8 символов и не более 72 байт UTF-8.')
+      return false
+    }
+    if (isCreate && data.password !== createConfirmation) {
+      setError('Начальный пароль и подтверждение не совпадают.')
       return false
     }
     if (isSelf && data.role !== user.role) {
@@ -143,7 +148,7 @@ function UserDialog({ mode, user, currentUserId, onClose, onSuccess, onModeChang
                 <label>Email *<input name="email" type="email" required maxLength={255} value={data.email} onChange={change} autoComplete="off"/></label>
                 <label>Телефон (необязательно)<input name="phone" type="tel" placeholder="+374XXXXXXXX" pattern={"\\+[1-9][0-9]{7,14}"} title="Международный формат: + и 8–15 цифр" value={data.phone} onChange={change} autoComplete="off"/></label>
                 <label>Роль *<select name="role" value={data.role} onChange={change} disabled={isSelf} required><option value="USER">Пользователь (USER)</option><option value="ADMIN">Администратор (ADMIN)</option></select></label>
-                {isCreate && <label className="admin-users-wide">Начальный пароль *<PasswordInput name="password" required minLength={8} autoComplete="new-password" value={data.password} onChange={change}/><small>Не менее 8 символов, максимум 72 байта UTF-8. Пароль не отображается при проверке.</small></label>}
+                {isCreate && <><label className="admin-users-wide">Начальный пароль *<PasswordInput name="password" required minLength={8} autoComplete="new-password" value={data.password} onChange={change}/></label><label className="admin-users-wide">Подтвердите начальный пароль *<PasswordInput required minLength={8} autoComplete="new-password" value={createConfirmation} onChange={event => setCreateConfirmation(event.target.value)}/><small>Не менее 8 символов, до 72 байт UTF-8. Оба пароля должны совпадать. Пароль не отображается при проверке.</small></label></>}
               </div>
               {isSelf && <p className="admin-users-help"><ShieldCheck size={16}/> Изменение собственной роли запрещено backend.</p>}
               {isEdit && <p className="admin-users-password-note"><KeyRound size={16}/> Пароль не меняется вместе с данными профиля. Для другого пользователя используйте «Сбросить пароль». Для своего — «Мой профиль».</p>}
