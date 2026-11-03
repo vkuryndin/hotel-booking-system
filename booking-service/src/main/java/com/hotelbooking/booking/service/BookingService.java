@@ -4,10 +4,7 @@ import com.hotelbooking.booking.client.HotelServiceClient;
 import com.hotelbooking.booking.dto.client.HotelRoomResponse;
 import com.hotelbooking.booking.dto.request.BookingRequest;
 import com.hotelbooking.booking.dto.response.BookingResponse;
-import com.hotelbooking.booking.entity.Booking;
 import com.hotelbooking.booking.entity.BookingCreationOutcome;
-import com.hotelbooking.booking.entity.BookingStatus;
-import com.hotelbooking.booking.exception.BookingNotFoundException;
 import com.hotelbooking.booking.exception.BookingRequestValidationException;
 import com.hotelbooking.booking.exception.BookingSagaUnavailableException;
 import com.hotelbooking.booking.exception.HotelServiceUnavailableException;
@@ -15,10 +12,7 @@ import com.hotelbooking.booking.exception.NoAvailableRoomsException;
 import com.hotelbooking.booking.exception.RequestInProgressException;
 import com.hotelbooking.booking.exception.RoomAlreadyBookedException;
 import com.hotelbooking.booking.exception.RoomUnavailableException;
-import com.hotelbooking.booking.mapper.BookingMapper;
-import com.hotelbooking.booking.repository.BookingRepository;
 import jakarta.validation.Validator;
-import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -26,14 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.json.JsonMapper;
@@ -43,27 +30,22 @@ public class BookingService {
 
   private final HotelServiceClient hotelServiceClient;
 
-  private final BookingRepository bookingRepository;
-  private final BookingMapper bookingMapper;
-
   private static final JsonMapper HOTEL_ERROR_MAPPER = JsonMapper.builder().build();
   private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
   private final BookingSagaStateService sagaStateService;
+  private final BookingQueryService bookingQueryService;
   private final Validator validator;
 
   public BookingService(
       HotelServiceClient hotelServiceClient,
-      BookingRepository bookingRepository,
-      BookingMapper bookingMapper,
       BookingSagaStateService sagaStateService,
-      Validator validator) {
+      Validator validator,
+      BookingQueryService bookingQueryService) {
     this.hotelServiceClient = hotelServiceClient;
-    this.bookingRepository = bookingRepository;
-    this.bookingMapper = bookingMapper;
-
     this.sagaStateService = sagaStateService;
     this.validator = validator;
+    this.bookingQueryService = bookingQueryService;
   }
 
   private void validateDates(BookingRequest request) {
@@ -225,25 +207,11 @@ public class BookingService {
     throw new IllegalStateException("No room selection result");
   }
 
-  @Transactional(readOnly = true)
-  public BookingResponse getBookingById(Long bookingId, Long userId, boolean isAdmin) {
-    Booking booking =
-        bookingRepository
-            .findById(bookingId)
-            .orElseThrow(() -> new BookingNotFoundException(bookingId));
-
-    if (!isAdmin && !booking.getUserId().equals(userId)) {
-      throw new AccessDeniedException("Access denied to booking: " + bookingId);
-    }
-
-    return bookingMapper.toResponse(booking);
-  }
-
   public BookingResponse cancelBooking(Long bookingId, Long userId, boolean isAdmin) {
     var candidate = sagaStateService.startCancellation(bookingId, userId, isAdmin);
 
     if (candidate.isEmpty()) {
-      return getBookingById(bookingId, userId, isAdmin);
+      return bookingQueryService.getBookingById(bookingId, userId, isAdmin);
     }
 
     var booking = candidate.get();
@@ -276,50 +244,6 @@ public class BookingService {
         .addKeyValue("status", response.status().name())
         .log("Booking cancellation completed");
     return response;
-  }
-
-  @PreAuthorize("hasRole('ADMIN')")
-  @Transactional(readOnly = true)
-  public Page<BookingResponse> getAllBookings(BookingStatus status, Pageable pageable) {
-    Pageable pageRequest = bookingPageable(pageable);
-
-    Page<Booking> bookings =
-        status == null
-            ? bookingRepository.findAllByOrderByCreatedAtDesc(pageRequest)
-            : bookingRepository.findByStatusOrderByCreatedAtDesc(status, pageRequest);
-
-    return bookings.map(bookingMapper::toResponse);
-  }
-
-  @Transactional(readOnly = true)
-  public Page<BookingResponse> getMyBookings(Long userId, Pageable pageable) {
-    return getMyBookings(userId, null, pageable);
-  }
-
-  @Transactional(readOnly = true)
-  public Page<BookingResponse> getMyBookings(Long userId, BookingStatus status, Pageable pageable) {
-    return getMyBookings(userId, status, null, pageable);
-  }
-
-  @Transactional(readOnly = true)
-  public Page<BookingResponse> getMyBookings(
-      Long userId, BookingStatus status, LocalDate checkOutFrom, Pageable pageable) {
-    if (checkOutFrom != null && status != BookingStatus.CONFIRMED) {
-      throw new IllegalArgumentException("checkOutFrom requires CONFIRMED status");
-    }
-    Pageable pageRequest = bookingPageable(pageable);
-    Page<Booking> bookings;
-    if (checkOutFrom != null) {
-      bookings =
-          bookingRepository.findByUserIdAndStatusAndCheckOutGreaterThanEqualOrderByCreatedAtDesc(
-              userId, status, checkOutFrom, pageRequest);
-    } else if (status != null) {
-      bookings =
-          bookingRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status, pageRequest);
-    } else {
-      bookings = bookingRepository.findByUserIdOrderByCreatedAtDesc(userId, pageRequest);
-    }
-    return bookings.map(bookingMapper::toResponse);
   }
 
   private BookingResponse responseForRepeatedRequest(
@@ -393,15 +317,6 @@ public class BookingService {
 
     throw new BookingSagaUnavailableException(
         "Booking cancelled because reservation failed", error);
-  }
-
-  private Pageable bookingPageable(Pageable pageable) {
-    if (pageable.getPageSize() > 100) {
-      throw new IllegalArgumentException("Page size must not exceed 100");
-    }
-
-    return PageRequest.of(
-        pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "id"));
   }
 
   private String hotelConflictCode(RuntimeException error) {

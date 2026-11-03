@@ -85,10 +85,7 @@ class JwtRevocationFilterTest {
   @Test
   void rejectedRequestsHaveUniformJsonErrorAndTraceId() {
     assertErrorBody(
-        run(HttpMethod.GET, "/api/rooms", "USER", true, 401),
-        401,
-        "TOKEN_REVOKED",
-        "/api/rooms");
+        run(HttpMethod.GET, "/api/rooms", "USER", true, 401), 401, "TOKEN_REVOKED", "/api/rooms");
     assertErrorBody(
         run(HttpMethod.GET, "/api/hotels", "USER", true, 403),
         403,

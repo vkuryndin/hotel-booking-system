@@ -25,8 +25,6 @@ import com.hotelbooking.booking.exception.NoAvailableRoomsException;
 import com.hotelbooking.booking.exception.RequestInProgressException;
 import com.hotelbooking.booking.exception.RoomAlreadyBookedException;
 import com.hotelbooking.booking.exception.RoomUnavailableException;
-import com.hotelbooking.booking.mapper.BookingMapper;
-import com.hotelbooking.booking.repository.BookingRepository;
 import jakarta.validation.Validator;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -51,18 +49,16 @@ class BookingServiceSagaTest {
   private static final LocalDate OUT = LocalDate.of(2055, 7, 12);
 
   private HotelServiceClient hotel;
-  private BookingRepository repository;
-  private BookingMapper mapper;
   private BookingSagaStateService state;
+  private BookingQueryService queryService;
   private BookingService service;
 
   @BeforeEach
   void setUp() {
     hotel = mock(HotelServiceClient.class);
-    repository = mock(BookingRepository.class);
-    mapper = mock(BookingMapper.class);
     state = mock(BookingSagaStateService.class);
-    service = new BookingService(hotel, repository, mapper, state, mock(Validator.class));
+    queryService = mock(BookingQueryService.class);
+    service = new BookingService(hotel, state, mock(Validator.class), queryService);
   }
 
   private BookingRequest manual() {
@@ -256,6 +252,20 @@ class BookingServiceSagaTest {
     ordered.verify(hotel).releaseRoom(ROOM, RESERVATION);
     ordered.verify(state).finishCancellation(BOOKING);
     verify(hotel, never()).compensateRoom(anyLong(), any(UUID.class));
+  }
+
+  @Test
+  void repeatedCancellationLoadsExistingBookingWithoutCallingHotelAgain() {
+    BookingResponse response =
+        new BookingResponse(
+            BOOKING, USER, ROOM, IN, OUT, BookingStatus.CANCELLED, Instant.now(), 1);
+    when(state.startCancellation(BOOKING, USER, false)).thenReturn(Optional.empty());
+    when(queryService.getBookingById(BOOKING, USER, false)).thenReturn(response);
+
+    assertEquals(response, service.cancelBooking(BOOKING, USER, false));
+    verify(queryService).getBookingById(BOOKING, USER, false);
+    verifyNoInteractions(hotel);
+    verify(state, never()).finishCancellation(anyLong());
   }
 
   @Test

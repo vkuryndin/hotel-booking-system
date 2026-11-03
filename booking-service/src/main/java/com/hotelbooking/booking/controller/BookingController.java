@@ -3,6 +3,7 @@ package com.hotelbooking.booking.controller;
 import com.hotelbooking.booking.dto.request.BookingRequest;
 import com.hotelbooking.booking.dto.response.BookingResponse;
 import com.hotelbooking.booking.entity.BookingStatus;
+import com.hotelbooking.booking.service.BookingQueryService;
 import com.hotelbooking.booking.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,9 +39,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class BookingController {
 
   private final BookingService bookingService;
+  private final BookingQueryService bookingQueryService;
 
-  public BookingController(BookingService bookingService) {
+  public BookingController(BookingService bookingService, BookingQueryService bookingQueryService) {
     this.bookingService = bookingService;
+    this.bookingQueryService = bookingQueryService;
   }
 
   @Operation(
@@ -107,7 +110,7 @@ public class BookingController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
           LocalDate checkOutFrom) {
     Long userId = Long.valueOf(jwt.getSubject());
-    return bookingService.getMyBookings(userId, status, checkOutFrom, pageable);
+    return bookingQueryService.getMyBookings(userId, status, checkOutFrom, pageable);
   }
 
   @Operation(
@@ -132,7 +135,7 @@ public class BookingController {
       @CurrentSecurityContext(expression = "authentication") Authentication authentication) {
     Long userId = Long.valueOf(jwt.getSubject());
 
-    return bookingService.getBookingById(id, userId, isAdmin(authentication));
+    return bookingQueryService.getBookingById(id, userId, isAdmin(authentication));
   }
 
   @Operation(
@@ -186,7 +189,7 @@ public class BookingController {
           @RequestParam(required = false)
           BookingStatus status,
       @PageableDefault(size = 20) Pageable pageable) {
-    return bookingService.getAllBookings(status, pageable);
+    return bookingQueryService.getAllBookings(status, pageable);
   }
 
   private boolean isAdmin(Authentication authentication) {

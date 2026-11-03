@@ -26,6 +26,7 @@ import com.hotelbooking.hotel.service.HotelStatisticsService;
 import com.hotelbooking.hotel.service.RoomDetailsService;
 import com.hotelbooking.hotel.service.RoomPhotoService;
 import com.hotelbooking.hotel.service.RoomReservationService;
+import com.hotelbooking.hotel.service.RoomSearchService;
 import com.hotelbooking.hotel.service.RoomService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -89,6 +90,7 @@ class HotelRoutesMvcTest {
   @MockitoBean private HotelPresentationService presentationService;
   @MockitoBean private HotelStatisticsService statisticsService;
   @MockitoBean private RoomService roomService;
+  @MockitoBean private RoomSearchService roomSearchService;
   @MockitoBean private RoomDetailsService detailsService;
   @MockitoBean private RoomPhotoService roomPhotoService;
   @MockitoBean private RoomReservationService reservationService;

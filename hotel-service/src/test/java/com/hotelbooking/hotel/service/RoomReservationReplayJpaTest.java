@@ -132,10 +132,12 @@ class RoomReservationReplayJpaTest {
 
     String request =
         "{\"reservationId\":\"%s\",\"checkIn\":\"%s\",\"checkOut\":\"%s\",\"guestCount\":1}"
-            .formatted(id, IN, OUT) + "\n";
+                .formatted(id, IN, OUT)
+            + "\n";
     String otherGuestCount =
         "{\"reservationId\":\"%s\",\"checkIn\":\"%s\",\"checkOut\":\"%s\",\"guestCount\":2}"
-            .formatted(id, IN, OUT) + "\n";
+                .formatted(id, IN, OUT)
+            + "\n";
 
     mockMvc
         .perform(post(url).contentType(MediaType.APPLICATION_JSON).content(request))
@@ -155,7 +157,8 @@ class RoomReservationReplayJpaTest {
     LocalDate yesterday = LocalDate.now().minusDays(1);
     String request =
         "{\"reservationId\":\"%s\",\"checkIn\":\"%s\",\"checkOut\":\"%s\",\"guestCount\":1}"
-            .formatted(id, yesterday, yesterday.plusDays(2)) + "\n";
+                .formatted(id, yesterday, yesterday.plusDays(2))
+            + "\n";
 
     mockMvc
         .perform(

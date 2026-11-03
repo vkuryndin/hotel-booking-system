@@ -11,8 +11,6 @@ import com.hotelbooking.booking.dto.client.HotelRoomResponse;
 import com.hotelbooking.booking.dto.request.BookingRequest;
 import com.hotelbooking.booking.exception.NoAvailableRoomsException;
 import com.hotelbooking.booking.exception.RoomUnavailableException;
-import com.hotelbooking.booking.mapper.BookingMapper;
-import com.hotelbooking.booking.repository.BookingRepository;
 import jakarta.validation.Validator;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,10 +20,9 @@ import org.junit.jupiter.api.Test;
 
 class BookingValidationCoverageUnitTest {
   HotelServiceClient hotel = mock(HotelServiceClient.class);
-  BookingRepository repo = mock(BookingRepository.class);
-  BookingMapper mapper = mock(BookingMapper.class);
   BookingSagaStateService state = mock(BookingSagaStateService.class);
-  BookingService service = new BookingService(hotel, repo, mapper, state, mock(Validator.class));
+  BookingService service =
+      new BookingService(hotel, state, mock(Validator.class), mock(BookingQueryService.class));
   UUID key = UUID.fromString("90000000-0000-0000-0000-000000000001");
   LocalDate in = LocalDate.of(2055, 1, 1);
   LocalDate out = in.plusDays(2);

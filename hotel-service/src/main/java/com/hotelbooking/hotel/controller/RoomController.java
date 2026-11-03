@@ -6,6 +6,7 @@ import com.hotelbooking.hotel.dto.request.RoomUpdateRequest;
 import com.hotelbooking.hotel.dto.response.RoomResponse;
 import com.hotelbooking.hotel.entity.RoomAmenity;
 import com.hotelbooking.hotel.entity.RoomCategory;
+import com.hotelbooking.hotel.service.RoomSearchService;
 import com.hotelbooking.hotel.service.RoomService;
 import com.hotelbooking.hotel.strategy.RoomSelectionMode;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,9 +44,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoomController {
 
   private final RoomService roomService;
+  private final RoomSearchService roomSearchService;
 
-  public RoomController(RoomService roomService) {
+  public RoomController(RoomService roomService, RoomSearchService roomSearchService) {
     this.roomService = roomService;
+    this.roomSearchService = roomSearchService;
   }
 
   @Operation(
@@ -115,7 +118,7 @@ public class RoomController {
           String direction,
       @PageableDefault(size = 20) Pageable pageable) {
     return ResponseEntity.ok(
-        roomService.searchRooms(
+        roomSearchService.searchRooms(
             hotelId,
             category,
             minCapacity,
@@ -143,7 +146,7 @@ public class RoomController {
   @GetMapping("/{id}")
   public ResponseEntity<RoomResponse> getRoomById(
       @Parameter(description = "Идентификатор номера.") @PathVariable Long id) {
-    return ResponseEntity.ok(roomService.getRoomById(id));
+    return ResponseEntity.ok(roomSearchService.getRoomById(id));
   }
 
   @Operation(
@@ -193,7 +196,7 @@ public class RoomController {
   public ResponseEntity<Page<RoomResponse>> getAvailableRooms(
       @Parameter(description = "Идентификатор отеля.") @RequestParam Long hotelId,
       @PageableDefault(size = 20) Pageable pageable) {
-    return ResponseEntity.ok(roomService.getAvailableRoomsByHotelId(hotelId, pageable));
+    return ResponseEntity.ok(roomSearchService.getAvailableRoomsByHotelId(hotelId, pageable));
   }
 
   @Operation(

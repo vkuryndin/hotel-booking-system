@@ -17,8 +17,6 @@ import com.hotelbooking.booking.dto.response.BookingResponse;
 import com.hotelbooking.booking.entity.BookingCreationOutcome;
 import com.hotelbooking.booking.entity.BookingStatus;
 import com.hotelbooking.booking.exception.BookingRequestValidationException;
-import com.hotelbooking.booking.mapper.BookingMapper;
-import com.hotelbooking.booking.repository.BookingRepository;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import java.time.Instant;
@@ -38,11 +36,7 @@ class HistoricalIdempotencyReplayTest {
 
   private BookingService service(HotelServiceClient hotel, BookingSagaStateService state) {
     return new BookingService(
-        hotel,
-        mock(BookingRepository.class),
-        mock(BookingMapper.class),
-        state,
-        VALIDATORS.getValidator());
+        hotel, state, VALIDATORS.getValidator(), mock(BookingQueryService.class));
   }
 
   @Test

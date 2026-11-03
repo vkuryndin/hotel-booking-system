@@ -153,8 +153,7 @@ class JwtServiceTest {
     assertEquals("ADMIN", after.getClaimAsString("role"));
     Number previousVersion =
         (Number) java.util.Objects.requireNonNull(before.getClaim("tokenVersion"));
-    Number nextVersion =
-        (Number) java.util.Objects.requireNonNull(after.getClaim("tokenVersion"));
+    Number nextVersion = (Number) java.util.Objects.requireNonNull(after.getClaim("tokenVersion"));
     assertEquals(previousVersion.longValue() + 1, nextVersion.longValue());
     // Revocation of an otherwise valid old signature is enforced by UserTokenStateWebConfig.
     assertEquals("USER", decoder.decode(before.getTokenValue()).getClaimAsString("role"));
