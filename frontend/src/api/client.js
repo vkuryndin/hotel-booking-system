@@ -1,6 +1,6 @@
 import { USERNAME_RULES } from '../utils/username.js'
 import { parseRetryAfterSeconds } from '../utils/loginRateLimit.js'
-import { createBlobCache, createTaskQueue, createTimedCache, isTemporaryError, retryRead } from '../utils/resilience.js'
+import { REQUEST_TIMEOUT_MS, createBlobCache, createTaskQueue, createTimedCache, isTemporaryError, retryRead } from '../utils/resilience.js'
 
 const BASE = (import.meta.env?.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 const KEY = 'hotel_booking_token'
@@ -84,7 +84,11 @@ async function fetchOnce(path, { method, body, auth, headers, signal, timeoutMs 
   } catch (error) {
     if (error.name === 'AbortError') {
       if (signal?.aborted) throw error // Route changed; do not show an error or retry.
-      throw new ApiError('Время ожидания запроса истекло.', 0, timedOut ? 'REQUEST_TIMEOUT' : 'REQUEST_ABORTED')
+      if (!timedOut) throw error
+      const message = method.toUpperCase() === 'GET'
+        ? 'Сервер долго не отвечает. Попробуйте обновить данные позже.'
+        : 'Сервер долго не отвечает. Результат операции неизвестен — проверьте данные перед повторной отправкой.'
+      throw new ApiError(message, 0, 'REQUEST_TIMEOUT')
     }
     if (error instanceof TypeError) throw new ApiError('Нет соединения с API Gateway.', 0, 'NETWORK_ERROR')
     throw error
@@ -108,7 +112,7 @@ export async function request(path, { method = 'GET', body, auth = true, headers
     if (ttl) latestReadStart.set(path, serial)
     try {
       const execute = () => fetchOnce(path, { method, body, auth, headers, signal,
-        timeoutMs: isRead ? 12_000 : 20_000 })
+        timeoutMs: isRead ? REQUEST_TIMEOUT_MS.read : REQUEST_TIMEOUT_MS.write })
       // Writes are never retried: their result may have committed before the connection failed.
       const result = isRead
         ? await retryRead(() => readQueue.run(execute, signal), { signal })
@@ -145,7 +149,7 @@ export async function imageBlob(path, signal) {
     return retryRead(() => photoQueue.run(async () => {
       const controller = new AbortController()
       let timedOut = false
-      const timer = setTimeout(() => { timedOut = true; controller.abort() }, 16_000)
+      const timer = setTimeout(() => { timedOut = true; controller.abort() }, REQUEST_TIMEOUT_MS.image)
       const abortShared = () => controller.abort()
       if (sharedSignal.aborted) controller.abort()
       else sharedSignal.addEventListener('abort', abortShared, { once: true })
@@ -164,8 +168,8 @@ export async function imageBlob(path, signal) {
       } catch (error) {
         if (error.name === 'AbortError') {
           if (sharedSignal.aborted) throw error
-          throw new ApiError('Время загрузки фотографии истекло.', 0,
-            timedOut ? 'IMAGE_TIMEOUT' : 'IMAGE_ABORTED')
+          if (!timedOut) throw error
+          throw new ApiError('Фотография загружается слишком долго. Попробуйте повторить загрузку позже.', 0, 'IMAGE_TIMEOUT')
         }
         if (error instanceof TypeError) throw new ApiError('Не удалось загрузить фотографию.', 0, 'NETWORK_ERROR')
         throw error

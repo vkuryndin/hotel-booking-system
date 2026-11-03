@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createBlobCache, createTaskQueue, createTimedCache, retryRead } from '../src/utils/resilience.js'
+import { createBlobCache, createTaskQueue, createTimedCache, isRetryableReadError, REQUEST_TIMEOUT_MS, retryRead } from '../src/utils/resilience.js'
 
 const deferred = () => {
   let resolve, reject
@@ -134,4 +134,21 @@ test('photo cache TTL expires and refreshes a changed image', async () => {
   now = 100
   assert.equal((await cache.get('photo', fetch)).id, 2)
   assert.equal(calls, 2)
+})
+
+
+test('slow-server deadlines leave time for reads, writes and photos', () => {
+  assert.deepEqual(REQUEST_TIMEOUT_MS, { read: 60_000, write: 90_000, image: 60_000 })
+})
+
+test('a client-side timeout does not trigger more requests against the overloaded server', async () => {
+  let attempts = 0
+  const timeout = { status: 0, code: 'REQUEST_TIMEOUT' }
+  await assert.rejects(retryRead(async () => { attempts++; throw timeout }, {
+    sleep: async () => { throw Error('Unexpected retry') },
+  }), error => error === timeout)
+  assert.equal(attempts, 1)
+  assert.equal(isRetryableReadError({ status: 0, code: 'NETWORK_ERROR' }), true)
+  assert.equal(isRetryableReadError({ status: 503 }), true)
+  assert.equal(isRetryableReadError({ status: 0, code: 'IMAGE_TIMEOUT' }), false)
 })

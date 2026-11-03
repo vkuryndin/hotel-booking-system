@@ -1,4 +1,11 @@
 /** Small dependency-free primitives used by API and image reads. */
+// A slow EC2 instance can legitimately take longer than the original 12/16/20s.
+// Keep finite safety limits so abandoned requests cannot occupy browser slots forever.
+export const REQUEST_TIMEOUT_MS = Object.freeze({
+  read: 60_000,
+  write: 90_000,
+  image: 60_000,
+})
 export function abortError() {
   const error = new Error('Запрос отменён')
   error.name = 'AbortError'
@@ -18,13 +25,20 @@ export function isTemporaryError(error) {
   return error?.status === 0 || [502, 503, 504].includes(error?.status)
 }
 
+// A timed-out request might still be running on the server. Retrying it immediately
+// adds load to an already slow instance. It may still use explicitly labelled stale data.
+export function isRetryableReadError(error) {
+  return isTemporaryError(error) && !['REQUEST_TIMEOUT', 'IMAGE_TIMEOUT',
+    'REQUEST_ABORTED', 'IMAGE_ABORTED'].includes(error?.code)
+}
+
 /** Only call for idempotent reads. Never retry account changes or bookings here. */
 export async function retryRead(load, { retries = 2, signal, sleep = wait, jitter = Math.random } = {}) {
   for (let attempt = 0; ; attempt++) {
     if (signal?.aborted) throw abortError()
     try { return await load() }
     catch (error) {
-      if (signal?.aborted || error?.name === 'AbortError' || !isTemporaryError(error) || attempt >= retries) throw error
+      if (signal?.aborted || error?.name === 'AbortError' || !isRetryableReadError(error) || attempt >= retries) throw error
       // Backoff with jitter avoids a synchronized thundering herd after service recovery.
       await sleep(Math.min(1800, 400 * 2 ** attempt) + Math.floor(jitter() * 200), signal)
     }
