@@ -36,7 +36,9 @@ Checkstyle и SpotBugs анализируют код, Spotless проверяе�
 
 ## Сквозные E2E
 
-Для полного E2E-прогона должны работать четыре приложения: Eureka Server → API Gateway → Hotel Service → Booking Service. Они используют отдельные H2 in-memory базы и регистрируются в Eureka; после старта дождитесь доступности сервисов. Проверка выполняется через JUnit-конфигурацию IntelliJ IDEA:
+Для полного E2E-прогона должны работать четыре приложения: Eureka Server → API Gateway → Hotel Service → Booking Service. Они используют отдельные H2 in-memory базы и регистрируются в Eureka; после старта дождитесь доступности сервисов. Проверка выполняется отдельно от `clean test` через JUnit-конфигурацию IntelliJ IDEA.
+
+### Конфигурация `E2E All` в IntelliJ IDEA
 
 | Поле | Значение |
 |---|---|
