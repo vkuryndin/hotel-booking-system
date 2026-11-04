@@ -22,16 +22,18 @@ Spring MVC + Data JPA + Security: регистрация и логин, выда
 
 | Модуль / пакет | Основные классы | Назначение |
 |---|---|---|
-| `discovery-server` · `com.hotelbooking.discovery` | `DiscoveryServerApplication` | Запуск Eureka Server. |
-| `api-gateway` · `com.hotelbooking.gateway.config` | `GatewaySecurityConfig`, `GatewaySecretFilter`, `JwtRevocationFilter`, `TraceWebFilter` | Входная безопасность, контроль актуальности JWT, внутренние заголовки и `traceId`; маршруты задаются конфигурацией Gateway. |
-| `booking-service` · `com.hotelbooking.booking.controller` | `RegistrationController`, `LoginController`, `BookingController`, `AdminUserController` | HTTP-контракты регистрации, входа, бронирований и управления пользователями. |
-| `booking-service` · `com.hotelbooking.booking.service` | `BookingService`, `BookingQueryService`, `BookingSagaStateService`, `HotelServiceClient`, `BookingSagaRecoveryService` | Создание и чтение бронирований, состояния Saga, интеграция с Hotel Service и восстановление. |
-| `booking-service` · `com.hotelbooking.booking.security` / `.config` | `ServiceTokenProvider`, `SecurityConfig`, `JwtDecoderConfig`, `HotelCircuitBreakerConfig` | Служебные JWT, правила доступа, проверка JWT и защита вызовов Hotel Service. |
-| `booking-service` · `.entity` / `.repository` / `.mapper` | `Booking`, `AppUser`, `BookingRepository`, `AppUserRepository`, `BookingMapper` | JPA-модель, запросы к H2 и преобразование в DTO. |
-| `hotel-service` · `com.hotelbooking.hotel.controller` / `.service` | `RoomReservationController`, `HotelService`, `HotelSearchService`, `RoomService`, `RoomSearchService` | API резервирований, CRUD, поиск и пагинация отелей и номеров. |
-| `hotel-service` · `com.hotelbooking.hotel.strategy` | `RoomSelectionStrategy`, `LeastBookedStrategy`, `MostExpensiveStrategy` | Ранжирование подходящих номеров. |
-| `hotel-service` · `com.hotelbooking.hotel.service` | `RoomReservationService`, `HotelPhotoService`, `RoomPhotoService`, `PhotoFileOperations` | Защита занятости дат, работа с фотографиями и согласование файлов с транзакциями. |
-| `hotel-service` · `.entity` / `.repository` / `.mapper` | `Hotel`, `Room`, `HotelPhoto`, `RoomPhoto`, `HotelRepository`, `RoomRepository` | JPA-модель, метаданные фотографий и работа с H2. |
+| `discovery-server` · `com.hotelbooking.discovery` | `DiscoveryServerApplication` | Точка запуска Eureka Server и регистрация сервисов. |
+| `api-gateway` · `com.hotelbooking.gateway.config` | `GatewaySecurityConfig`, `GatewaySecretFilter`, `JwtRevocationFilter`, `TraceWebFilter` | Проверка доступа и актуальности JWT, доверенные заголовки, сквозной `traceId`. |
+| `booking-service` · `com.hotelbooking.booking.controller` | `RegistrationController`, `LoginController`, `BookingController`, `AdminUserController`, `BookingRecoveryAdminController` | Внешние API учётных записей и бронирований, управление пользователями и административное Recovery. |
+| `booking-service` · `com.hotelbooking.booking.service` | `BookingService`, `BookingQueryService`, `BookingSagaStateService`, `BookingSagaRecoveryService`, `ManualBookingRecoveryService`, `ExhaustedSagaMonitor` | Создание, поиск, переходы состояний Saga, фоновое и административное восстановление. |
+| `booking-service` · `com.hotelbooking.booking.client` | `HotelServiceClient` | Межсервисные REST-вызовы резервирования и освобождения номера. |
+| `booking-service` · `com.hotelbooking.booking.security` / `.config` | `ServiceTokenProvider`, `SecurityConfig`, `JwtDecoderConfig`, `HotelCircuitBreakerConfig` | Выпуск служебных JWT, авторизация и конфигурация отказоустойчивости. |
+| `booking-service` · `.entity` / `.repository` / `.mapper` | `Booking`, `AppUser`, `BookingRepository`, `AppUserRepository`, `BookingMapper` | JPA-сущности, доступ к Booking H2 и преобразование DTO. |
+| `hotel-service` · `com.hotelbooking.hotel.controller` | `RoomReservationController` | Служебный HTTP-контракт резервирования и освобождения номера. |
+| `hotel-service` · `com.hotelbooking.hotel.service` | `HotelService`, `HotelSearchService`, `RoomService`, `RoomSearchService`, `RoomReservationService` | CRUD, поиск, подбор, контроль пересечения дат и защита конкурентных резервирований. |
+| `hotel-service` · `com.hotelbooking.hotel.strategy` | `RoomSelectionStrategy`, `LeastBookedStrategy`, `MostExpensiveStrategy` | Стратегии ранжирования доступных номеров. |
+| `hotel-service` · `com.hotelbooking.hotel.service` | `HotelPhotoService`, `RoomPhotoService`, `PhotoFileOperations` | Хранение изображений, метаданные и компенсация файловых операций. |
+| `hotel-service` · `.entity` / `.repository` / `.mapper` | `Hotel`, `Room`, `HotelPhoto`, `RoomPhoto`, `HotelRepository`, `RoomRepository` | JPA-сущности и доступ к Hotel H2. |
 
 ## Межсервисные границы
 
