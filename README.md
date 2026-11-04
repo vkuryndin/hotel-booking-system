@@ -79,7 +79,7 @@ flowchart TB
 
 ## Настройка секретов
 
-Для Booking Service обязательны переменные окружения и параметры, перечисленные ниже (учётные данные демопользователей и администратора — необязательные):
+Для Booking Service необходимо настроить параметры JWT и межсервисный секрет. При локальном запуске через Gradle/IntelliJ IDEA `ADMIN_EMAIL` и `ADMIN_PASSWORD` можно не задавать **оба сразу** (тогда администратор при старте не создаётся); пароли демопользователей нужны при `APP_DEMO_ENABLED=true`. При запуске через Docker Compose **все четыре переменные** `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `DEMO_USER_1_PASSWORD` и `DEMO_USER_2_PASSWORD` обязательны **независимо от** `APP_DEMO_ENABLED`: в `compose.yaml` для них использована форма `${VARIABLE:?Required in .env}`, и без заданных значений Compose не запустит конфигурацию.
 
 | Имя | Назначение |
 |---|---|
@@ -88,8 +88,8 @@ flowchart TB
 | `SERVICE_JWT_KEYSTORE_PATH` | Путь к отдельному PKCS#12 keystore для service JWT |
 | `SERVICE_JWT_KEYSTORE_PASSWORD` | Пароль служебного хранилища |
 | `GATEWAY_INTERNAL_SECRET` | Секрет доверенного взаимодействия Gateway/сервисов. Во всех компонентах, использующих эту переменную, должно быть установлено одинаковое значение. |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Необязательная инициализация администратора |
-| `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` | Необязательные пароли демопользователей |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Создание администратора: при локальном запуске необязательная пара; в Docker Compose обязательны обе переменные |
+| `DEMO_USER_1_PASSWORD`, `DEMO_USER_2_PASSWORD` | Пароли демопользователей: локально нужны при включённых демоданных; в Docker Compose обязательны обе переменные |
 
 **Каталоги фотографий (Hotel Service).** Переменная `HOTEL_PHOTOS_DIR` задаёт путь к фотографиям отелей; по умолчанию используется `storage/hotels` (`app.photos.directory` в `hotel-service/src/main/resources/application.yml`). Фотографии номеров используют отдельное свойство `app.room-photos.directory`, по умолчанию `storage/rooms`; его считывают `RoomPhotoService` и `DemoHotelsInitializer`. При необходимости другой каталог для номеров задаётся в VM options **Hotel Service**: `-Dapp.room-photos.directory=<абсолютный-путь>`. Оба относительных пути отсчитываются от рабочей директории процесса Hotel Service.
 

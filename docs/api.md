@@ -147,6 +147,54 @@ Content-Type: application/json
 - Изменение профиля и пользователя администратором — частичные операции `PATCH`. Изменение собственной роли ADMIN и удаление последнего администратора ограничены.
 - Фотографии загружаются через `multipart/form-data`, поле `file`. Поддерживаются JPEG/PNG/WebP, до 5 МБ на файл и до 10 фотографий на объект. Выдача бинарного файла осуществляется `GET .../photos/{photoId}/file`, тип ответа соответствует изображению.
 
+## Примеры JSON-ответов
+
+Ниже приведены примеры **формата фактических DTO** из Booking Service. Значения идентификаторов, дат и персональных данных условные; JWT заменён заполнителем. При реальном вызове они будут другими.
+
+**Регистрация** — `POST /api/users/register`, `201 Created`, заголовок `Location: /api/users/1`. Возвращается `UserResponse`: регистрация создаёт пользователя, **но не выдаёт JWT**; для получения токена нужен отдельный запрос входа.
+
+```json
+{
+  "id": 1,
+  "email": "anna@example.com",
+  "username": "anna",
+  "phone": null,
+  "firstName": "Anna",
+  "lastName": "Petrova",
+  "role": "USER"
+}
+```
+
+**Вход** — `POST /api/users/login`, `200 OK`. Возвращается `LoginResponse`; `expiresIn` указан в секундах (при текущем `PT1H` — 3600).
+
+```json
+{
+  "accessToken": "<JWT>",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "passwordChangeRequired": false,
+  "username": "anna",
+  "firstName": "Anna",
+  "lastName": "Petrova",
+  "email": "anna@example.com"
+}
+```
+
+**Успешное бронирование** — `POST /api/bookings`, `201 Created`, заголовок `Location: /api/bookings/42`. Возвращается `BookingResponse`; в примере Saga завершилась подтверждением (`CONFIRMED`).
+
+```json
+{
+  "id": 42,
+  "userId": 1,
+  "roomId": 7,
+  "checkIn": "2027-04-10",
+  "checkOut": "2027-04-12",
+  "status": "CONFIRMED",
+  "createdAt": "2026-11-04T09:00:00Z",
+  "guestCount": 2
+}
+```
+
 ## Ответы и ошибки
 
 Успешное создание бронирования/отеля/номера возвращает `201 Created`; удаление отеля, номера или фотографии — `204 No Content`, удаление пользователя — `200 OK` с телом ответа, административный повтор Recovery — `202 Accepted`. Чтение и изменение обычно возвращают `200 OK`. Ответы поиска используют Spring Data `Page` (поля `content`, `totalElements`, `totalPages`, `number`, `size` и др.).
@@ -158,9 +206,9 @@ Content-Type: application/json
   "timestamp": "2026-11-03T09:00:00Z",
   "status": 409,
   "code": "ROOM_ALREADY_BOOKED",
-  "message": "Room is already booked for requested dates",
+  "message": "Room is already booked for selected dates: 7",
   "path": "/api/bookings",
-  "traceId": "example-trace-id"
+  "traceId": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
