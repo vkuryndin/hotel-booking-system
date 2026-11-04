@@ -53,6 +53,8 @@ bin/
 /storage/
 **/storage/
 
-# EC2 deployment secrets (never commit)
+# EC2 deployment secrets
 /.env
 /.secrets/
+
+/frontend/README.md
